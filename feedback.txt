@@ -1,0 +1,8 @@
+up right down left arrow input
+shuffle cards, so ordering matters
+text color/font color
+
+
+
+
+Stages/Levels -> 3 Stars, time based
