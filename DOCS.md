@@ -220,6 +220,15 @@ Renders the results panel with expected/actual answers and correctness badges.
 ### showFailure(reason)
 Shows a failure panel (used for platformer failure before recall).
 
+### getStageStars(elapsedSeconds, stage)
+Returns 0–3 stars based on elapsed seconds and the stage star targets.
+
+### saveStageStars(stage, stars)
+Persists the best star result for a stage.
+
+### showStageComplete(elapsedSeconds, stars, stage)
+Shows the stage completion summary with time and stars.
+
 ### handleEndlessStreakEnd()
 Resets streak/round when a streak ends in Endless mode.
 

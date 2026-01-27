@@ -30,6 +30,8 @@
     'data.js',
     'tutorial-mode.js',
     'endless-mode.js',
+    'stages-data.js',
+    'stages-mode.js',
     'app-core.js',
     'modifiers/background-color.js',
     'modifiers/misleading-colors.js',

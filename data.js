@@ -1,5 +1,5 @@
 const dataSets = {
-        numbers: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+        numbers: ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
         colors: [
           { label: "Red", color: "#ef4444" },
           { label: "Blue", color: "#3b82f6" },
@@ -11,7 +11,11 @@ const dataSets = {
           { label: "Brown", color: "#8b5e34" },
           { label: "Purple", color: "#8b5cf6" }
         ],
-        letters: ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"],
+        letters: [
+          "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
+          "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
+          "U", "V", "W", "X", "Y", "Z"
+        ],
         shapes: [
           { label: "Circle", shape: "circle" },
           { label: "Square", shape: "square" },

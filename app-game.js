@@ -22,6 +22,26 @@
         timerId = setInterval(tick, 100);
       }
 
+      function startStageStopwatch() {
+        if (!stageTimerPill) return;
+        if (stageTimerId) {
+          clearInterval(stageTimerId);
+        }
+        const startTime = stageState.startTime || performance.now();
+        stageTimerId = setInterval(() => {
+          const elapsedMs = performance.now() - startTime;
+          const seconds = (elapsedMs / 1000).toFixed(2);
+          stageTimerPill.textContent = `Time ${seconds}`;
+        }, 50);
+      }
+
+      function stopStageStopwatch() {
+        if (stageTimerId) {
+          clearInterval(stageTimerId);
+          stageTimerId = null;
+        }
+      }
+
       function setModalState(modal, open) {
         if (!modal) return;
         if (open) {
@@ -125,7 +145,7 @@
           !swapTimeoutId &&
           !(pausedState.swapRemaining && swapStartRecall)
         ) {
-          setTimer(Number(recallInput.value), "Recall", () => {
+          setTimer(getRecallSeconds(), "Recall", () => {
             checkAnswers();
           });
         }
@@ -249,6 +269,99 @@
         resultsPanel.classList.add("show");
       }
 
+      function showReviewFailure(entries, mode, swapOrder = null) {
+        document.body.classList.add("stage-fail");
+        const originalItems = roundItems;
+        const useSwapOrder =
+          Array.isArray(swapOrder) && swapOrder.length === roundItems.length && swapOrder.every(Number.isInteger);
+        if (useSwapOrder) {
+          roundItems = swapOrder.map((idx) => originalItems[idx]);
+        }
+        renderCards(true);
+        if (promptGrid) {
+          promptGrid.innerHTML = "";
+          entries.forEach((entry) => {
+            const prompt = document.createElement("div");
+            prompt.className = "card hidden-card hint";
+            prompt.textContent = entry.expected.label;
+            promptGrid.appendChild(prompt);
+          });
+        }
+        renderInputs();
+        roundItems = originalItems;
+        inputGrid.querySelectorAll("input").forEach((input) => {
+          const index = Number(input.dataset.index);
+          const entry = entries[index];
+          if (!entry) return;
+          input.value = entry.expected.answer;
+          input.disabled = true;
+          input.classList.toggle("answer-correct", entry.correct);
+          input.classList.toggle("answer-wrong", !entry.correct);
+        });
+        const buttons =
+          mode === "stages"
+            ? `<button id="stageRetryButton" class="secondary" type="button">Retry stage</button>
+               <button id="stageBackButton" class="secondary" type="button">Back to stages</button>`
+            : `<button id="practiceRetryButton" class="secondary" type="button">Retry round</button>
+               <button id="practiceBackButton" class="secondary" type="button">Back to menu</button>`;
+        resultsPanel.innerHTML = `
+          <div class="stage-complete">
+            <div class="stage-complete__header"></div>
+            <div class="stage-complete__actions">
+              ${buttons}
+            </div>
+          </div>
+        `;
+        resultsPanel.classList.add("show");
+      }
+
+      function getStageStars(elapsedSeconds, stage) {
+        const targets = window.getStageStarTargets ? window.getStageStarTargets(stage) : null;
+        if (!targets) return 0;
+        if (elapsedSeconds <= targets.gold) return 3;
+        if (elapsedSeconds <= targets.silver) return 2;
+        if (elapsedSeconds <= targets.bronze) return 1;
+        return 0;
+      }
+
+      function saveStageStars(stage, stars) {
+        if (!stage || !window.stageStars) return;
+        const key = stage.id ? String(stage.id) : String(stageState.index + 1);
+        const current = window.stageStars[key] || 0;
+        if (stars > current) {
+          window.stageStars[key] = stars;
+          if (window.saveStageStars) {
+            window.saveStageStars();
+          }
+        }
+      }
+
+      function showStageComplete(elapsedSeconds, stars, stage) {
+        stopStageStopwatch();
+        document.body.classList.remove("stage-fail");
+        cardGrid.innerHTML = "";
+        inputGrid.innerHTML = "";
+        const starText = "*".repeat(stars).padEnd(3, "-");
+        const stageName = stage && stage.name ? stage.name : `Stage ${stageState.index + 1}`;
+        resultsPanel.innerHTML = `
+          <div class="stage-complete">
+            <div class="stage-complete__header">
+              <strong>${stageName} complete!</strong>
+              <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s</div>
+            </div>
+            <div class="stage-complete__stars" aria-label="Stage stars">
+              <span class="stage-star${stars >= 1 ? " is-filled" : ""}"></span>
+              <span class="stage-star${stars >= 2 ? " is-filled" : ""}"></span>
+              <span class="stage-star${stars >= 3 ? " is-filled" : ""}"></span>
+            </div>
+            <div class="stage-complete__actions">
+              <button id="stageBackButton" class="secondary" type="button">Back to stages</button>
+            </div>
+          </div>
+        `;
+        resultsPanel.classList.add("show");
+      }
+
       function handleEndlessStreakEnd() {
         if (gameMode !== "endless") return;
         streak = 0;
@@ -264,6 +377,13 @@
 
       function checkAnswers() {
         if (phase !== "recall") return;
+        if (swapTimeoutId) {
+          clearTimeout(swapTimeoutId);
+          swapTimeoutId = null;
+          swapStartTime = null;
+          swapRemaining = null;
+          swapStartRecall = null;
+        }
         clearInterval(timerId);
         timerId = null;
         const platformerRequired = platformerState.required;
@@ -309,9 +429,86 @@
             startTutorialStep({ advanceRound: true });
             return;
           }
+          if (gameMode === "stages") {
+            const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+            const stageRounds = stage && stage.rounds ? stage.rounds : 1;
+            if (round >= stageRounds) {
+              stageState.completed = true;
+              stageState.failed = false;
+              stageState.elapsedMs = performance.now() - (stageState.startTime || performance.now());
+              const elapsedSeconds = stageState.elapsedMs / 1000;
+              const stars = getStageStars(elapsedSeconds, stage);
+              stageState.lastStars = stars;
+              saveStageStars(stage, stars);
+              lockInputs(true);
+              renderCards(true);
+              showStageComplete(elapsedSeconds, stars, stage);
+              if (submitBtn) {
+                submitBtn.disabled = true;
+              }
+              if (nextBtn) {
+                nextBtn.disabled = false;
+                nextBtn.textContent = "Back to stages";
+              }
+              setPhase("Stage complete", "result");
+              updateScore();
+              return;
+            }
+            startRound();
+            return;
+          }
           streak += 1;
           updateScore();
           startRound();
+          return;
+        }
+        if (gameMode === "stages") {
+          lockInputs(true);
+          const swapOrder = swapMap ? swapMap.slice() : null;
+          swapActive = false;
+          swapPair = null;
+          swapMap = null;
+          if (swapCleanup) {
+            swapCleanup();
+            swapCleanup = null;
+          }
+          showReviewFailure(entries, "stages", swapOrder);
+          if (submitBtn) {
+            submitBtn.disabled = true;
+          }
+          if (nextBtn) {
+            nextBtn.disabled = false;
+            nextBtn.textContent = "Retry stage";
+          }
+          stageState.failed = true;
+          stageState.completed = false;
+          stageState.active = false;
+          stopStageStopwatch();
+          streak = 0;
+          setPhase("Round complete", "result");
+          updateScore();
+          return;
+        }
+        if (gameMode === "practice") {
+          lockInputs(true);
+          const swapOrder = swapMap ? swapMap.slice() : null;
+          swapActive = false;
+          swapPair = null;
+          swapMap = null;
+          if (swapCleanup) {
+            swapCleanup();
+            swapCleanup = null;
+          }
+          showReviewFailure(entries, "practice", swapOrder);
+          if (submitBtn) {
+            submitBtn.disabled = true;
+          }
+          if (nextBtn) {
+            nextBtn.disabled = true;
+          }
+          streak = 0;
+          setPhase("Round complete", "result");
+          updateScore();
           return;
         }
         lockInputs(true);
@@ -331,7 +528,13 @@
           nextBtn.disabled = false;
         }
         if (nextBtn) {
-          nextBtn.textContent = gameMode === "tutorial" ? "Retry" : "Next round";
+          if (gameMode === "tutorial") {
+            nextBtn.textContent = "Retry";
+          } else if (gameMode === "stages") {
+            nextBtn.textContent = "Retry stage";
+          } else {
+            nextBtn.textContent = "Next round";
+          }
         }
         if (gameMode === "endless") {
           handleEndlessStreakEnd();
@@ -397,13 +600,40 @@
           platformerState.failed = true;
           lockInputs(true);
           renderCards(true);
-          showFailure("Platformer failed");
           if (submitBtn) {
             submitBtn.disabled = true;
           }
+          if (nextBtn) {
+            nextBtn.disabled = false;
+            if (gameMode === "stages") {
+              nextBtn.textContent = "Retry stage";
+            } else {
+              nextBtn.textContent = "Next round";
+            }
+          }
           if (gameMode === "endless") {
             handleEndlessStreakEnd();
+          } else if (gameMode === "stages") {
+            const entries = roundItems.map((item) => ({
+              expected: buildExpectedLabel(item),
+              actual: "",
+              correct: false
+            }));
+            stageState.failed = true;
+            stageState.completed = false;
+            stageState.active = false;
+            stopStageStopwatch();
+            streak = 0;
+            showReviewFailure(entries, "stages");
+          } else if (gameMode === "practice") {
+            const entries = roundItems.map((item) => ({
+              expected: buildExpectedLabel(item),
+              actual: "",
+              correct: false
+            }));
+            showReviewFailure(entries, "practice");
           } else {
+            showFailure("Platformer failed");
             streak = 0;
           }
           setPhase("Round complete", "result");
@@ -439,7 +669,7 @@
           }
           setPhase("Type what you saw", "recall");
           focusFirstInput();
-          setTimer(Number(recallInput.value), "Recall", () => {
+          setTimer(getRecallSeconds(), "Recall", () => {
             checkAnswers();
           });
         };
@@ -473,6 +703,24 @@
         if (gameMode === "tutorial") {
           startTutorialStep({ advanceRound });
           return;
+        }
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (!stage) {
+            setPhase("No stages configured", "idle");
+            return;
+          }
+          if (!stageState.active) {
+            stageState.active = true;
+            stageState.startTime = performance.now();
+            stageState.completed = false;
+            stageState.failed = false;
+            startStageStopwatch();
+          }
+          const stageRounds = stage.rounds || 1;
+          if (advanceRound && round >= stageRounds) {
+            return;
+          }
         }
         const nextRound = advanceRound ? round + 1 : round;
         const categories = getActiveCategories(nextRound);
