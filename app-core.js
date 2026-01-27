@@ -5,6 +5,13 @@ const revealInput = document.getElementById("revealTime");
       const playStart = document.getElementById("playStart");
       const referenceOpen = document.getElementById("referenceOpen");
       const fullscreenToggle = document.getElementById("fullscreenToggle");
+      const stagesOpen = document.getElementById("stagesOpen");
+      const stagesScreen = document.getElementById("stagesScreen");
+      const stagesBack = document.getElementById("stagesBack");
+      const stagesPrev = document.getElementById("stagesPrev");
+      const stagesNext = document.getElementById("stagesNext");
+      const stagesFooter = document.getElementById("stagesFooter");
+      const stageList = document.getElementById("stageList");
       const submitBtn = document.getElementById("submitBtn");
       const nextBtn = document.getElementById("nextBtn");
       const practiceModal = document.getElementById("practiceModal");
@@ -42,6 +49,7 @@ const revealInput = document.getElementById("revealTime");
       const modeSelect = document.getElementById("modeSelect");
       const phasePill = document.getElementById("phasePill");
       const timerPill = document.getElementById("timerPill");
+      const stageTimerPill = document.getElementById("stageTimerPill");
       const timerBar = document.getElementById("timerBar");
       const timerFill = document.getElementById("timerFill");
       const modePill = document.getElementById("modePill");
@@ -50,6 +58,7 @@ const revealInput = document.getElementById("revealTime");
       const scorePill = document.getElementById("scorePill");
       const livesPill = document.getElementById("livesPill");
       const cardGrid = document.getElementById("cardGrid");
+      const promptGrid = document.getElementById("promptGrid");
       const inputGrid = document.getElementById("inputGrid");
       const resultsPanel = document.getElementById("resultsPanel");
       const tutorialMessage = document.getElementById("tutorialMessage");
@@ -70,6 +79,7 @@ const revealInput = document.getElementById("revealTime");
       let gameMode = "practice";
       let pausedState = null;
       let timerState = null;
+      let stageTimerId = null;
       const platformerState = {
         enabled: false,
         completed: false,
@@ -107,6 +117,16 @@ const revealInput = document.getElementById("revealTime");
         currentStep: null,
         completed: false
       };
+      const stageState = {
+        active: false,
+        index: 0,
+        startTime: null,
+        elapsedMs: 0,
+        completed: false,
+        failed: false,
+        lastStars: 0,
+        page: 0
+      };
       let dragSelecting = false;
       let dragTargetState = null;
       function getSelectedCategories() {
@@ -122,6 +142,13 @@ const revealInput = document.getElementById("revealTime");
           }
           return ["numbers"];
         }
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (window.getStageCategories) {
+            return window.getStageCategories(stage);
+          }
+          return ["numbers"];
+        }
         return getSelectedCategories();
       }
 
@@ -129,6 +156,21 @@ const revealInput = document.getElementById("revealTime");
         if (gameMode === "endless") {
           if (window.getEndlessChallengeOptions) {
             return window.getEndlessChallengeOptions(currentRound);
+          }
+          return {
+            enableMathOps: false,
+            mathChance: 0.7,
+            misleadColors: false,
+            misleadChance: 0.6,
+            enableBackgroundColor: false,
+            backgroundColorChance: 0.35,
+            enableGlitch: false
+          };
+        }
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (window.getStageChallengeOptions) {
+            return window.getStageChallengeOptions(stage);
           }
           return {
             enableMathOps: false,
@@ -155,12 +197,22 @@ const revealInput = document.getElementById("revealTime");
         if (gameMode === "endless") {
           return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).platformer);
         }
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
+          return Boolean(modifiers && modifiers.platformer);
+        }
         return Boolean(practicePlatformer.checked);
       }
 
       function isAdEnabled() {
         if (gameMode === "endless") {
           return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).ads);
+        }
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
+          return Boolean(modifiers && modifiers.ads);
         }
         return Boolean(practiceAds.checked);
       }
@@ -169,12 +221,22 @@ const revealInput = document.getElementById("revealTime");
         if (gameMode === "endless") {
           return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).fog);
         }
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
+          return Boolean(modifiers && modifiers.fog);
+        }
         return Boolean(practiceFog.checked);
       }
 
       function isSwapEnabled() {
         if (gameMode === "endless") {
           return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).swapCards);
+        }
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
+          return Boolean(modifiers && modifiers.swapCards);
         }
         return Boolean(practiceSwap && practiceSwap.checked);
       }
@@ -204,7 +266,7 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function updateCategoryControls() {
-        const disabled = gameMode === "endless";
+        const disabled = gameMode !== "practice";
         document.querySelectorAll(".checkboxes input").forEach((input) => {
           input.disabled = disabled;
         });
@@ -242,7 +304,9 @@ const revealInput = document.getElementById("revealTime");
         if (tutorialRecallMessage && (!nextState || nextState !== "recall")) {
           tutorialRecallMessage.style.display = "none";
         }
+        updateRoundVisibility();
         updateStreakVisibility();
+        updateStageTimerVisibility();
         if (nextState === "idle") {
           document.body.classList.remove("show-pause");
           document.body.classList.remove("pause-hint");
@@ -250,13 +314,23 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function updateScore() {
-        roundPill.textContent = `Round ${round}`;
+        const stage = gameMode === "stages" && window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        if (gameMode === "stages" && stage) {
+          roundPill.textContent = `Round ${round}/${stage.rounds || 1}`;
+        } else {
+          roundPill.textContent = `Round ${round}`;
+        }
         if (gameMode === "endless") {
           modePill.textContent = "Mode: Endless";
           scorePill.textContent = "Score -";
           livesPill.textContent = "Lives -";
         } else if (gameMode === "tutorial") {
           modePill.textContent = "Mode: Tutorial";
+          scorePill.textContent = "Score -";
+          livesPill.textContent = "Lives -";
+        } else if (gameMode === "stages") {
+          const stageLabel = stage ? stage.name || `Stage ${stage.id || stageState.index + 1}` : "Stages";
+          modePill.textContent = `Mode: ${stageLabel}`;
           scorePill.textContent = "Score -";
           livesPill.textContent = "Lives -";
         } else {
@@ -267,12 +341,38 @@ const revealInput = document.getElementById("revealTime");
         if (streakPill) {
           streakPill.textContent = `STREAK ${streak}`;
         }
+        updateRoundVisibility();
+        updateStageTimerVisibility();
+      }
+
+      function updateRoundVisibility() {
+        if (!roundPill) return;
+        const showRound = gameMode !== "practice" && phase !== "idle";
+        roundPill.style.display = showRound ? "block" : "none";
       }
 
       function updateStreakVisibility() {
         if (!streakPill) return;
         const showStreak = (gameMode === "practice" || gameMode === "endless") && phase !== "idle";
         streakPill.style.display = showStreak ? "block" : "none";
+      }
+
+      function updateStageTimerVisibility() {
+        if (!stageTimerPill) return;
+        const showStageTimer = gameMode === "stages" && phase !== "idle";
+        stageTimerPill.style.display = showStageTimer ? "block" : "none";
+        if (!showStageTimer) {
+          stageTimerPill.textContent = "Time 0.00";
+        }
+      }
+
+      function resetStageProgress() {
+        stageState.active = false;
+        stageState.startTime = null;
+        stageState.elapsedMs = 0;
+        stageState.completed = false;
+        stageState.failed = false;
+        stageState.lastStars = 0;
       }
 
       function clamp(value, min, max) {
@@ -282,6 +382,9 @@ const revealInput = document.getElementById("revealTime");
 
       function resetBoard() {
         cardGrid.innerHTML = "";
+        if (promptGrid) {
+          promptGrid.innerHTML = "";
+        }
         inputGrid.innerHTML = "";
         resultsPanel.classList.remove("show");
         resultsPanel.innerHTML = "";
@@ -397,17 +500,31 @@ const revealInput = document.getElementById("revealTime");
             ? Number(cardCountInput.value || 4)
             : gameMode === "endless"
               ? (window.getEndlessCardCount ? window.getEndlessCardCount(round) : 3)
-            : 1;
+              : gameMode === "stages"
+                ? (window.getStageCardCount
+                    ? window.getStageCardCount(
+                        window.getStageConfig ? window.getStageConfig(stageState.index) : null
+                      )
+                    : 4)
+                : 1;
+        const uniquePool = categories.reduce((total, category) => {
+          const list = dataSets[category];
+          return total + (Array.isArray(list) ? list.length : 0);
+        }, 0);
+        const targetCount = Math.max(1, count);
+        const allowDuplicates = uniquePool > 0 && count > uniquePool;
         const chosen = [];
         const used = new Set();
-        while (chosen.length < count) {
+        while (chosen.length < targetCount) {
           const category = categories[Math.floor(Math.random() * categories.length)];
           const list = dataSets[category];
           const rawItem = list[Math.floor(Math.random() * list.length)];
           const item = typeof rawItem === "string" ? { label: rawItem } : rawItem;
           const key = `${category}-${item.label}`.toLowerCase();
-          if (used.has(key)) continue;
-          used.add(key);
+          if (!allowDuplicates) {
+            if (used.has(key)) continue;
+            used.add(key);
+          }
           chosen.push(buildChallenge({ ...item, category }, options));
         }
         return applyNumberChallenges(chosen, options);

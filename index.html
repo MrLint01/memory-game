@@ -6,27 +6,41 @@
     <title>Flash Recall</title>
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
+  <body data-state="idle" data-mode="practice" data-view="home">
     <main>
       <header>
-        <h1>Flash Recall</h1>
+        <div class="title-wrap">
+          <div class="title-cards" aria-hidden="true">
+            <span class="title-card card-a"></span>
+            <span class="title-card card-b"></span>
+            <span class="title-card card-c"></span>
+          </div>
+          <h1 class="title">Flash Recall</h1>
+        </div>
       </header>
       <section class="layout">
         <aside class="panel">
-          <h2>Choose Mode</h2>
           <div class="controls">
             <div class="mode-grid">
+              <button id="playStart" class="mode-card primary" type="button">
+                <strong>Play</strong>
+              </button>
               <button id="practiceStart" class="mode-card" type="button">
-                <strong>Practice</strong>
-                <span>Free play with your current ruleset.</span>
+                <strong>Sandbox</strong>
               </button>
-              <button id="adventureStart" class="mode-card" type="button">
-                <strong>Adventure</strong>
-                <span>Draft modifiers, gain points, manage lives.</span>
+            </div>
+            <div class="quick-actions">
+              <button id="settingsOpen" class="quick-action" type="button" aria-label="Open settings">
+                Settings
               </button>
-              <button id="referenceOpen" class="mode-card" type="button">
-                <strong>Reference</strong>
-                <span>Card types, modifiers, and answers.</span>
+              <button id="statsOpen" class="quick-action" type="button" aria-label="Open stats">
+                Stats
+              </button>
+              <button id="referenceOpen" class="quick-action" type="button" aria-label="Open reference">
+                Reference
+              </button>
+              <button id="fullscreenToggle" class="quick-action" type="button" aria-label="Toggle fullscreen">
+                Full Screen
               </button>
             </div>
           </div>
@@ -36,6 +50,7 @@
           <div class="pill" id="modePill">Mode: Practice</div>
           <div class="pill" id="phasePill">Waiting to start</div>
           <div class="pill" id="timerPill">00</div>
+          <div class="pill" id="stageTimerPill">Time 0.00</div>
           <div class="pill" id="roundPill">Round 0</div>
           <div class="pill" id="scorePill">Streak 0</div>
           <div class="pill" id="livesPill">Lives 3</div>
@@ -43,7 +58,10 @@
           <div class="timer-bar" id="timerBar">
             <div class="timer-bar__fill" id="timerFill"></div>
           </div>
+          <div class="tutorial-message" id="tutorialMessage"></div>
+          <div class="tutorial-recall-message" id="tutorialRecallMessage"></div>
           <div class="cards" id="cardGrid"></div>
+          <div class="prompts" id="promptGrid"></div>
           <div class="inputs" id="inputGrid"></div>
           <div class="platformer panel" id="platformerPanel">
             <div class="platformer-header">Platformer</div>
@@ -51,31 +69,51 @@
           </div>
           <div class="actions"></div>
           <div class="results" id="resultsPanel"></div>
-          <div class="draft" id="draftPanel">
-            <h3>Choose a modifier</h3>
-            <div class="draft-grid" id="draftGrid"></div>
-          </div>
         </section>
+      </section>
+      <section class="stages-screen" id="stagesScreen" aria-hidden="true">
+        <div class="stages-hero">
+          <button id="stagesBack" class="secondary" type="button">Back</button>
+          <h2>Stages</h2>
+          <div class="stages-nav">
+            <button id="stagesPrev" class="secondary" type="button">Prev</button>
+            <button id="stagesNext" class="secondary" type="button">Next</button>
+          </div>
+        </div>
+        <div class="stage-board">
+          <div class="stage-list stage-grid" id="stageList"></div>
+        </div>
+        <div class="stages-footer">
+          <div id="stagesFooter"></div>
+        </div>
       </section>
     </main>
     <div class="modal" id="practiceModal" aria-hidden="true">
       <div class="modal-card">
-        <h3>Practice Settings</h3>
+        <h3>Sandbox Settings</h3>
         <div class="controls">
-          <div class="control-group">
-            <label for="revealTime">Reveal time (seconds)</label>
-            <input id="revealTime" type="number" min="2" max="20" step="1" value="10" />
+          <div class="control-row settings-row">
+            <div class="stat-field">
+              <label for="revealTime">Reveal (s)</label>
+              <input id="revealTime" type="number" min="2" max="20" step="1" value="20" />
+            </div>
+            <div class="stat-field">
+              <label for="recallTime">Recall (s)</label>
+              <input id="recallTime" type="number" min="5" max="30" step="1" value="20" />
+            </div>
+            <div class="stat-field">
+              <label for="cardCount">Cards</label>
+              <input id="cardCount" type="number" min="1" max="10" step="1" value="4" />
+            </div>
           </div>
           <div class="control-group">
-            <label for="recallTime">Recall time (seconds)</label>
-            <input id="recallTime" type="number" min="5" max="30" step="1" value="15" />
-          </div>
-          <div class="control-group">
-            <label for="cardCount">Number of cards (1-10)</label>
-            <input id="cardCount" type="number" min="1" max="10" step="1" value="4" />
-          </div>
-          <div class="control-group">
-            <label>Card types</label>
+            <div class="control-row">
+              <label>Card types</label>
+              <div class="control-actions">
+                <button id="practiceSelectAll" class="link-button" type="button">Select all</button>
+                <button id="practiceDeselectAll" class="link-button" type="button">Deselect all</button>
+              </div>
+            </div>
             <div class="checkboxes">
               <label><input type="checkbox" value="numbers" checked />Numbers</label>
               <label><input type="checkbox" value="colors" checked />Colors</label>
@@ -100,10 +138,12 @@
         </div>
         <div class="modal-actions">
           <button id="practiceCancel" class="secondary" type="button">Back</button>
-          <button id="practiceConfirm" type="button">Start Practice</button>
+          <button id="practiceConfirm" type="button">Start Sandbox</button>
         </div>
       </div>
     </div>
+    <div data-include="ui/settings.html"></div>
+    <div data-include="ui/stats.html"></div>
     <div class="modal modal--pause" id="pauseModal" aria-hidden="true">
       <div class="modal-card">
         <h3>Paused</h3>
@@ -114,142 +154,7 @@
         </div>
       </div>
     </div>
-    <div class="modal" id="referenceModal" aria-hidden="true">
-      <div class="modal-card reference-card">
-        <div class="reference-header">
-          <h3>Reference Sheet</h3>
-          <div class="reference-note">Inputs are case-insensitive.</div>
-        </div>
-        <div class="reference-grid">
-          <div class="reference-block">
-            <h4>Card Types</h4>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Number</span>
-              <span class="ref-example">7</span>
-              <span class="ref-recall">Number</span>
-              <span class="ref-answer">Ans: 7</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Letter</span>
-              <span class="ref-example">B</span>
-              <span class="ref-recall">Letter</span>
-              <span class="ref-answer">Ans: B</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Direction</span>
-              <span class="ref-example ref-arrow">↑</span>
-              <span class="ref-recall">Direction</span>
-              <span class="ref-answer">Ans: Up / U</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Shape</span>
-              <span class="ref-example">
-                <svg class="shape-svg shape-svg--mini" viewBox="0 0 100 100" aria-hidden="true">
-                  <circle class="shape-stroke" cx="50" cy="50" r="28"></circle>
-                </svg>
-              </span>
-              <span class="ref-recall">Shape</span>
-              <span class="ref-answer">Ans: Circle / C</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Shape</span>
-              <span class="ref-example">
-                <svg class="shape-svg shape-svg--mini" viewBox="0 0 100 100" aria-hidden="true">
-                  <rect class="shape-stroke" x="26" y="26" width="48" height="48"></rect>
-                </svg>
-              </span>
-              <span class="ref-recall">Shape</span>
-              <span class="ref-answer">Ans: Square / S / Rectangle / R</span>
-            </div>
-          </div>
-          <div class="reference-block">
-            <h4>Color Cards</h4>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Background Color</span>
-              <span class="ref-example ref-swatch" style="background:#f97316;">BLUE</span>
-              <span class="ref-recall">Background color</span>
-              <span class="ref-answer">Ans: Orange / O</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Text Color</span>
-              <span class="ref-example ref-swatch" style="background:#3b82f6;">BLUE</span>
-              <span class="ref-recall">Color text</span>
-              <span class="ref-answer">Ans: Blue / B</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Misleading</span>
-              <span class="ref-example ref-swatch" style="background:#22c55e;">PINK</span>
-              <span class="ref-recall">Color text</span>
-              <span class="ref-answer">Ans: Pink / P</span>
-            </div>
-          </div>
-          <div class="reference-block">
-            <h4>Number Modifiers</h4>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Addition</span>
-              <span class="ref-example">9</span>
-              <span class="ref-recall">+ 2</span>
-              <span class="ref-answer">Ans: 11</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Subtraction</span>
-              <span class="ref-example">6</span>
-              <span class="ref-recall">- 1</span>
-              <span class="ref-answer">Ans: 5</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Multiplication</span>
-              <span class="ref-example">4</span>
-              <span class="ref-recall">* 2</span>
-              <span class="ref-answer">Ans: 8</span>
-            </div>
-          </div>
-          <div class="reference-block">
-            <h4>Other Modifiers</h4>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Pop-up</span>
-              <span class="ref-example ref-card ref-popup">
-                <span class="ref-popup-box">AD</span>
-                <span class="ref-popup-x">X</span>
-              </span>
-              <span class="ref-effect">Interferes visibility until closed.</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Fog</span>
-              <span class="ref-example ref-card ref-fog">7</span>
-              <span class="ref-effect">Move cursor around to clear fog.</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Glitch</span>
-              <span class="ref-example ref-card glitch glitch-animate">7</span>
-              <span class="ref-effect">Cards flicker to black.</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Platformer</span>
-              <span class="ref-example ref-card ref-platformer">
-                <span class="ref-platformer-ground"></span>
-                <span class="ref-platformer-player"></span>
-                <span class="ref-platformer-goal"></span>
-              </span>
-              <span class="ref-effect">Reach the goal before reveal ends.</span>
-            </div>
-            <div class="reference-row has-recall">
-              <span class="ref-label">Card Swap</span>
-              <span class="ref-example ref-card ref-swap ref-swap-animate">
-                <span class="ref-swap-card ref-swap-card--1">1</span>
-                <span class="ref-swap-card ref-swap-card--2">2</span>
-                <span class="ref-swap-card ref-swap-card--3">3</span>
-                <span class="ref-swap-card ref-swap-card--4">4</span>
-              </span>
-              <span class="ref-effect">Two cards swap positions.</span>
-            </div>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button id="referenceClose" type="button">Close</button>
-        </div>
-      </div>
-    </div>
+    <div data-include="ui/reference.html"></div>
     <div class="interrupt-modal" id="interruptModal" aria-hidden="true">
       <div class="interrupt-card">
         <div class="interrupt-header">
@@ -259,14 +164,16 @@
       </div>
     </div>
     <div class="pill hud-streak" id="streakPill">STREAK 0</div>
+    <button class="hud-pause" id="pauseButton" type="button">Pause</button>
     <canvas class="fog-overlay" id="fogCanvas"></canvas>
     <div class="config-hidden">
       <select id="modeSelect">
         <option value="practice" selected>Practice</option>
-        <option value="adventure">Adventure</option>
+        <option value="endless">Endless</option>
+        <option value="tutorial">Tutorial</option>
+        <option value="stages">Stages</option>
       </select>
     </div>
-    <script src="data.js" defer></script>
-    <script src="app.js" defer></script>
+    <script src="ui-loader.js"></script>
   </body>
 </html>
