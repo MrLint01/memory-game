@@ -600,6 +600,24 @@
         } else if (phase === "recall") {
           checkAnswers();
         } else if (phase === "result") {
+          if (gameMode === "stages" && stageState.failed) {
+            stageState.failed = false;
+            stageState.completed = false;
+            stageState.startTime = performance.now();
+            stageState.active = false;
+            if (stageTimerId) {
+              clearInterval(stageTimerId);
+              stageTimerId = null;
+            }
+            resetGame();
+            startRound({ advanceRound: true });
+            return;
+          }
+          if (gameMode === "practice") {
+            resetForRetryRound();
+            startRound({ reuseItems: false, advanceRound: false });
+            return;
+          }
           startRound();
         }
       });

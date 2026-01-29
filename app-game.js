@@ -352,12 +352,14 @@
             expected: buildExpectedLabel(expectedItem),
             actual,
             raw,
-            correct: isCorrectAnswer(expectedItem, actual)
+            correct: isCorrectAnswer(expectedItem, raw)
           };
         });
+        window.__lastEntries = entries;
         const allCorrect =
           (!platformerRequired || (platformerState.completed && !platformerState.failed)) &&
           entries.every((entry) => entry.correct);
+        window.__lastAllCorrect = allCorrect;
         updatePlatformerVisibility(false);
         if (allCorrect) {
           if (gameMode === "stages") {

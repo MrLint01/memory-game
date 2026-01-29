@@ -4,7 +4,7 @@
       id: 1,
       name: "Stage 1",
       rounds: 3,
-      cards: 8,
+      cards: 1,
       revealSeconds: 6,
       recallSeconds: 15,
       categories: ["numbers"],

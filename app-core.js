@@ -383,6 +383,9 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function isCorrectAnswer(item, actualValue) {
+        if (!actualValue || !String(actualValue).trim()) {
+          return false;
+        }
         const actual = normalize(actualValue);
         const expected = normalize(item.answer ?? item.label);
         if (item.category === "colors") {
