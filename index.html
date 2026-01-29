@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Flash Recall</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=1" />
   </head>
   <body data-state="idle" data-mode="practice" data-view="home">
     <main>
@@ -51,15 +51,12 @@
           <div class="pill" id="phasePill">Waiting to start</div>
           <div class="pill" id="timerPill">00</div>
           <div class="pill" id="stageTimerPill">Time 0.00</div>
-          <div class="pill" id="roundPill">Round 0</div>
           <div class="pill" id="scorePill">Streak 0</div>
           <div class="pill" id="livesPill">Lives 3</div>
         </div>
           <div class="timer-bar" id="timerBar">
             <div class="timer-bar__fill" id="timerFill"></div>
           </div>
-          <div class="tutorial-message" id="tutorialMessage"></div>
-          <div class="tutorial-recall-message" id="tutorialRecallMessage"></div>
           <div class="cards" id="cardGrid"></div>
           <div class="prompts" id="promptGrid"></div>
           <div class="inputs" id="inputGrid"></div>
@@ -163,17 +160,16 @@
         <div class="interrupt-body">Pop-up block</div>
       </div>
     </div>
+    <div class="pill hud-round" id="roundPill">Round 0</div>
     <div class="pill hud-streak" id="streakPill">STREAK 0</div>
     <button class="hud-pause" id="pauseButton" type="button">Pause</button>
     <canvas class="fog-overlay" id="fogCanvas"></canvas>
     <div class="config-hidden">
       <select id="modeSelect">
         <option value="practice" selected>Practice</option>
-        <option value="endless">Endless</option>
-        <option value="tutorial">Tutorial</option>
         <option value="stages">Stages</option>
       </select>
     </div>
-    <script src="ui-loader.js"></script>
+    <script src="ui-loader.js?v=1"></script>
   </body>
 </html>

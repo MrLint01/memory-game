@@ -19,7 +19,8 @@
   const loadScript = (src) =>
     new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = src;
+      const cacheBust = Date.now();
+      script.src = src.includes('?') ? `${src}&v=${cacheBust}` : `${src}?v=${cacheBust}`;
       script.defer = true;
       script.onload = resolve;
       script.onerror = () => reject(new Error(`Failed to load ${src}`));
@@ -28,8 +29,6 @@
 
   const scriptList = [
     'data.js',
-    'tutorial-mode.js',
-    'endless-mode.js',
     'stages-data.js',
     'stages-mode.js',
     'app-core.js',

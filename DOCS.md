@@ -8,40 +8,40 @@ This document describes the functions in the core game scripts. Use your editor�
 Reads the checked category checkboxes in the Practice settings modal and returns only values that exist in `dataSets`. This ensures the game never picks a category that has no backing data.
 
 ### getActiveCategories(currentRound)
-Returns the category pool for the current round based on `gameMode`. In Endless mode it uses the endless rules; otherwise it uses the practice selections from the UI.
+Returns the category pool for the current round based on `gameMode`. In Stages it uses the stage configuration; otherwise it uses the practice selections from the UI.
 
 ### getChallengeOptions(currentRound)
-Builds the modifier settings for the round (math ops, misleading colors, background color recall, glitch). In Endless mode it reads the rule table; in Practice it reads the checkboxes.
+Builds the modifier settings for the round (math ops, misleading colors, background color recall, glitch). In Stages it reads the stage config; in Practice it reads the checkboxes.
 
 ### isPlatformerEnabled()
-Returns whether the platformer modifier is active for the current round. In Endless it is driven by endless rules; in Practice by the checkbox.
+Returns whether the platformer modifier is active for the current round. In Stages it is driven by stage modifiers; in Practice by the checkbox.
 
 ### isAdEnabled()
-Returns whether the ads modifier is active for the current round. In Endless it is driven by endless rules; in Practice by the checkbox.
+Returns whether the ads modifier is active for the current round. In Stages it is driven by stage modifiers; in Practice by the checkbox.
 
 ### isFogEnabled()
-Returns whether the fog modifier is active for the current round. In Endless it is driven by endless rules; in Practice by the checkbox.
+Returns whether the fog modifier is active for the current round. In Stages it is driven by stage modifiers; in Practice by the checkbox.
 
 ### isSwapEnabled()
-Returns whether the swap modifier is active for the current round. In Endless it is driven by endless rules; in Practice by the checkbox.
+Returns whether the swap modifier is active for the current round. In Stages it is driven by stage modifiers; in Practice by the checkbox.
 
 ### skipRevealNow()
 Ends the reveal phase early, cancels timers and ad scheduling, and transitions immediately into recall.
 
 ### updateModeUI()
-Synchronizes `gameMode` with the hidden `modeSelect` control, updates the page’s data attributes, refreshes score/streak UI, and updates the endless leaderboard.
+Synchronizes `gameMode` with the hidden `modeSelect` control, updates the page’s data attributes, and refreshes score/streak UI.
 
 ### updateCategoryControls()
-Enables or disables category/modifier checkboxes depending on the active mode. Endless mode locks these inputs because rules are auto‑controlled.
+Enables or disables category/modifier checkboxes depending on the active mode. Stages locks these inputs because rules are auto‑controlled.
 
 ### setPhase(text, nextState)
-Updates the phase pill text and the `phase` state. Also toggles tutorial recall text visibility and updates streak visibility.
+Updates the phase pill text and the `phase` state, then refreshes round/streak/stage timer visibility.
 
 ### updateScore()
 Renders the pills for mode/round/score/lives and the streak indicator based on current game mode.
 
 ### updateStreakVisibility()
-Shows the streak pill only during Practice/Endless active phases. Hides it for idle or tutorial states.
+Shows the streak pill only during Practice active phases. Hides it for idle or stages.
 
 ### clamp(value, min, max)
 Utility to clamp a numeric value into a min/max range.
@@ -66,15 +66,6 @@ Applies modifier logic to a base item: misleading labels, background‑color rec
 
 ### pickItems()
 Selects a unique set of items for the round from active categories, applies modifier transformations (including math ops), and returns the final list.
-
-### resolveTutorialMessageCoord(value)
-Normalizes tutorial message position values into CSS units (rem or %), or returns null for invalid input.
-
-### applyTutorialMessagePosition(step)
-Positions the tutorial message element based on a tutorial step’s `messagePosition` config.
-
-### applyTutorialRecallMessagePosition(step)
-Positions the tutorial recall message element based on a tutorial step’s `recallMessagePosition` config.
 
 ### renderCards(show)
 Renders card elements either in reveal mode (showing values) or recall mode (showing hints/categories).
@@ -229,9 +220,6 @@ Persists the best star result for a stage.
 ### showStageComplete(elapsedSeconds, stars, stage)
 Shows the stage completion summary with time and stars.
 
-### handleEndlessStreakEnd()
-Resets streak/round when a streak ends in Endless mode.
-
 ### lockInputs(locked)
 Enables/disables recall inputs.
 
@@ -244,14 +232,8 @@ Transitions from reveal to recall, handling modifiers (swap, ads, fog, glitch, p
 ### startRound(options)
 Creates a new round (or reuses items), resets UI, starts reveal timer, and activates modifiers.
 
-### buildTutorialCard(entry)
-Converts tutorial step entries into full item objects for rendering/recall.
-
-### startTutorialStep(options)
-Advances the tutorial flow, renders cards/prompts, and starts timers if needed.
-
 ### getRevealSeconds()
-Returns the reveal duration, accounting for tutorial timing overrides.
+Returns the reveal duration, accounting for stage timing overrides.
 
 ## app-events.js
 
