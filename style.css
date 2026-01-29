@@ -172,6 +172,10 @@ h1 {
   font-size: 0.85rem;
   color: var(--ink);
 }
+.stage-card--locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
       .stage.panel {
         position: relative;
       }

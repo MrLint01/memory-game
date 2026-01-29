@@ -327,12 +327,22 @@
       function saveStageStars(stage, stars) {
         if (!stage || !window.stageStars) return;
         const key = stage.id ? String(stage.id) : String(stageState.index + 1);
+        
+        // Save stars (keep the highest)
         const current = window.stageStars[key] || 0;
         if (stars > current) {
           window.stageStars[key] = stars;
-          if (window.saveStageStars) {
-            window.saveStageStars();
-          }
+        }
+        
+        // Mark as completed (regardless of stars)
+        if (!window.stageCompleted) {
+          window.stageCompleted = {};
+        }
+        window.stageCompleted[key] = true;
+        
+        // Call the global save function if it exists
+        if (window.saveStageStars) {
+          window.saveStageStars();
         }
       }
 

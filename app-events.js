@@ -213,6 +213,25 @@
         return enabled.length ? enabled.join(", ") : "None";
       }
 
+      function isStageUnlocked(stageIndex) {
+        // Stage 1 (first stage) is always unlocked
+        if (stageIndex === 0) return true;
+        
+        // Check if previous stage has been completed
+        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        const prevStage = stages[stageIndex - 1];
+        if (!prevStage) return false;
+        
+        const prevStageKey = prevStage && prevStage.id ? String(prevStage.id) : String(stageIndex);
+        
+        // Initialize stageCompleted object if it doesn't exist
+        if (!window.stageCompleted) {
+          window.stageCompleted = {};
+        }
+        
+        return window.stageCompleted[prevStageKey] === true;
+      }
+
       function renderStageList() {
         if (!stageList) return;
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
@@ -239,10 +258,15 @@
               })
               .join("");
             const name = stage && stage.id ? String(stage.id) : String(index + 1);
+            const unlocked = isStageUnlocked(index);
+            const lockedClass = unlocked ? "" : " stage-card--locked";
+            const lockedAttr = unlocked ? "" : " disabled";
+            const lockIcon = unlocked ? "" : "";
+
             return `
-              <button class="stage-card stage-card--clickable" type="button" data-stage-index="${index}">
-                <strong>${name}</strong>
-                <div class="stage-meta stage-stars">Stars: ${starsMarkup}</div>
+              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}"${lockedAttr}>
+                <strong>${name}${lockIcon}</strong>
+                <div class="stage-meta stage-stars">${unlocked ? `Stars: ${starsMarkup}` : 'Locked'}</div>
               </button>
             `;
           })
@@ -359,6 +383,12 @@
           if (!button) return;
           const index = Number(button.dataset.stageIndex);
           if (!Number.isFinite(index)) return;
+          
+          // Check if stage is unlocked before starting
+          if (!isStageUnlocked(index)) {
+            return;
+          }
+          
           startStage(index);
         });
       }
