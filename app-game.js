@@ -320,9 +320,9 @@
               <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s</div>
             </div>
             <div class="stage-complete__stars" aria-label="Stage stars">
-              <span class="stage-star${stars >= 1 ? " is-filled" : ""}"></span>
-              <span class="stage-star${stars >= 2 ? " is-filled" : ""}"></span>
-              <span class="stage-star${stars >= 3 ? " is-filled" : ""}"></span>
+              <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
+              <span class="stage-star${stars >= 2 ? " is-filled" : ""}">✦</span>
+              <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
             </div>
             <div class="stage-complete__actions">
               <button id="stageBackButton" class="secondary" type="button">Back to stages</button>

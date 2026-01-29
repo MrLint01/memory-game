@@ -4,7 +4,7 @@
       id: 1,
       name: "Stage 1",
       rounds: 3,
-      cards: 1,
+      cards: 2,
       revealSeconds: 6,
       recallSeconds: 15,
       categories: ["numbers"],
@@ -29,7 +29,7 @@
       recallSeconds: 15,
       categories: ["numbers"],
       modifiers: {
-        mathOps: true,
+        mathOps: false,
         misleadColors: false,
         backgroundColor: false,
         swapCards: false,

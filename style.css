@@ -889,18 +889,16 @@ body[data-state="paused"] .hud-pause {
 .stage-stars {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
 }
 .stage-star {
-  width: 0.55rem;
-  height: 0.55rem;
-  border: 2px solid var(--border);
-  border-radius: 999px;
-  display: inline-block;
-  background: transparent;
+  font-size: 2.5rem;
+  color: #D1D5DB; /* Light gray for empty stars */
+  line-height: 1;
 }
 .stage-star.is-filled {
-  background: #22c55e;
+  color: #FDB022; /* Warm orange-gold */
 }
       .quick-actions {
         margin-top: 1rem;

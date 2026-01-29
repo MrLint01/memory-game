@@ -164,22 +164,28 @@
             const index = startIndex + offset;
             const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
             const stars = window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0;
-            const starsMarkup = [1, 2, 3]
-              .map((value) => {
-                const filled = stars >= value ? " is-filled" : "";
-                return `<span class="stage-star${filled}"></span>`;
-              })
-              .join("");
+            const isCompleted = window.stageCompleted && window.stageCompleted[stageKey];
+
+            // Only show stars if stage is completed
+            const starsMarkup = isCompleted
+              ? [1, 2, 3]
+                  .map((value) => {
+                    const filled = stars >= value ? " is-filled" : "";
+                    return `<span class="stage-star${filled}">✦</span>`;
+                  })
+                  .join("")
+              : "";
+
             const name = stage && stage.id ? String(stage.id) : String(index + 1);
             const unlocked = isStageUnlocked(index);
             const lockedClass = unlocked ? "" : " stage-card--locked";
             const lockedAttr = unlocked ? "" : " disabled";
-            const lockIcon = unlocked ? "" : "";
+            const lockIcon = unlocked ? "" : ""; /* No lock icon right now. We can add one if we want */
 
             return `
               <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}"${lockedAttr}>
                 <strong>${name}${lockIcon}</strong>
-                <div class="stage-meta stage-stars">${unlocked ? `Stars: ${starsMarkup}` : 'Locked'}</div>
+                <div class="stage-meta stage-stars">${unlocked ? (isCompleted ? `${starsMarkup}` : '') : 'Locked'}</div>
               </button>
             `;
           })
