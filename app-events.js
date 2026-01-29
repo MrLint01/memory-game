@@ -1,81 +1,5 @@
-      function startTutorialStep(options = {}) {
-        const { advanceRound = true } = options;
-        const stepCount = window.getTutorialStepCount ? window.getTutorialStepCount() : 0;
-        if (!stepCount) return;
-        if (advanceRound) {
-          tutorialState.stepIndex = Math.min(stepCount - 1, tutorialState.stepIndex + 1);
-        }
-        const step = window.getTutorialStep
-          ? window.getTutorialStep(tutorialState.stepIndex)
-          : null;
-        tutorialState.currentStep = step;
-        tutorialState.completed = false;
-        round = tutorialState.stepIndex + 1;
-        updateScore();
-        resetBoard();
-        if (tutorialMessage) {
-          tutorialMessage.textContent = step && step.message ? step.message : "";
-          tutorialMessage.style.display = tutorialMessage.textContent ? "block" : "none";
-          applyTutorialMessagePosition(step);
-        }
-        if (tutorialRecallMessage) {
-          tutorialRecallMessage.textContent = "";
-          tutorialRecallMessage.style.display = "none";
-          applyTutorialRecallMessagePosition(null);
-        }
-        if (!step) return;
-        if (step.type === "prompt") {
-          roundItems = [];
-          roundItemsBase = [];
-          renderCards(false);
-          renderInputs();
-          lockInputs(true);
-          if (submitBtn) {
-            submitBtn.disabled = true;
-          }
-          if (nextBtn) {
-            nextBtn.disabled = true;
-          }
-          resultsPanel.classList.remove("show");
-          setPhase("Tutorial", "show");
-          updatePlatformerVisibility(false);
-          stopFog();
-          stopGlitching();
-          return;
-        }
-        roundItems = (step.cards || []).map(buildTutorialCard);
-        roundItemsBase = roundItems.map((item) => ({ ...item }));
-        renderCards(true);
-        renderInputs();
-        lockInputs(true);
-        if (submitBtn) {
-          submitBtn.disabled = true;
-        }
-        if (nextBtn) {
-          nextBtn.disabled = true;
-        }
-        resultsPanel.classList.remove("show");
-        setPhase("Memorize the cards", "show");
-        updatePlatformerVisibility(false);
-        stopFog();
-        stopGlitching();
-        if (step.timed) {
-          const revealSeconds = step.revealSeconds || getRevealSeconds();
-          setTimer(revealSeconds, "Reveal", () => {
-            beginRecallPhase();
-          });
-        }
-      }
-
       function getRevealSeconds() {
         const base = Number(revealInput.value) || 5;
-        if (gameMode === "tutorial") {
-          const step = tutorialState.currentStep;
-          if (step && step.timed && step.revealSeconds) {
-            return step.revealSeconds;
-          }
-          return base;
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (stage && Number(stage.revealSeconds)) {
@@ -87,13 +11,6 @@
 
       function getRecallSeconds() {
         const base = Number(recallInput.value) || 5;
-        if (gameMode === "tutorial") {
-          const step = tutorialState.currentStep;
-          if (step && step.timed && step.recallSeconds) {
-            return step.recallSeconds;
-          }
-          return base;
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (stage && Number(stage.recallSeconds)) {
@@ -140,10 +57,6 @@
         }
         setPhase("Waiting to start", "idle");
         resetBoard();
-        if (tutorialMessage) {
-          tutorialMessage.style.display = "none";
-          tutorialMessage.textContent = "";
-        }
         if (submitBtn) {
           submitBtn.disabled = true;
         }
@@ -446,16 +359,6 @@
         startRound();
       });
 
-      if (tutorialStart) {
-        tutorialStart.addEventListener("click", () => {
-          modeSelect.value = "tutorial";
-          updateModeUI();
-          resetGame();
-          tutorialState.stepIndex = -1;
-          startRound({ advanceRound: true });
-        });
-      }
-
       practiceModal.addEventListener("click", (event) => {
         if (event.target === practiceModal) {
           closePracticeModal();
@@ -575,18 +478,6 @@
 
       if (nextBtn) {
         nextBtn.addEventListener("click", () => {
-          if (phase === "result" && gameMode === "tutorial") {
-            if (tutorialState.completed) {
-              resetGame();
-              setPhase("Waiting to start", "idle");
-              if (tutorialMessage) {
-                tutorialMessage.style.display = "none";
-              }
-              return;
-            }
-            startTutorialStep({ advanceRound: false });
-            return;
-          }
           if (phase === "result" && gameMode === "stages") {
             if (stageState.completed) {
               resetStageProgress();
@@ -694,16 +585,6 @@
           }
           return;
         }
-        if (gameMode === "tutorial" && tutorialState.currentStep && tutorialState.currentStep.type === "prompt") {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            startTutorialStep({ advanceRound: true });
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            resetGame();
-          }
-          return;
-        }
         if (event.key === "Escape") {
           event.preventDefault();
           openPauseModal();
@@ -712,19 +593,6 @@
         if (event.key !== "Enter") return;
         if (phase === "recall" && (swapTimeoutId || swapStartRecall)) {
           event.preventDefault();
-          return;
-        }
-        if (gameMode === "tutorial" && phase === "result") {
-          event.preventDefault();
-          if (tutorialState.completed) {
-            resetGame();
-            setPhase("Waiting to start", "idle");
-            if (tutorialMessage) {
-              tutorialMessage.style.display = "none";
-            }
-          } else {
-            startTutorialStep({ advanceRound: false });
-          }
           return;
         }
         if (phase === "show") {

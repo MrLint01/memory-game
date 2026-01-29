@@ -218,57 +218,6 @@
         };
       }
 
-      function showResults(entries, allCorrect) {
-        resultsPanel.innerHTML = `
-          <strong>${allCorrect ? "Perfect recall!" : "Not quite."}</strong>
-          <ul>
-            ${entries
-              .map(
-                (entry, idx) => `
-                  <li>
-                    <span class="result-expected">
-                    <span class="result-label">Card ${entry.displayIndex} · ${entry.expected.label}${
-                      entry.swappedWith ? ` (SWAPPED ${entry.swappedWith})` : ""
-                    }</span>
-                      <span class="result-answer">${entry.expected.answer}</span>
-                    </span>
-                    <span class="badge ${entry.correct ? "good" : "bad"}">
-                      ${entry.correct ? "Correct" : `You: ${entry.actual || "-"}`}
-                    </span>
-                  </li>`
-              )
-              .join("")}
-          </ul>
-        `;
-        resultsPanel.classList.add("show");
-      }
-
-      function showFailure(reason) {
-        const entries = roundItems.map((item) => ({
-          expected: buildExpectedLabel(item),
-          actual: "",
-          correct: false
-        }));
-        resultsPanel.innerHTML = `
-          <strong>${reason}</strong>
-          <ul>
-            ${entries
-              .map(
-                (entry, idx) => `
-                  <li>
-                    <span class="result-expected">
-                      <span class="result-label">Card ${idx + 1} · ${entry.expected.label}</span>
-                      <span class="result-answer">${entry.expected.answer}</span>
-                    </span>
-                    <span class="badge bad">You: -</span>
-                  </li>`
-              )
-              .join("")}
-          </ul>
-        `;
-        resultsPanel.classList.add("show");
-      }
-
       function showReviewFailure(entries, mode, swapOrder = null) {
         document.body.classList.add("stage-fail");
         const originalItems = roundItems;
@@ -293,10 +242,21 @@
           const index = Number(input.dataset.index);
           const entry = entries[index];
           if (!entry) return;
-          input.value = entry.expected.answer;
+          const displayValue =
+            Object.prototype.hasOwnProperty.call(entry, "raw") && entry.raw !== "" ? entry.raw : entry.actual;
+          const baseValue = displayValue ? displayValue : "—";
+          input.value = baseValue;
           input.disabled = true;
           input.classList.toggle("answer-correct", entry.correct);
           input.classList.toggle("answer-wrong", !entry.correct);
+          const wrapper = input.parentElement;
+          if (wrapper && !entry.correct) {
+            wrapper.classList.add("has-correct-inline");
+            const correct = document.createElement("span");
+            correct.className = "input-correct-inline";
+            correct.textContent = `Correct: ${entry.expected.answer}`;
+            wrapper.appendChild(correct);
+          }
         });
         const buttons =
           mode === "stages"
@@ -362,13 +322,6 @@
         resultsPanel.classList.add("show");
       }
 
-      function handleEndlessStreakEnd() {
-        if (gameMode !== "endless") return;
-        streak = 0;
-        round = 0;
-        updateScore();
-      }
-
       function lockInputs(locked) {
         inputGrid.querySelectorAll("input").forEach((input) => {
           input.disabled = locked;
@@ -391,12 +344,14 @@
           const mappedIndex = swapMap ? swapMap[index] : index;
           const expectedItem = roundItems[mappedIndex];
           const input = inputGrid.querySelector(`input[data-index="${index}"]`);
-          const actual = input ? normalize(input.value) : "";
+          const raw = input ? input.value : "";
+          const actual = normalize(raw);
           return {
             displayIndex: mappedIndex + 1,
             swappedWith: swapMap && mappedIndex !== index ? index + 1 : null,
             expected: buildExpectedLabel(expectedItem),
             actual,
+            raw,
             correct: isCorrectAnswer(expectedItem, actual)
           };
         });
@@ -405,30 +360,6 @@
           entries.every((entry) => entry.correct);
         updatePlatformerVisibility(false);
         if (allCorrect) {
-          if (gameMode === "tutorial") {
-            const stepCount = window.getTutorialStepCount ? window.getTutorialStepCount() : 0;
-            if (tutorialState.stepIndex >= stepCount - 1) {
-              tutorialState.completed = true;
-              if (tutorialMessage) {
-                tutorialMessage.textContent =
-                  "Tutorial complete! Press Enter to return and begin an attempt in Endless mode.";
-                tutorialMessage.style.display = "block";
-                applyTutorialMessagePosition(tutorialState.currentStep);
-              }
-              if (submitBtn) {
-                submitBtn.disabled = true;
-              }
-              if (nextBtn) {
-                nextBtn.textContent = "Finish";
-                nextBtn.disabled = false;
-              }
-              setPhase("Tutorial complete", "result");
-              updateScore();
-              return;
-            }
-            startTutorialStep({ advanceRound: true });
-            return;
-          }
           if (gameMode === "stages") {
             const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
             const stageRounds = stage && stage.rounds ? stage.rounds : 1;
@@ -520,7 +451,6 @@
           swapCleanup = null;
         }
         renderCards(true);
-        showResults(entries, allCorrect);
         if (submitBtn) {
           submitBtn.disabled = true;
         }
@@ -528,19 +458,13 @@
           nextBtn.disabled = false;
         }
         if (nextBtn) {
-          if (gameMode === "tutorial") {
-            nextBtn.textContent = "Retry";
-          } else if (gameMode === "stages") {
+          if (gameMode === "stages") {
             nextBtn.textContent = "Retry stage";
           } else {
             nextBtn.textContent = "Next round";
           }
         }
-        if (gameMode === "endless") {
-          handleEndlessStreakEnd();
-        } else {
-          streak = 0;
-        }
+        streak = 0;
         setPhase("Round complete", "result");
         updateScore();
       }
@@ -569,33 +493,6 @@
         hideAd();
         stopFog();
         stopGlitching();
-        if (gameMode === "tutorial") {
-          if (tutorialMessage) {
-            tutorialMessage.style.display = "none";
-          }
-          if (tutorialRecallMessage) {
-            const step = tutorialState.currentStep;
-            const recallText = step && step.recallMessage ? step.recallMessage : "";
-            tutorialRecallMessage.textContent = recallText;
-            tutorialRecallMessage.style.display = recallText ? "block" : "none";
-            applyTutorialRecallMessagePosition(step);
-          }
-          renderCards(false);
-          renderInputs();
-          lockInputs(false);
-          if (submitBtn) {
-            submitBtn.disabled = false;
-          }
-          setPhase("Type what you saw", "recall");
-          focusFirstInput();
-          const step = tutorialState.currentStep;
-          if (step && step.timed && step.recallSeconds) {
-            setTimer(step.recallSeconds, "Recall", () => {
-              checkAnswers();
-            });
-          }
-          return;
-        }
         if (platformerState.required && !platformerState.completed) {
           platformerState.failed = true;
           lockInputs(true);
@@ -611,9 +508,7 @@
               nextBtn.textContent = "Next round";
             }
           }
-          if (gameMode === "endless") {
-            handleEndlessStreakEnd();
-          } else if (gameMode === "stages") {
+          if (gameMode === "stages") {
             const entries = roundItems.map((item) => ({
               expected: buildExpectedLabel(item),
               actual: "",
@@ -625,16 +520,13 @@
             stopStageStopwatch();
             streak = 0;
             showReviewFailure(entries, "stages");
-          } else if (gameMode === "practice") {
+          } else {
             const entries = roundItems.map((item) => ({
               expected: buildExpectedLabel(item),
               actual: "",
               correct: false
             }));
             showReviewFailure(entries, "practice");
-          } else {
-            showFailure("Platformer failed");
-            streak = 0;
           }
           setPhase("Round complete", "result");
           updateScore();
@@ -700,10 +592,7 @@
 
       function startRound(options = {}) {
         const { reuseItems = false, advanceRound = true } = options;
-        if (gameMode === "tutorial") {
-          startTutorialStep({ advanceRound });
-          return;
-        }
+        document.body.classList.remove("stage-fail");
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (!stage) {
@@ -774,58 +663,4 @@
         setTimer(revealSeconds, "Reveal", () => {
           beginRecallPhase();
         });
-      }
-
-      function buildTutorialCard(entry) {
-        if (entry.category === "numbers") {
-          if (entry.mathOp) {
-            return applyNumberChallenge({ label: entry.label, category: "numbers" });
-          }
-          if (entry.answer || entry.recallHint) {
-            return {
-              label: entry.label,
-              category: "numbers",
-              answer: entry.answer ?? String(entry.label),
-              recallHint: entry.recallHint || ""
-            };
-          }
-        }
-        if (entry.category === "colors") {
-          if (entry.recallHint || entry.answer || entry.backgroundColorHex || entry.color) {
-            return {
-              label: entry.label,
-              category: "colors",
-              answer: entry.answer ?? String(entry.label),
-              recallHint: entry.recallHint ?? null,
-              backgroundColorHex: entry.backgroundColorHex ?? null,
-              color: entry.color ?? null
-            };
-          }
-          const colorEntry = dataSets.colors.find(
-            (color) => color.label.toLowerCase() === String(entry.label).toLowerCase()
-          );
-          if (colorEntry) {
-            return { ...colorEntry, category: "colors", answer: colorEntry.label };
-          }
-          return { label: entry.label, category: "colors", answer: String(entry.label) };
-        }
-        if (entry.category === "directions") {
-          const dirEntry = dataSets.directions.find(
-            (dir) => dir.label.toLowerCase() === String(entry.label).toLowerCase()
-          );
-          if (dirEntry) {
-            return { ...dirEntry, category: "directions", answer: dirEntry.label };
-          }
-          return { label: entry.label, category: "directions", answer: String(entry.label) };
-        }
-        if (entry.category === "shapes") {
-          const shapeEntry = dataSets.shapes.find(
-            (shape) => shape.label.toLowerCase() === String(entry.label).toLowerCase()
-          );
-          if (shapeEntry) {
-            return { ...shapeEntry, category: "shapes", answer: shapeEntry.label };
-          }
-          return { label: entry.label, category: "shapes", answer: String(entry.label) };
-        }
-        return { label: entry.label, category: entry.category, answer: String(entry.label) };
       }

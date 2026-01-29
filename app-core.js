@@ -1,7 +1,6 @@
 const revealInput = document.getElementById("revealTime");
       const recallInput = document.getElementById("recallTime");
       const practiceStart = document.getElementById("practiceStart");
-      const tutorialStart = document.getElementById("tutorialStart");
       const playStart = document.getElementById("playStart");
       const referenceOpen = document.getElementById("referenceOpen");
       const fullscreenToggle = document.getElementById("fullscreenToggle");
@@ -61,8 +60,6 @@ const revealInput = document.getElementById("revealTime");
       const promptGrid = document.getElementById("promptGrid");
       const inputGrid = document.getElementById("inputGrid");
       const resultsPanel = document.getElementById("resultsPanel");
-      const tutorialMessage = document.getElementById("tutorialMessage");
-      const tutorialRecallMessage = document.getElementById("tutorialRecallMessage");
       const platformerPanel = document.getElementById("platformerPanel");
       const platformerCanvas = document.getElementById("platformerCanvas");
       const platformerCtx = platformerCanvas.getContext("2d");
@@ -112,11 +109,6 @@ const revealInput = document.getElementById("revealTime");
       let swapRemaining = null;
       let swapStartRecall = null;
       let swapCleanup = null;
-      const tutorialState = {
-        stepIndex: 0,
-        currentStep: null,
-        completed: false
-      };
       const stageState = {
         active: false,
         index: 0,
@@ -136,12 +128,6 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function getActiveCategories(currentRound) {
-        if (gameMode === "endless") {
-          if (window.getEndlessCategories) {
-            return window.getEndlessCategories(currentRound);
-          }
-          return ["numbers"];
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (window.getStageCategories) {
@@ -153,20 +139,6 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function getChallengeOptions(currentRound) {
-        if (gameMode === "endless") {
-          if (window.getEndlessChallengeOptions) {
-            return window.getEndlessChallengeOptions(currentRound);
-          }
-          return {
-            enableMathOps: false,
-            mathChance: 0.7,
-            misleadColors: false,
-            misleadChance: 0.6,
-            enableBackgroundColor: false,
-            backgroundColorChance: 0.35,
-            enableGlitch: false
-          };
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (window.getStageChallengeOptions) {
@@ -194,9 +166,6 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function isPlatformerEnabled() {
-        if (gameMode === "endless") {
-          return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).platformer);
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
@@ -206,9 +175,6 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function isAdEnabled() {
-        if (gameMode === "endless") {
-          return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).ads);
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
@@ -218,9 +184,6 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function isFogEnabled() {
-        if (gameMode === "endless") {
-          return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).fog);
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
@@ -230,9 +193,6 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function isSwapEnabled() {
-        if (gameMode === "endless") {
-          return Boolean(window.getEndlessModifiers && window.getEndlessModifiers(round).swapCards);
-        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
@@ -301,9 +261,6 @@ const revealInput = document.getElementById("revealTime");
           phase = nextState;
           page.dataset.state = nextState;
         }
-        if (tutorialRecallMessage && (!nextState || nextState !== "recall")) {
-          tutorialRecallMessage.style.display = "none";
-        }
         updateRoundVisibility();
         updateStreakVisibility();
         updateStageTimerVisibility();
@@ -320,15 +277,7 @@ const revealInput = document.getElementById("revealTime");
         } else {
           roundPill.textContent = `Round ${round}`;
         }
-        if (gameMode === "endless") {
-          modePill.textContent = "Mode: Endless";
-          scorePill.textContent = "Score -";
-          livesPill.textContent = "Lives -";
-        } else if (gameMode === "tutorial") {
-          modePill.textContent = "Mode: Tutorial";
-          scorePill.textContent = "Score -";
-          livesPill.textContent = "Lives -";
-        } else if (gameMode === "stages") {
+        if (gameMode === "stages") {
           const stageLabel = stage ? stage.name || `Stage ${stage.id || stageState.index + 1}` : "Stages";
           modePill.textContent = `Mode: ${stageLabel}`;
           scorePill.textContent = "Score -";
@@ -353,7 +302,7 @@ const revealInput = document.getElementById("revealTime");
 
       function updateStreakVisibility() {
         if (!streakPill) return;
-        const showStreak = (gameMode === "practice" || gameMode === "endless") && phase !== "idle";
+        const showStreak = gameMode === "practice" && phase !== "idle";
         streakPill.style.display = showStreak ? "block" : "none";
       }
 
@@ -498,9 +447,7 @@ const revealInput = document.getElementById("revealTime");
         const count =
           gameMode === "practice"
             ? Number(cardCountInput.value || 4)
-            : gameMode === "endless"
-              ? (window.getEndlessCardCount ? window.getEndlessCardCount(round) : 3)
-              : gameMode === "stages"
+            : gameMode === "stages"
                 ? (window.getStageCardCount
                     ? window.getStageCardCount(
                         window.getStageConfig ? window.getStageConfig(stageState.index) : null
@@ -530,76 +477,6 @@ const revealInput = document.getElementById("revealTime");
         return applyNumberChallenges(chosen, options);
       }
 
-      function resolveTutorialMessageCoord(value) {
-        if (value === null || value === undefined) return null;
-        if (typeof value === "number" && Number.isFinite(value)) {
-          return `${value}rem`;
-        }
-        if (typeof value === "string") {
-          return value.trim();
-        }
-        return null;
-      }
-
-      function applyTutorialMessagePosition(step) {
-        if (!tutorialMessage) return;
-        const position = step && step.messagePosition ? step.messagePosition : null;
-        if (!position) {
-          tutorialMessage.style.left = "";
-          tutorialMessage.style.top = "";
-          tutorialMessage.style.transform = "";
-          return;
-        }
-        const left = resolveTutorialMessageCoord(position.x);
-        const top = resolveTutorialMessageCoord(position.y);
-        if (left) {
-          tutorialMessage.style.left = left;
-        } else {
-          tutorialMessage.style.left = "";
-        }
-        if (top) {
-          tutorialMessage.style.top = top;
-        } else {
-          tutorialMessage.style.top = "";
-        }
-        if (position.center === true) {
-          tutorialMessage.style.transform = "translateX(-50%)";
-        } else if (left) {
-          tutorialMessage.style.transform = "none";
-        } else {
-          tutorialMessage.style.transform = "";
-        }
-      }
-
-      function applyTutorialRecallMessagePosition(step) {
-        if (!tutorialRecallMessage) return;
-        const position = step && step.recallMessagePosition ? step.recallMessagePosition : null;
-        if (!position) {
-          tutorialRecallMessage.style.left = "";
-          tutorialRecallMessage.style.top = "";
-          tutorialRecallMessage.style.transform = "";
-          return;
-        }
-        const left = resolveTutorialMessageCoord(position.x);
-        const top = resolveTutorialMessageCoord(position.y);
-        if (left) {
-          tutorialRecallMessage.style.left = left;
-        } else {
-          tutorialRecallMessage.style.left = "";
-        }
-        if (top) {
-          tutorialRecallMessage.style.top = top;
-        } else {
-          tutorialRecallMessage.style.top = "";
-        }
-        if (position.center === true) {
-          tutorialRecallMessage.style.transform = "translateX(-50%)";
-        } else if (left) {
-          tutorialRecallMessage.style.transform = "none";
-        } else {
-          tutorialRecallMessage.style.transform = "";
-        }
-      }
 
       function renderCards(show) {
         cardGrid.innerHTML = "";

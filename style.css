@@ -310,43 +310,6 @@ h1 {
   display: grid;
   gap: 1rem;
 }
-.tutorial-message {
-  position: fixed;
-  left: 50%;
-  top: 5.3rem;
-  transform: translateX(-50%);
-  max-width: min(720px, 92%);
-  padding: 0.6rem 0.8rem;
-  border: 2px solid var(--border);
-  background: #ffffff;
-  font-size: 1.7rem;
-  line-height: 1.3;
-  color: var(--ink);
-  display: none;
-  z-index: 4;
-}
-.tutorial-recall-message {
-  position: fixed;
-  left: 50%;
-  top: 5.3rem;
-  transform: translateX(-50%);
-  max-width: min(720px, 92%);
-  padding: 0.6rem 0.8rem;
-  border: 2px solid var(--border);
-  background: #ffffff;
-  font-size: 2.0rem;
-  line-height: 1.3;
-  color: var(--ink);
-  display: none;
-  z-index: 4;
-}
-body[data-mode="tutorial"] #cardGrid {
-  top: calc(var(--stage-hud-offset) + 7.2rem);
-}
-body[data-mode="tutorial"][data-state="recall"] .tutorial-message,
-body[data-mode="tutorial"][data-state="result"] .tutorial-message {
-  display: none;
-}
       .stage .status,
       .stage .actions,
       #inputGrid,
@@ -508,6 +471,25 @@ body.pause-active .card * {
         gap: 1rem;
         align-items: center;
       }
+.hud-round {
+  position: fixed;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 6;
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+  outline: none;
+  outline-offset: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.1rem;
+  box-shadow: 6px 6px 0 #e5e7eb;
+}
+.hud-streak {
+  top: 3.4rem;
+}
 .hud-streak {
   position: fixed;
   top: 1.2rem;
@@ -714,11 +696,27 @@ body[data-state="paused"] .hud-pause {
       .inputs {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 0.8rem;
+        column-gap: 0.8rem;
+        row-gap: 1.4rem;
       }
       .input-slot {
         display: grid;
         gap: 0.35rem;
+        position: relative;
+      }
+      .input-correct-inline {
+        position: absolute;
+        left: 0;
+        top: calc(100% + 0.2rem);
+        font-size: 0.75rem;
+        color: #dc2626;
+        pointer-events: none;
+      }
+      .input-correct {
+        font-size: 0.75rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
       }
       .input-label {
         font-size: 0.7rem;
