@@ -2,6 +2,7 @@
   const storageKey = "flashRecallStageStars";
   window.stagesConfig = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
   window.stageStars = {};
+  window.stageBestTimes = {};
 
   function loadStageStars() {
     try {
@@ -27,6 +28,8 @@
   loadStageStars();
 
   window.saveStageStars = saveStageStars;
+
+  window.saveStageBestTimes = function saveStageBestTimes() {};
 
   window.getStageConfig = function getStageConfig(index) {
     if (!Array.isArray(window.stagesConfig)) return null;

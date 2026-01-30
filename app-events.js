@@ -21,6 +21,10 @@
       }
 
       function resetGame() {
+        bumpRoundFlowToken();
+        if (successAnimationActive) {
+          cancelSuccessAnimation();
+        }
         clearInterval(timerId);
         timerId = null;
         if (stageTimerId) {
@@ -48,12 +52,11 @@
         roundItems = [];
         roundItemsBase = [];
         updateScore();
-        timerPill.textContent = "00";
-        if (stageTimerPill) {
-          stageTimerPill.textContent = "Time 0.00";
-        }
         if (timerFill) {
           timerFill.style.width = "100%";
+        }
+        if (stageTimerHud) {
+          stageTimerHud.textContent = "Time 0.00";
         }
         setPhase("Waiting to start", "idle");
         resetBoard();
@@ -67,6 +70,10 @@
       }
 
       function resetForRetryRound() {
+        bumpRoundFlowToken();
+        if (successAnimationActive) {
+          cancelSuccessAnimation();
+        }
         clearInterval(timerId);
         timerId = null;
         document.body.classList.remove("stage-fail");
@@ -85,9 +92,6 @@
         stopGlitching();
         clearAdTimer();
         hideAd();
-        if (timerPill) {
-          timerPill.textContent = "00";
-        }
         if (timerFill) {
           timerFill.style.width = "100%";
         }
@@ -164,17 +168,21 @@
             const index = startIndex + offset;
             const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
             const stars = window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0;
+            const bestTimeSeconds = Number(
+              window.stageBestTimes && window.stageBestTimes[stageKey]
+            );
             const isCompleted = window.stageCompleted && window.stageCompleted[stageKey];
+            const bestTimeText =
+              isCompleted && Number.isFinite(bestTimeSeconds)
+                ? `${bestTimeSeconds.toFixed(2)}s`
+                : "—";
 
-            // Only show stars if stage is completed
-            const starsMarkup = isCompleted
-              ? [1, 2, 3]
-                  .map((value) => {
-                    const filled = stars >= value ? " is-filled" : "";
-                    return `<span class="stage-star${filled}">✦</span>`;
-                  })
-                  .join("")
-              : "";
+            const starsMarkup = [1, 2, 3]
+              .map((value) => {
+                const filled = stars >= value ? " is-filled" : "";
+                return `<span class="stage-star${filled}">✦</span>`;
+              })
+              .join("");
 
             const name = stage && stage.id ? String(stage.id) : String(index + 1);
             const unlocked = isStageUnlocked(index);
@@ -185,7 +193,8 @@
             return `
               <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}"${lockedAttr}>
                 <strong>${name}${lockIcon}</strong>
-                <div class="stage-meta stage-stars">${unlocked ? (isCompleted ? `${starsMarkup}` : '') : 'Locked'}</div>
+                <div class="stage-meta stage-stars">${starsMarkup}</div>
+                <div class="stage-meta stage-best">Best: ${bestTimeText}</div>
               </button>
             `;
           })
@@ -469,6 +478,9 @@
 
       pauseRestart.addEventListener("click", () => {
         closePauseModal();
+        if (gameMode === "stages") {
+          resetStageProgress();
+        }
         resetGame();
         startRound();
       });
@@ -526,10 +538,6 @@
               stageState.completed = false;
               stageState.startTime = performance.now();
               stageState.active = false;
-              if (stageTimerId) {
-                clearInterval(stageTimerId);
-                stageTimerId = null;
-              }
               resetGame();
               startRound({ advanceRound: true });
               return;
@@ -566,10 +574,6 @@
           stageState.completed = false;
           stageState.startTime = performance.now();
           stageState.active = false;
-          if (stageTimerId) {
-            clearInterval(stageTimerId);
-            stageTimerId = null;
-          }
           resetGame();
           startRound({ advanceRound: true });
           return;
@@ -626,6 +630,10 @@
           openPauseModal();
           return;
         }
+        if (successAnimationActive) {
+          event.preventDefault();
+          return;
+        }
         if (event.key !== "Enter") return;
         if (phase === "recall" && (swapTimeoutId || swapStartRecall)) {
           event.preventDefault();
@@ -641,10 +649,6 @@
             stageState.completed = false;
             stageState.startTime = performance.now();
             stageState.active = false;
-            if (stageTimerId) {
-              clearInterval(stageTimerId);
-              stageTimerId = null;
-            }
             resetGame();
             startRound({ advanceRound: true });
             return;
@@ -661,3 +665,16 @@
       updateModeUI();
       resetGame();
       updateCategoryControls();
+
+      if (successAnimationToggle) {
+        const storageKey = "flashRecallSuccessAnimation";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          successAnimationToggle.checked = saved === "1";
+        }
+        setSuccessAnimationEnabled(successAnimationToggle.checked);
+        successAnimationToggle.addEventListener("change", () => {
+          window.localStorage.setItem(storageKey, successAnimationToggle.checked ? "1" : "0");
+          setSuccessAnimationEnabled(successAnimationToggle.checked);
+        });
+      }

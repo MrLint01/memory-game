@@ -46,16 +46,13 @@ const revealInput = document.getElementById("revealTime");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
       const modeSelect = document.getElementById("modeSelect");
-      const phasePill = document.getElementById("phasePill");
-      const timerPill = document.getElementById("timerPill");
-      const stageTimerPill = document.getElementById("stageTimerPill");
       const timerBar = document.getElementById("timerBar");
       const timerFill = document.getElementById("timerFill");
-      const modePill = document.getElementById("modePill");
       const streakPill = document.getElementById("streakPill");
       const roundPill = document.getElementById("roundPill");
-      const scorePill = document.getElementById("scorePill");
-      const livesPill = document.getElementById("livesPill");
+      const stageTimerHud = document.getElementById("stageTimerHud");
+      const successAnimationToggle = document.getElementById("successAnimationToggle");
+      const successToast = document.getElementById("successToast");
       const cardGrid = document.getElementById("cardGrid");
       const promptGrid = document.getElementById("promptGrid");
       const inputGrid = document.getElementById("inputGrid");
@@ -71,12 +68,26 @@ const revealInput = document.getElementById("revealTime");
       let round = 0;
       let streak = 0;
       let timerId = null;
+      let stageTimerId = null;
+      let roundFlowToken = 0;
+      let successAnimationEnabled = true;
+      let successAnimationActive = false;
+      let successAnimationPaused = false;
+      let successAnimationStart = null;
+      let successAnimationRemaining = 0;
+      let successAnimationTimeoutId = null;
+      let successAnimationPromise = null;
+      let successAnimationResolve = null;
+      const successAnimationDurationMs = 900;
+
+      function bumpRoundFlowToken() {
+        roundFlowToken += 1;
+      }
       let roundItems = [];
       let roundItemsBase = [];
       let gameMode = "practice";
       let pausedState = null;
       let timerState = null;
-      let stageTimerId = null;
       const platformerState = {
         enabled: false,
         completed: false,
@@ -227,7 +238,7 @@ const revealInput = document.getElementById("revealTime");
 
       function updateCategoryControls() {
         const disabled = gameMode !== "practice";
-        document.querySelectorAll(".checkboxes input").forEach((input) => {
+        document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
           input.disabled = disabled;
         });
         if (!disabled) {
@@ -256,7 +267,6 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function setPhase(text, nextState) {
-        phasePill.textContent = text;
         if (nextState) {
           phase = nextState;
           page.dataset.state = nextState;
@@ -276,16 +286,6 @@ const revealInput = document.getElementById("revealTime");
           roundPill.textContent = `Round ${round}/${stage.rounds || 1}`;
         } else {
           roundPill.textContent = `Round ${round}`;
-        }
-        if (gameMode === "stages") {
-          const stageLabel = stage ? stage.name || `Stage ${stage.id || stageState.index + 1}` : "Stages";
-          modePill.textContent = `Mode: ${stageLabel}`;
-          scorePill.textContent = "Score -";
-          livesPill.textContent = "Lives -";
-        } else {
-          modePill.textContent = "Mode: Practice";
-          scorePill.textContent = "Score -";
-          livesPill.textContent = "Lives -";
         }
         if (streakPill) {
           streakPill.textContent = `STREAK ${streak}`;
@@ -307,12 +307,117 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function updateStageTimerVisibility() {
-        if (!stageTimerPill) return;
+        if (!stageTimerHud) return;
         const showStageTimer = gameMode === "stages" && phase !== "idle";
-        stageTimerPill.style.display = showStageTimer ? "block" : "none";
+        stageTimerHud.style.display = showStageTimer ? "block" : "none";
         if (!showStageTimer) {
-          stageTimerPill.textContent = "Time 0.00";
+          stageTimerHud.textContent = "Time 0.00";
         }
+      }
+
+      function setSuccessAnimationEnabled(enabled) {
+        successAnimationEnabled = Boolean(enabled);
+      }
+
+      function pauseSuccessAnimation() {
+        if (!successAnimationActive || successAnimationPaused || !successToast) return;
+        successAnimationPaused = true;
+        if (successAnimationTimeoutId) {
+          clearTimeout(successAnimationTimeoutId);
+          successAnimationTimeoutId = null;
+        }
+        if (successAnimationStart) {
+          const elapsed = performance.now() - successAnimationStart;
+          successAnimationRemaining = Math.max(0, successAnimationRemaining - elapsed);
+        }
+        successAnimationStart = null;
+        successToast.style.animationPlayState = "paused";
+      }
+
+      function resumeSuccessAnimation() {
+        if (!successAnimationActive || !successAnimationPaused || !successToast) return;
+        successAnimationPaused = false;
+        successAnimationStart = performance.now();
+        successToast.style.animationPlayState = "running";
+        successAnimationTimeoutId = window.setTimeout(() => {
+          finishSuccessAnimation();
+        }, successAnimationRemaining);
+      }
+
+      function finishSuccessAnimation() {
+        if (!successAnimationActive) return;
+        if (successAnimationTimeoutId) {
+          clearTimeout(successAnimationTimeoutId);
+          successAnimationTimeoutId = null;
+        }
+        successToast.classList.remove("show");
+        successAnimationActive = false;
+        successAnimationPaused = false;
+        successAnimationStart = null;
+        successAnimationRemaining = 0;
+        successAnimationPromise = null;
+        if (typeof successAnimationResolve === "function") {
+          successAnimationResolve();
+        }
+        successAnimationResolve = null;
+      }
+
+      function cancelSuccessAnimation() {
+        if (!successAnimationActive) return;
+        if (successAnimationTimeoutId) {
+          clearTimeout(successAnimationTimeoutId);
+          successAnimationTimeoutId = null;
+        }
+        if (successToast) {
+          successToast.classList.remove("show");
+          successToast.style.animationPlayState = "";
+        }
+        successAnimationActive = false;
+        successAnimationPaused = false;
+        successAnimationStart = null;
+        successAnimationRemaining = 0;
+        successAnimationPromise = null;
+        if (typeof successAnimationResolve === "function") {
+          successAnimationResolve();
+        }
+        successAnimationResolve = null;
+      }
+
+      function playSuccessAnimation() {
+        if (!successAnimationEnabled || !successToast) {
+          return Promise.resolve();
+        }
+        if (successAnimationActive && successAnimationPromise) {
+          return successAnimationPromise;
+        }
+        successAnimationActive = true;
+        successAnimationPaused = false;
+        const shouldPauseStageTimer = gameMode === "stages" && typeof stopStageStopwatch === "function";
+        const wasStageTimerRunning = shouldPauseStageTimer && stageTimerId;
+        if (wasStageTimerRunning) {
+          stopStageStopwatch();
+        }
+        successToast.classList.remove("show");
+        void successToast.offsetWidth;
+        successToast.classList.add("show");
+        successToast.style.animationPlayState = "running";
+        successAnimationRemaining = successAnimationDurationMs;
+        successAnimationStart = performance.now();
+        successAnimationPromise = new Promise((resolve) => {
+          successAnimationResolve = resolve;
+          successAnimationTimeoutId = window.setTimeout(() => {
+            if (wasStageTimerRunning && typeof startStageStopwatch === "function") {
+              if (stageState && typeof stageState.startTime === "number") {
+                stageState.startTime += successAnimationDurationMs;
+              }
+              if (!document.body.classList.contains("pause-active")) {
+                startStageStopwatch();
+              }
+            }
+            finishSuccessAnimation();
+          }, successAnimationRemaining);
+        });
+        return successAnimationPromise;
       }
 
       function resetStageProgress() {

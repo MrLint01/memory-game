@@ -46,14 +46,6 @@
           </div>
         </aside>
         <section class="stage panel">
-          <div class="status">
-          <div class="pill" id="modePill">Mode: Practice</div>
-          <div class="pill" id="phasePill">Waiting to start</div>
-          <div class="pill" id="timerPill">00</div>
-          <div class="pill" id="stageTimerPill">Time 0.00</div>
-          <div class="pill" id="scorePill">Streak 0</div>
-          <div class="pill" id="livesPill">Lives 3</div>
-        </div>
           <div class="timer-bar" id="timerBar">
             <div class="timer-bar__fill" id="timerFill"></div>
           </div>
@@ -161,9 +153,11 @@
       </div>
     </div>
     <div class="pill hud-round" id="roundPill">Round 0</div>
+    <div class="pill hud-timer" id="stageTimerHud">Time 0.00</div>
     <div class="pill hud-streak" id="streakPill">STREAK 0</div>
     <button class="hud-pause" id="pauseButton" type="button">Pause</button>
     <canvas class="fog-overlay" id="fogCanvas"></canvas>
+    <div class="success-toast" id="successToast" aria-hidden="true">All correct!</div>
     <div class="config-hidden">
       <select id="modeSelect">
         <option value="practice" selected>Practice</option>

@@ -6,7 +6,6 @@
         function tick() {
           const remaining = Math.max(0, timerState.endTime - performance.now());
           const display = `${Math.ceil(remaining / 1000)}s`;
-          timerPill.textContent = label ? `${label}: ${display}` : display;
           if (timerFill) {
             const progress = totalSeconds ? remaining / (totalSeconds * 1000) : 0;
             timerFill.style.width = `${Math.max(0, Math.min(1, progress)) * 100}%`;
@@ -23,7 +22,7 @@
       }
 
       function startStageStopwatch() {
-        if (!stageTimerPill) return;
+        if (!stageTimerHud) return;
         if (stageTimerId) {
           clearInterval(stageTimerId);
         }
@@ -31,7 +30,7 @@
         stageTimerId = setInterval(() => {
           const elapsedMs = performance.now() - startTime;
           const seconds = (elapsedMs / 1000).toFixed(2);
-          stageTimerPill.textContent = `Time ${seconds}`;
+          stageTimerHud.textContent = `Time ${seconds}`;
         }, 50);
       }
 
@@ -64,14 +63,19 @@
         }
         pausedState = {
           phase,
-          phaseText: phasePill.textContent,
+          phaseText: phase,
           timer: null,
           adWasActive: false,
           fogWasActive: false,
           adSnapshot: null,
           glitchWasActive: false,
-          swapRemaining: null
+          swapRemaining: null,
+          stagePauseStart: null
         };
+        if (gameMode === "stages" && stageState.active) {
+          pausedState.stagePauseStart = performance.now();
+          stopStageStopwatch();
+        }
         if (timerState) {
           const remainingMs = Math.max(0, timerState.endTime - performance.now());
           pausedState.timer = {
@@ -102,6 +106,9 @@
           swapTimeoutId = null;
           swapStartTime = null;
         }
+        if (successAnimationActive) {
+          pauseSuccessAnimation();
+        }
         clearAdTimer();
         if (timerId) {
           clearInterval(timerId);
@@ -120,6 +127,10 @@
 
       function resumeFromPause() {
         if (!pausedState || !pausedState.phase) return;
+        if (pausedState.stagePauseStart && typeof stageState.startTime === "number") {
+          const pauseDuration = performance.now() - pausedState.stagePauseStart;
+          stageState.startTime += pauseDuration;
+        }
         const remainingSeconds =
           pausedState.timer && pausedState.timer.remainingMs > 0
             ? pausedState.timer.remainingMs / 1000
@@ -150,6 +161,13 @@
           });
         }
         restorePausedEffects(remainingSeconds);
+        if (gameMode === "stages" && stageState.active) {
+          if (successAnimationActive) {
+            resumeSuccessAnimation();
+          } else {
+            startStageStopwatch();
+          }
+        }
         pausedState = null;
       }
 
@@ -284,7 +302,7 @@
         return 0;
       }
 
-      function saveStageStars(stage, stars) {
+      function saveStageStars(stage, stars, elapsedSeconds) {
         if (!stage || !window.stageStars) return;
         const key = stage.id ? String(stage.id) : String(stageState.index + 1);
         
@@ -303,6 +321,19 @@
         // Call the global save function if it exists
         if (window.saveStageStars) {
           window.saveStageStars();
+        }
+
+        if (Number.isFinite(elapsedSeconds)) {
+          if (!window.stageBestTimes) {
+            window.stageBestTimes = {};
+          }
+          const currentBest = Number(window.stageBestTimes[key]);
+          if (!Number.isFinite(currentBest) || elapsedSeconds < currentBest) {
+            window.stageBestTimes[key] = elapsedSeconds;
+          }
+          if (window.saveStageBestTimes) {
+            window.saveStageBestTimes();
+          }
         }
       }
 
@@ -338,7 +369,7 @@
         });
       }
 
-      function checkAnswers() {
+      async function checkAnswers() {
         if (phase !== "recall") return;
         if (swapTimeoutId) {
           clearTimeout(swapTimeoutId);
@@ -372,6 +403,11 @@
         window.__lastAllCorrect = allCorrect;
         updatePlatformerVisibility(false);
         if (allCorrect) {
+          const flowToken = roundFlowToken;
+          await playSuccessAnimation();
+          if (flowToken !== roundFlowToken) {
+            return;
+          }
           if (gameMode === "stages") {
             const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
             const stageRounds = stage && stage.rounds ? stage.rounds : 1;
@@ -381,8 +417,8 @@
               stageState.elapsedMs = performance.now() - (stageState.startTime || performance.now());
               const elapsedSeconds = stageState.elapsedMs / 1000;
               const stars = getStageStars(elapsedSeconds, stage);
-              stageState.lastStars = stars;
-              saveStageStars(stage, stars);
+          stageState.lastStars = stars;
+          saveStageStars(stage, stars, elapsedSeconds);
               lockInputs(true);
               renderCards(true);
               showStageComplete(elapsedSeconds, stars, stage);
@@ -529,8 +565,8 @@
             stageState.failed = true;
             stageState.completed = false;
             stageState.active = false;
-            stopStageStopwatch();
             streak = 0;
+            stopStageStopwatch();
             showReviewFailure(entries, "stages");
           } else {
             const entries = roundItems.map((item) => ({
@@ -558,7 +594,6 @@
             swapActive = true;
           }
         }
-        timerPill.textContent = "Swapping...";
         if (timerFill) {
           timerFill.style.width = "100%";
         }
