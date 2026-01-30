@@ -516,6 +516,7 @@ body.pause-active .card * {
   top: 1.2rem;
   right: 1.2rem;
   z-index: 6;
+  display: none;
   background: #111827;
   color: #ffffff;
   border-color: #111827;
@@ -534,6 +535,7 @@ body.pause-active .card * {
   top: 3.4rem;
   right: 1.2rem;
   z-index: 6;
+  display: none;
   background: #111827;
   color: #ffffff;
   border-color: #111827;
@@ -552,6 +554,7 @@ body.pause-active .card * {
   top: 5.6rem;
   right: 1.2rem;
   z-index: 6;
+  display: none;
 }
 body[data-mode="practice"] .hud-streak {
   top: 1.2rem;
