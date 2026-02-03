@@ -12,6 +12,7 @@ const revealInput = document.getElementById("revealTime");
       const stagesFooter = document.getElementById("stagesFooter");
       const stageList = document.getElementById("stageList");
       const stageInstructions = document.getElementById("stageInstructions");
+      const hudCluster = document.getElementById("hudCluster");
       const submitBtn = document.getElementById("submitBtn");
       const nextBtn = document.getElementById("nextBtn");
       const practiceModal = document.getElementById("practiceModal");
@@ -412,6 +413,9 @@ const revealInput = document.getElementById("revealTime");
         if (!stageTimerHud) return;
         const showStageTimer = gameMode === "stages" && phase !== "idle";
         stageTimerHud.style.display = showStageTimer ? "block" : "none";
+        if (hudCluster) {
+          hudCluster.style.display = showStageTimer ? "flex" : "none";
+        }
         if (!showStageTimer) {
           stageTimerHud.textContent = "Time 0.00";
         }

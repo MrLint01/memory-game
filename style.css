@@ -556,7 +556,7 @@ body.pause-active .card * {
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
-  display: flex;
+  display: none;
   gap: 0.9rem;
   align-items: center;
   justify-content: center;
