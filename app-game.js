@@ -277,16 +277,37 @@
             wrapper.appendChild(correct);
           }
         });
+        const title = mode === "stages" ? "Stage failed" : "Round failed";
+        const subtitle = "Review the answers below, then try again.";
         const buttons =
           mode === "stages"
-            ? `<button id="stageRetryButton" class="secondary" type="button">Retry stage</button>
-               <button id="stageBackButton" class="secondary" type="button">Back to stages</button>`
-            : `<button id="practiceRetryButton" class="secondary" type="button">Retry round</button>
-               <button id="practiceBackButton" class="secondary" type="button">Back to menu</button>`;
+            ? `<button id="stageBackButton" class="secondary" type="button">
+                 <span class="action-title">Back</span>
+                 <span class="action-key">(Q)</span>
+               </button>
+               <button id="stageRetryButton" class="secondary" type="button">
+                 <span class="action-title">Retry</span>
+                 <span class="action-key">(R)</span>
+               </button>`
+            : `<button id="practiceBackButton" class="secondary" type="button">
+                 <span class="action-title">Back</span>
+                 <span class="action-key">(Q)</span>
+               </button>
+               <button id="practiceRetryButton" class="secondary" type="button">
+                 <span class="action-title">Retry</span>
+                 <span class="action-key">(R)</span>
+               </button>`;
+        const actions = document.querySelector(".stage .actions");
+        if (actions) {
+          actions.innerHTML = "";
+        }
         resultsPanel.innerHTML = `
-          <div class="stage-complete">
-            <div class="stage-complete__header"></div>
-            <div class="stage-complete__actions">
+          <div class="stage-fail-bar">
+            <div class="stage-fail-bar__text">
+              <strong>${title}</strong>
+              <div class="stage-meta">${subtitle}</div>
+            </div>
+            <div class="stage-fail-bar__actions">
               ${buttons}
             </div>
           </div>
@@ -344,6 +365,10 @@
         document.body.classList.remove("stage-fail");
         cardGrid.innerHTML = "";
         inputGrid.innerHTML = "";
+        const actions = document.querySelector(".stage .actions");
+        if (actions) {
+          actions.innerHTML = "";
+        }
         const starText = "*".repeat(stars).padEnd(3, "-");
         const stageName = stage && stage.name ? stage.name : `Stage ${stageState.index + 1}`;
         resultsPanel.innerHTML = `
@@ -352,16 +377,25 @@
               <strong>${stageName} complete!</strong>
               <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s</div>
             </div>
-            <div class="stage-complete__stars" aria-label="Stage stars">
+            <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}">
               <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
               <span class="stage-star${stars >= 2 ? " is-filled" : ""}">✦</span>
               <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
               ${stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : ""}
             </div>
             <div class="stage-complete__actions">
-              <button id="stageBackButton" class="secondary" type="button">Back to stages</button>
-              <button id="stageNextButton" class="secondary" type="button">Next stage</button>
-              <button id="stageRetryButton" class="secondary" type="button">Retry stage</button>
+              <button id="stageBackButton" class="secondary" type="button">
+                <span class="action-title">Back</span>
+                <span class="action-key">(Q)</span>
+              </button>
+              <button id="stageNextButton" class="secondary" type="button">
+                <span class="action-title">Next</span>
+                <span class="action-key">(N)</span>
+              </button>
+              <button id="stageRetryButton" class="secondary" type="button">
+                <span class="action-title">Retry</span>
+                <span class="action-key">(R)</span>
+              </button>
             </div>
           </div>
         `;

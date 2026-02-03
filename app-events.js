@@ -181,16 +181,10 @@
           stageList.innerHTML = "<div class=\"stage-meta\">No stages configured yet.</div>";
           return;
         }
-        const perPage = 5;
-        const totalPages = Math.max(1, Math.ceil(stages.length / perPage));
-        if (stageState.page >= totalPages) {
-          stageState.page = totalPages - 1;
-        }
-        const startIndex = stageState.page * perPage;
-        const slice = stages.slice(startIndex, startIndex + perPage);
-        stageList.innerHTML = slice
+        stageState.page = 0;
+        stageList.innerHTML = stages
           .map((stage, offset) => {
-            const index = startIndex + offset;
+            const index = offset;
             const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
             const stars = window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0;
             const bestTimeSeconds = Number(
@@ -257,14 +251,8 @@
             `;
           })
           .join("");
-        if (stagesPrev) {
-          stagesPrev.disabled = stageState.page === 0;
-        }
-        if (stagesNext) {
-          stagesNext.disabled = stageState.page >= totalPages - 1;
-        }
         if (stagesFooter) {
-          stagesFooter.textContent = `World ${stageState.page + 1} / ${totalPages}`;
+          stagesFooter.textContent = `${stages.length} stages`;
         }
       }
 
@@ -351,18 +339,10 @@
         });
       }
       if (stagesPrev) {
-        stagesPrev.addEventListener("click", () => {
-          if (stageState.page > 0) {
-            stageState.page -= 1;
-            renderStageList();
-          }
-        });
+        stagesPrev.remove();
       }
       if (stagesNext) {
-        stagesNext.addEventListener("click", () => {
-          stageState.page += 1;
-          renderStageList();
-        });
+        stagesNext.remove();
       }
 
       if (stageList) {
@@ -663,6 +643,7 @@
       });
 
       document.addEventListener("keydown", (event) => {
+        const keyLower = event.key.toLowerCase();
         if (pauseModal.classList.contains("show") && event.key === "Escape") {
           event.preventDefault();
           closePauseModal();
@@ -703,6 +684,26 @@
           event.preventDefault();
           openPauseModal();
           return;
+        }
+        if (phase === "result" && gameMode === "stages") {
+          if (keyLower === "q") {
+            event.preventDefault();
+            const backBtn = document.getElementById("stageBackButton");
+            if (backBtn) backBtn.click();
+            return;
+          }
+          if (keyLower === "n") {
+            event.preventDefault();
+            const nextBtn = document.getElementById("stageNextButton");
+            if (nextBtn) nextBtn.click();
+            return;
+          }
+          if (keyLower === "r") {
+            event.preventDefault();
+            const retryBtn = document.getElementById("stageRetryButton");
+            if (retryBtn) retryBtn.click();
+            return;
+          }
         }
         if (successAnimationActive) {
           event.preventDefault();

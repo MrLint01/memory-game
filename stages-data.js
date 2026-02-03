@@ -18,7 +18,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2, gold: 5, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4, gold: 5, silver: 8, bronze: 20 },
       instructions: [
         // Round 1 — reveal
         [
@@ -142,18 +142,6 @@
             at: 0
           }
         ]
-      ],
-      resultInstructions: [
-          {
-            text: "Stage complete. Press **RETURN/ENTER** to try again.",
-            x: 0,
-            y: 130,
-            w: 100,
-            h: 0.7,
-            size: "2rem",
-            color: "#111827",
-            at: 0,
-          }
       ]
     },
     {
