@@ -323,6 +323,7 @@ const revealInput = document.getElementById("revealTime");
         const slides = instructionData && instructionData.slides ? instructionData.slides : [];
         const resultEntries = instructionData && instructionData.result ? instructionData.result : [];
         if (phase === "result") {
+          if (!stageState || !stageState.completed) return;
           if (!Array.isArray(resultEntries) || !resultEntries.length) return;
           scheduleInstructionEntries(resultEntries);
           return;
@@ -417,7 +418,7 @@ const revealInput = document.getElementById("revealTime");
 
       function updateRoundVisibility() {
         if (!roundPill) return;
-        const showRound = gameMode !== "practice" && phase !== "idle";
+        const showRound = gameMode !== "practice" && phase !== "idle" && phase !== "result";
         roundPill.style.display = showRound ? "block" : "none";
       }
 
@@ -429,7 +430,7 @@ const revealInput = document.getElementById("revealTime");
 
       function updateStageTimerVisibility() {
         if (!stageTimerHud) return;
-        const showStageTimer = gameMode === "stages" && phase !== "idle";
+        const showStageTimer = gameMode === "stages" && phase !== "idle" && phase !== "result";
         stageTimerHud.style.display = showStageTimer ? "block" : "none";
         if (hudCluster) {
           hudCluster.style.display = showStageTimer ? "flex" : "none";
