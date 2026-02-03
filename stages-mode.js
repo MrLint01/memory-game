@@ -80,11 +80,14 @@
     const modifiers = window.getStageModifiers(stage);
     return {
       enableMathOps: Boolean(modifiers.mathOps),
-      mathChance: 0.7,
+      mathChance: typeof modifiers.mathChance === "number" ? modifiers.mathChance : 0.7,
       misleadColors: Boolean(modifiers.misleadColors),
-      misleadChance: 0.6,
+      misleadChance: typeof modifiers.misleadChance === "number" ? modifiers.misleadChance : 0.6,
       enableBackgroundColor: Boolean(modifiers.backgroundColor),
-      backgroundColorChance: 0.35,
+      backgroundColorChance:
+        typeof modifiers.backgroundColorChance === "number" ? modifiers.backgroundColorChance : 0.35,
+      backgroundPromptChance:
+        typeof modifiers.backgroundPromptChance === "number" ? modifiers.backgroundPromptChance : 0.5,
       enableGlitch: Boolean(modifiers.glitch)
     };
   };

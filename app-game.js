@@ -592,7 +592,7 @@
         swapActive = false;
         swapPair = null;
         swapMap = null;
-        if (swapEnabled && roundItems.length > 1) {
+        if (swapEnabled && roundItems.length > 1 && Math.random() < swapChance) {
           swapPair = pickSwapPair(roundItems.length);
           if (swapPair) {
             swapMap = roundItems.map((_, idx) => idx);
@@ -697,6 +697,7 @@
         adEnabled = isAdEnabled();
         fogEnabled = isFogEnabled();
         swapEnabled = isSwapEnabled();
+        swapChance = getSwapChance();
         adShownThisRound = false;
         pendingSkipAfterAd = false;
         swapActive = false;

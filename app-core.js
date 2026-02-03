@@ -26,6 +26,10 @@ const revealInput = document.getElementById("revealTime");
       const practiceFog = document.getElementById("practiceFog");
       const practiceAds = document.getElementById("practiceAds");
       const practiceSwap = document.getElementById("practiceSwap");
+      const practiceMathChance = document.getElementById("practiceMathChance");
+      const practiceMisleadChance = document.getElementById("practiceMisleadChance");
+      const practiceBackgroundChance = document.getElementById("practiceBackgroundChance");
+      const practiceSwapChance = document.getElementById("practiceSwapChance");
       const pauseModal = document.getElementById("pauseModal");
       const pauseResume = document.getElementById("pauseResume");
       const pauseRestart = document.getElementById("pauseRestart");
@@ -115,6 +119,7 @@ const revealInput = document.getElementById("revealTime");
       let fogLastMove = { x: null, y: null, t: 0 };
       let glitchTimer = null;
       let swapEnabled = false;
+      let swapChance = 1;
       let swapActive = false;
       let swapPair = null;
       let swapMap = null;
@@ -171,11 +176,11 @@ const revealInput = document.getElementById("revealTime");
         }
         return {
           enableMathOps: practiceMathOps.checked,
-          mathChance: 0.7,
+          mathChance: clamp(Number(practiceMathChance && practiceMathChance.value) || 0.7, 0, 1),
           misleadColors: practiceMisleadColors.checked,
-          misleadChance: 0.6,
+          misleadChance: clamp(Number(practiceMisleadChance && practiceMisleadChance.value) || 0.6, 0, 1),
           enableBackgroundColor: practiceBackgroundColor.checked,
-          backgroundColorChance: 0.35,
+          backgroundColorChance: clamp(Number(practiceBackgroundChance && practiceBackgroundChance.value) || 0.35, 0, 1),
           enableGlitch: practiceGlitch.checked
         };
       }
@@ -216,6 +221,16 @@ const revealInput = document.getElementById("revealTime");
         return Boolean(practiceSwap && practiceSwap.checked);
       }
 
+      function getSwapChance() {
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
+          const value = modifiers && typeof modifiers.swapChance === "number" ? modifiers.swapChance : 1;
+          return Math.max(0, Math.min(1, value));
+        }
+        return clamp(Number(practiceSwapChance && practiceSwapChance.value) || 1, 0, 1);
+      }
+
       function skipRevealNow() {
         if (phase !== "show") return;
         if (timerId) {
@@ -243,6 +258,9 @@ const revealInput = document.getElementById("revealTime");
       function updateCategoryControls() {
         const disabled = gameMode !== "practice";
         document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
+          input.disabled = disabled;
+        });
+        document.querySelectorAll("#practiceModal .stat-field input").forEach((input) => {
           input.disabled = disabled;
         });
         if (!disabled) {
@@ -637,7 +655,9 @@ const revealInput = document.getElementById("revealTime");
           }
           challenge.textLabel = challenge.misleadingLabel || challenge.label;
           const allowBackground = Boolean(options.enableBackgroundColor);
-          challenge.colorTarget = allowBackground && Math.random() < 0.5 ? "background" : "text";
+          const bgChance =
+            typeof options.backgroundColorChance === "number" ? options.backgroundColorChance : 0.5;
+          challenge.colorTarget = allowBackground && Math.random() < bgChance ? "background" : "text";
           if (challenge.colorTarget === "background") {
             challenge.answer = challenge.label;
             challenge.recallHint = "Background color";
@@ -645,12 +665,20 @@ const revealInput = document.getElementById("revealTime");
             challenge.answer = challenge.textLabel;
             challenge.recallHint = "Color text";
           }
-        } else if (options.enableBackgroundColor && Math.random() < options.backgroundColorChance) {
-          const backgroundColor = pickBackgroundColor();
-          challenge.backgroundColorLabel = backgroundColor.label;
-          challenge.backgroundColorHex = backgroundColor.color;
-          challenge.answer = backgroundColor.label;
-          challenge.recallHint = "Background color";
+        } else if (options.enableBackgroundColor) {
+          const bgChance =
+            typeof options.backgroundColorChance === "number" ? options.backgroundColorChance : 0.5;
+          if (Math.random() < bgChance) {
+            const backgroundColor = pickBackgroundColor();
+            challenge.backgroundColorLabel = backgroundColor.label;
+            challenge.backgroundColorHex = backgroundColor.color;
+            const promptChance =
+              typeof options.backgroundPromptChance === "number" ? options.backgroundPromptChance : 0.5;
+            if (Math.random() < promptChance) {
+              challenge.answer = backgroundColor.label;
+              challenge.recallHint = "Background color";
+            }
+          }
         }
         return challenge;
       }

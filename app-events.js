@@ -151,6 +151,7 @@
       }
 
       function isStageUnlocked(stageIndex) {
+        if (window.unlockAllStages) return true;
         // Stage 1 (first stage) is always unlocked
         if (stageIndex === 0) return true;
         
@@ -171,6 +172,7 @@
 
       function renderStageList() {
         if (!stageList) return;
+        window.unlockAllStages = true;
         if (!window.stageNewSeen) {
           window.stageNewSeen = {};
         }
