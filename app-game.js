@@ -26,11 +26,12 @@
         if (stageTimerId) {
           clearInterval(stageTimerId);
         }
-        const startTime = stageState.startTime || performance.now();
         stageTimerId = setInterval(() => {
+          const startTime = stageState.startTime || performance.now();
           const elapsedMs = performance.now() - startTime;
-          const seconds = (elapsedMs / 1000).toFixed(2);
-          stageTimerHud.textContent = `Time ${seconds}`;
+          const elapsedSeconds = elapsedMs / 1000;
+          stageState.elapsedSeconds = elapsedSeconds;
+          stageTimerHud.textContent = `Time ${elapsedSeconds.toFixed(2)}`;
         }, 50);
       }
 
@@ -296,6 +297,7 @@
       function getStageStars(elapsedSeconds, stage) {
         const targets = window.getStageStarTargets ? window.getStageStarTargets(stage) : null;
         if (!targets) return 0;
+        if (Number.isFinite(targets.platinum) && elapsedSeconds <= targets.platinum) return 4;
         if (elapsedSeconds <= targets.gold) return 3;
         if (elapsedSeconds <= targets.silver) return 2;
         if (elapsedSeconds <= targets.bronze) return 1;
@@ -354,9 +356,12 @@
               <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
               <span class="stage-star${stars >= 2 ? " is-filled" : ""}">✦</span>
               <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
+              ${stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : ""}
             </div>
             <div class="stage-complete__actions">
               <button id="stageBackButton" class="secondary" type="button">Back to stages</button>
+              <button id="stageNextButton" class="secondary" type="button">Next stage</button>
+              <button id="stageRetryButton" class="secondary" type="button">Retry stage</button>
             </div>
           </div>
         `;
@@ -414,8 +419,10 @@
             if (round >= stageRounds) {
               stageState.completed = true;
               stageState.failed = false;
-              stageState.elapsedMs = performance.now() - (stageState.startTime || performance.now());
-              const elapsedSeconds = stageState.elapsedMs / 1000;
+              const elapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
+                ? stageState.elapsedSeconds
+                : (performance.now() - (stageState.startTime || performance.now())) / 1000;
+              stageState.elapsedMs = elapsedSeconds * 1000;
               const stars = getStageStars(elapsedSeconds, stage);
           stageState.lastStars = stars;
           saveStageStars(stage, stars, elapsedSeconds);

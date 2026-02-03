@@ -11,6 +11,7 @@ const revealInput = document.getElementById("revealTime");
       const stagesNext = document.getElementById("stagesNext");
       const stagesFooter = document.getElementById("stagesFooter");
       const stageList = document.getElementById("stageList");
+      const stageInstructions = document.getElementById("stageInstructions");
       const submitBtn = document.getElementById("submitBtn");
       const nextBtn = document.getElementById("nextBtn");
       const practiceModal = document.getElementById("practiceModal");
@@ -69,6 +70,8 @@ const revealInput = document.getElementById("revealTime");
       let streak = 0;
       let timerId = null;
       let stageTimerId = null;
+      let stageInstructionTimers = [];
+      let stageInstructionToken = 0;
       let roundFlowToken = 0;
       let successAnimationEnabled = true;
       let successAnimationActive = false;
@@ -274,10 +277,109 @@ const revealInput = document.getElementById("revealTime");
         updateRoundVisibility();
         updateStreakVisibility();
         updateStageTimerVisibility();
+        renderStageInstructions();
         if (nextState === "idle") {
           document.body.classList.remove("show-pause");
           document.body.classList.remove("pause-hint");
         }
+      }
+
+      function toPercent(value) {
+        const numberValue = Number(value);
+        if (!Number.isFinite(numberValue)) return null;
+        return numberValue <= 1 ? numberValue * 100 : numberValue;
+      }
+
+      function renderStageInstructions() {
+        if (!stageInstructions) return;
+        stageInstructionToken += 1;
+        stageInstructionTimers.forEach((timerId) => clearTimeout(timerId));
+        stageInstructionTimers = [];
+        stageInstructions.innerHTML = "";
+        if (gameMode !== "stages") return;
+        if (phase !== "show" && phase !== "recall" && phase !== "result") return;
+        const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        if (!stage || !window.getStageInstructionSlides) return;
+        const instructionData = window.getStageInstructionSlides(stage);
+        const slides = instructionData && instructionData.slides ? instructionData.slides : [];
+        const resultEntries = instructionData && instructionData.result ? instructionData.result : [];
+        if (phase === "result") {
+          if (!Array.isArray(resultEntries) || !resultEntries.length) return;
+          scheduleInstructionEntries(resultEntries);
+          return;
+        }
+        if (!Array.isArray(slides) || !slides.length) return;
+        const currentRound = Math.max(1, Number(round) || 1);
+        const slideIndex = (currentRound - 1) * 2 + (phase === "show" ? 0 : 1);
+        const entries = slides[slideIndex];
+        if (!Array.isArray(entries) || !entries.length) return;
+        scheduleInstructionEntries(entries);
+      }
+
+      function scheduleInstructionEntries(entries) {
+        const renderToken = stageInstructionToken;
+        const fadeMs = 500;
+        const showEntry = (entry) => {
+          if (renderToken !== stageInstructionToken) return;
+          if (!entry || typeof entry.text !== "string" || !entry.text.trim()) return;
+          const box = document.createElement("div");
+          box.className = "stage-instruction";
+          if (entry.className) {
+            String(entry.className)
+              .split(" ")
+              .filter(Boolean)
+              .forEach((cls) => box.classList.add(cls));
+          }
+          const rawText = entry.text;
+          const safeText = String(rawText).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const formatted = safeText.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+          box.innerHTML = `<span class="stage-instruction__text">${formatted}</span>`;
+          const left = toPercent(entry.x);
+          const top = toPercent(entry.y);
+          const width = toPercent(entry.w);
+          const height = toPercent(entry.h);
+          if (left !== null) box.style.left = `${left}%`;
+          if (top !== null) box.style.top = `${top}%`;
+          if (width !== null) box.style.width = `${width}%`;
+          if (height !== null) box.style.height = `${height}%`;
+          if (entry.align) {
+            box.style.textAlign = entry.align;
+          }
+          if (entry.size) {
+            box.style.fontSize = entry.size;
+          }
+          if (entry.color) {
+            box.style.color = entry.color;
+          }
+          stageInstructions.appendChild(box);
+          requestAnimationFrame(() => {
+            if (renderToken !== stageInstructionToken) return;
+            box.classList.add("is-visible");
+          });
+          const duration = Number(entry.duration);
+          if (Number.isFinite(duration) && duration > 0) {
+            const hideId = window.setTimeout(() => {
+              if (renderToken !== stageInstructionToken) return;
+              box.classList.remove("is-visible");
+              box.classList.add("is-hidden");
+              const removeId = window.setTimeout(() => {
+                if (renderToken !== stageInstructionToken) return;
+                box.remove();
+              }, fadeMs);
+              stageInstructionTimers.push(removeId);
+            }, duration);
+            stageInstructionTimers.push(hideId);
+          }
+        };
+        entries.forEach((entry) => {
+          const delay = Number(entry && entry.at);
+          if (Number.isFinite(delay) && delay > 0) {
+            const timerId = window.setTimeout(() => showEntry(entry), delay);
+            stageInstructionTimers.push(timerId);
+          } else {
+            showEntry(entry);
+          }
+        });
       }
 
       function updateScore() {

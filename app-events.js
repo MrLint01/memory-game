@@ -115,6 +115,26 @@
         setModalState(practiceModal, false);
       }
 
+      function isPracticeUnlocked() {
+        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        const unlockStageIndex = 4; // Stage 5 (0-based index)
+        const unlockStage = stages[unlockStageIndex];
+        const unlockKey = unlockStage && unlockStage.id ? String(unlockStage.id) : String(unlockStageIndex + 1);
+        return Boolean(window.stageCompleted && window.stageCompleted[unlockKey]);
+      }
+
+      function updatePracticeLock() {
+        const unlocked = isPracticeUnlocked();
+        if (practiceStart) {
+          practiceStart.disabled = !unlocked;
+          practiceStart.classList.toggle("mode-card--locked", !unlocked);
+          const lockText = practiceStart.querySelector(".mode-card__lock");
+          if (lockText) {
+            lockText.textContent = unlocked ? "" : "Locked • Clear Stage 5";
+          }
+        }
+      }
+
       function formatStageModifiers(modifiers) {
         const entries = [
           { key: "mathOps", label: "Math ops" },
@@ -151,6 +171,9 @@
 
       function renderStageList() {
         if (!stageList) return;
+        if (!window.stageNewSeen) {
+          window.stageNewSeen = {};
+        }
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         if (!stages.length) {
           stageList.innerHTML = "<div class=\"stage-meta\">No stages configured yet.</div>";
@@ -183,18 +206,51 @@
                 return `<span class="stage-star${filled}">✦</span>`;
               })
               .join("");
+            const secretStarMarkup = stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : "";
 
             const name = stage && stage.id ? String(stage.id) : String(index + 1);
             const unlocked = isStageUnlocked(index);
             const lockedClass = unlocked ? "" : " stage-card--locked";
             const lockedAttr = unlocked ? "" : " disabled";
             const lockIcon = unlocked ? "" : ""; /* No lock icon right now. We can add one if we want */
+            const attempted = isCompleted || stars > 0 || Number.isFinite(bestTimeSeconds);
+            const showProgress = unlocked && attempted;
+            const unlockedUnattempted = unlocked && !attempted;
+            const isNew = unlockedUnattempted && index !== 0 && !window.stageNewSeen[stageKey];
+            const lockedLabel = !unlocked
+              ? `<div class="stage-meta stage-locked">Locked</div>`
+              : isNew
+                ? `<div class="stage-meta stage-locked stage-new">New</div>`
+                : "";
+            const placeholderStars =
+              `<div class="stage-meta stage-stars stage-meta--placeholder" aria-hidden="true">` +
+              `<span class="stage-star">✦</span><span class="stage-star">✦</span><span class="stage-star">✦</span>` +
+              `</div>`;
+            const placeholderBest =
+              `<div class="stage-meta stage-best stage-meta--placeholder" aria-hidden="true">Best: 00.00s</div>`;
+
+            if (unlockedUnattempted) {
+              window.stageNewSeen[stageKey] = true;
+            }
 
             return `
               <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}"${lockedAttr}>
                 <strong>${name}${lockIcon}</strong>
-                <div class="stage-meta stage-stars">${starsMarkup}</div>
-                <div class="stage-meta stage-best">Best: ${bestTimeText}</div>
+                ${lockedLabel}
+                ${
+                  showProgress
+                    ? `<div class="stage-meta stage-stars">${starsMarkup}${secretStarMarkup}</div>`
+                    : unlockedUnattempted
+                      ? `<div class="stage-meta stage-stars">${starsMarkup}</div>`
+                      : placeholderStars
+                }
+                ${
+                  showProgress
+                    ? `<div class="stage-meta stage-best">Best: ${bestTimeText}</div>`
+                    : unlockedUnattempted
+                      ? `<div class="stage-meta stage-best">Best: —</div>`
+                      : placeholderBest
+                }
               </button>
             `;
           })
@@ -223,6 +279,7 @@
           stagesScreen.setAttribute("aria-hidden", "true");
         }
         document.body.dataset.view = "home";
+        updatePracticeLock();
       }
 
       function startStage(index) {
@@ -241,6 +298,7 @@
       }
 
       practiceStart.addEventListener("click", () => {
+        if (!isPracticeUnlocked()) return;
         openPracticeModal();
       });
 
@@ -556,6 +614,20 @@
             openStagesScreen();
             return;
           }
+          const nextButton = event.target.closest("#stageNextButton");
+          if (nextButton) {
+            const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+            const nextIndex = stageState.index + 1;
+            if (!stages[nextIndex]) return;
+            stageState.failed = false;
+            stageState.completed = false;
+            stageState.startTime = performance.now();
+            stageState.active = false;
+            stageState.index = nextIndex;
+            resetGame();
+            startRound({ advanceRound: true });
+            return;
+          }
           const practiceBack = event.target.closest("#practiceBackButton");
           if (practiceBack) {
             resetGame();
@@ -653,6 +725,15 @@
             startRound({ advanceRound: true });
             return;
           }
+          if (gameMode === "stages" && stageState.completed) {
+            stageState.failed = false;
+            stageState.completed = false;
+            stageState.startTime = performance.now();
+            stageState.active = false;
+            resetGame();
+            startRound({ advanceRound: true });
+            return;
+          }
           if (gameMode === "practice") {
             resetForRetryRound();
             startRound({ reuseItems: false, advanceRound: false });
@@ -663,6 +744,7 @@
       });
 
       updateModeUI();
+      updatePracticeLock();
       resetGame();
       updateCategoryControls();
 
