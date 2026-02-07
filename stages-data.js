@@ -1,4 +1,6 @@
 (() => {
+  // When true, only Stage 1 is unlocked.
+  window.lockAllStagesExceptFirst = true;
   window.stagesConfig = [
     {
       id: 1,

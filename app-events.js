@@ -152,6 +152,7 @@
 
       function isStageUnlocked(stageIndex) {
         if (window.unlockAllStages) return true;
+        if (window.lockAllStagesExceptFirst) return stageIndex === 0;
         // Stage 1 (first stage) is always unlocked
         if (stageIndex === 0) return true;
         
@@ -172,11 +173,29 @@
 
       function renderStageList() {
         if (!stageList) return;
-        window.unlockAllStages = true;
         if (!window.stageNewSeen) {
           window.stageNewSeen = {};
         }
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        const lockIconSrc = "imgs/lock.png";
+        const stagesTotal = document.getElementById("stagesTotal");
+        const stagesProgress = document.getElementById("stagesProgress");
+        if (stagesTotal || stagesProgress) {
+          const totalStars = stages.reduce((sum, stage, index) => {
+            const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+            return sum + (window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0);
+          }, 0);
+          const completedCount = stages.reduce((sum, stage, index) => {
+            const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+            return sum + (window.stageCompleted && window.stageCompleted[stageKey] ? 1 : 0);
+          }, 0);
+          if (stagesTotal) {
+            stagesTotal.innerHTML = `<span class="stage-total__stars">✦</span><span class="stage-total__count">${totalStars}</span>`;
+          }
+          if (stagesProgress) {
+            stagesProgress.innerHTML = `<span class="stage-progress__label stage-progress__label--check">✓</span><span class="stage-progress__count">${completedCount}/${stages.length}</span>`;
+          }
+        }
         if (!stages.length) {
           stageList.innerHTML = "<div class=\"stage-meta\">No stages configured yet.</div>";
           return;
@@ -208,13 +227,17 @@
             const unlocked = isStageUnlocked(index);
             const lockedClass = unlocked ? "" : " stage-card--locked";
             const lockedAttr = unlocked ? "" : " disabled";
-            const lockIcon = unlocked ? "" : ""; /* No lock icon right now. We can add one if we want */
+            const lockIcon = unlocked
+              ? ""
+              : lockIconSrc
+                ? `<img class="stage-lock" src="${lockIconSrc}" alt="" />`
+                : "";
             const attempted = isCompleted || stars > 0 || Number.isFinite(bestTimeSeconds);
             const showProgress = unlocked && attempted;
             const unlockedUnattempted = unlocked && !attempted;
             const isNew = unlockedUnattempted && index !== 0 && !window.stageNewSeen[stageKey];
             const lockedLabel = !unlocked
-              ? `<div class="stage-meta stage-locked">Locked</div>`
+              ? ""
               : isNew
                 ? `<div class="stage-meta stage-locked stage-new">New</div>`
                 : "";
@@ -231,7 +254,8 @@
 
             return `
               <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}"${lockedAttr}>
-                <strong>${name}${lockIcon}</strong>
+                ${unlocked ? `<strong>${name}</strong>` : ""}
+                ${lockIcon}
                 ${lockedLabel}
                 ${
                   showProgress
@@ -252,7 +276,7 @@
           })
           .join("");
         if (stagesFooter) {
-          stagesFooter.textContent = `${stages.length} stages`;
+          stagesFooter.textContent = "";
         }
       }
 
@@ -420,6 +444,24 @@
       }
       if (statsOpen && statsModal) {
         statsOpen.addEventListener("click", () => {
+          const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+          const stagesClearedEl = document.getElementById("statsStagesCleared");
+          const stagesTotalEl = document.getElementById("statsStagesTotal");
+          const starsEarnedEl = document.getElementById("statsStarsEarned");
+          if (stagesClearedEl || stagesTotalEl || starsEarnedEl) {
+            const totalStages = stages.length;
+            const stagesCleared = stages.reduce((sum, stage, index) => {
+              const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+              return sum + (window.stageCompleted && window.stageCompleted[stageKey] ? 1 : 0);
+            }, 0);
+            const starsEarned = stages.reduce((sum, stage, index) => {
+              const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+              return sum + (window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0);
+            }, 0);
+            if (stagesClearedEl) stagesClearedEl.textContent = String(stagesCleared);
+            if (stagesTotalEl) stagesTotalEl.textContent = String(totalStages);
+            if (starsEarnedEl) starsEarnedEl.textContent = String(starsEarned);
+          }
           setModalState(statsModal, true);
         });
       }
@@ -587,51 +629,67 @@
         });
       }
 
-      if (resultsPanel) {
-        resultsPanel.addEventListener("click", (event) => {
-          const button = event.target.closest("#stageBackButton");
-          if (button) {
-            resetStageProgress();
-            resetGame();
-            openStagesScreen();
-            return;
-          }
-          const nextButton = event.target.closest("#stageNextButton");
-          if (nextButton) {
-            const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
-            const nextIndex = stageState.index + 1;
-            if (!stages[nextIndex]) return;
-            stageState.failed = false;
-            stageState.completed = false;
-            stageState.startTime = performance.now();
-            stageState.active = false;
-            stageState.index = nextIndex;
-            resetGame();
-            startRound({ advanceRound: true });
-            return;
-          }
-          const practiceBack = event.target.closest("#practiceBackButton");
-          if (practiceBack) {
-            resetGame();
-            setPhase("Waiting to start", "idle");
-            return;
-          }
-          const practiceRetry = event.target.closest("#practiceRetryButton");
-          if (practiceRetry) {
-            resetForRetryRound();
-            startRound({ reuseItems: false, advanceRound: false });
-            return;
-          }
-          const retryButton = event.target.closest("#stageRetryButton");
-          if (!retryButton) return;
+      function handleResultActionClick(event) {
+        const menuButton = event.target.closest("#stageMenuButton, #stageBackButton");
+        if (menuButton) {
+          resetStageProgress();
+          resetGame();
+          openStagesScreen();
+          return;
+        }
+        const nextButton = event.target.closest("#stageNextButton");
+        if (nextButton) {
+          const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+          const nextIndex = stageState.index + 1;
+          if (!stages[nextIndex]) return;
           stageState.failed = false;
           stageState.completed = false;
           stageState.startTime = performance.now();
           stageState.active = false;
+          stageState.index = nextIndex;
           resetGame();
           startRound({ advanceRound: true });
           return;
-        });
+        }
+        const practiceBack = event.target.closest("#practiceBackButton");
+        if (practiceBack) {
+          resetGame();
+          setPhase("Waiting to start", "idle");
+          return;
+        }
+        const practiceRetry = event.target.closest("#practiceRetryButton");
+        if (practiceRetry) {
+          resetForRetryRound();
+          startRound({ reuseItems: false, advanceRound: false });
+          return;
+        }
+        const homeButton = event.target.closest("#stageHomeButton");
+        if (homeButton) {
+          resetStageProgress();
+          resetGame();
+          setPhase("Waiting to start", "idle");
+          modeSelect.value = "practice";
+          updateModeUI();
+          document.body.dataset.view = "home";
+          updatePracticeLock();
+          return;
+        }
+        const retryButton = event.target.closest("#stageRetryButton");
+        if (!retryButton) return;
+        stageState.failed = false;
+        stageState.completed = false;
+        stageState.startTime = performance.now();
+        stageState.active = false;
+        resetGame();
+        startRound({ advanceRound: true });
+        return;
+      }
+
+      if (resultsPanel) {
+        resultsPanel.addEventListener("click", handleResultActionClick);
+      }
+      if (actions) {
+        actions.addEventListener("click", handleResultActionClick);
       }
 
       modeSelect.addEventListener("change", () => {
@@ -688,8 +746,9 @@
         if (phase === "result" && gameMode === "stages") {
           if (keyLower === "q") {
             event.preventDefault();
-            const backBtn = document.getElementById("stageBackButton");
-            if (backBtn) backBtn.click();
+            const menuBtn =
+              document.getElementById("stageMenuButton") || document.getElementById("stageBackButton");
+            if (menuBtn) menuBtn.click();
             return;
           }
           if (keyLower === "n") {

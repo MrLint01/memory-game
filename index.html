@@ -40,17 +40,17 @@
               </button>
             </div>
             <div class="quick-actions">
-              <button id="settingsOpen" class="quick-action" type="button" aria-label="Open settings">
-                Settings
+              <button id="settingsOpen" class="quick-action icon-button" type="button" aria-label="Open settings">
+                <img class="action-icon" src="imgs/settings_button.png" alt="" />
               </button>
-              <button id="statsOpen" class="quick-action" type="button" aria-label="Open stats">
-                Stats
+              <button id="statsOpen" class="quick-action icon-button" type="button" aria-label="Open stats">
+                <img class="action-icon" src="imgs/stat_button.png" alt="" />
               </button>
-              <button id="referenceOpen" class="quick-action" type="button" aria-label="Open reference">
-                Reference
+              <button id="referenceOpen" class="quick-action icon-button" type="button" aria-label="Open reference">
+                <img class="action-icon" src="imgs/reference_button.png" alt="" />
               </button>
-              <button id="fullscreenToggle" class="quick-action" type="button" aria-label="Toggle fullscreen">
-                Full Screen
+              <button id="fullscreenToggle" class="quick-action icon-button" type="button" aria-label="Toggle fullscreen">
+                <img class="action-icon" src="imgs/fullscreen_button.png" alt="" />
               </button>
             </div>
           </div>
@@ -73,8 +73,13 @@
       </section>
       <section class="stages-screen" id="stagesScreen" aria-hidden="true">
         <div class="stages-hero">
-          <button id="stagesBack" class="secondary" type="button">Back</button>
-          <h2>Stages</h2>
+          <button id="stagesBack" class="quick-action icon-button" type="button" aria-label="Home">
+            <img class="action-icon" src="imgs/home_button.png" alt="" />
+          </button>
+          <div class="stages-summary">
+            <div class="stages-progress" id="stagesProgress" aria-live="polite"></div>
+            <div class="stages-total" id="stagesTotal" aria-live="polite"></div>
+          </div>
         </div>
         <div class="stage-board">
           <div class="stage-list stage-grid" id="stageList"></div>

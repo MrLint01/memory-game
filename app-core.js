@@ -62,6 +62,7 @@ const revealInput = document.getElementById("revealTime");
       const cardGrid = document.getElementById("cardGrid");
       const promptGrid = document.getElementById("promptGrid");
       const inputGrid = document.getElementById("inputGrid");
+      const actions = document.querySelector(".stage .actions");
       const resultsPanel = document.getElementById("resultsPanel");
       const platformerPanel = document.getElementById("platformerPanel");
       const platformerCanvas = document.getElementById("platformerCanvas");

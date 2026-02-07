@@ -251,7 +251,10 @@
           entries.forEach((entry) => {
             const prompt = document.createElement("div");
             prompt.className = "card hidden-card hint";
-            prompt.textContent = entry.expected.label;
+            prompt.innerHTML = `
+              <small>Card ${entry.displayIndex}</small>
+              <span>${entry.expected.label}</span>
+            `;
             promptGrid.appendChild(prompt);
           });
         }
@@ -278,16 +281,17 @@
           }
         });
         const title = mode === "stages" ? "Stage failed" : "Round failed";
-        const subtitle = "Review the answers below, then try again.";
+        const subtitle = "";
         const buttons =
           mode === "stages"
-            ? `<button id="stageBackButton" class="secondary" type="button">
-                 <span class="action-title">Back</span>
-                 <span class="action-key">(Q)</span>
+            ? `<button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
+                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
                </button>
-               <button id="stageRetryButton" class="secondary" type="button">
-                 <span class="action-title">Retry</span>
-                 <span class="action-key">(R)</span>
+               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
+                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+               </button>
+               <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
+                 <img class="action-icon" src="imgs/home_button.png" alt="" />
                </button>`
             : `<button id="practiceBackButton" class="secondary" type="button">
                  <span class="action-title">Back</span>
@@ -299,16 +303,13 @@
                </button>`;
         const actions = document.querySelector(".stage .actions");
         if (actions) {
-          actions.innerHTML = "";
+          actions.innerHTML = mode === "stages" ? `<div class="stage-fail-actions">${buttons}</div>` : "";
         }
         resultsPanel.innerHTML = `
           <div class="stage-fail-bar">
             <div class="stage-fail-bar__text">
               <strong>${title}</strong>
-              <div class="stage-meta">${subtitle}</div>
-            </div>
-            <div class="stage-fail-bar__actions">
-              ${buttons}
+              ${subtitle ? `<div class="stage-meta">${subtitle}</div>` : ""}
             </div>
           </div>
         `;
@@ -384,17 +385,17 @@
               ${stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : ""}
             </div>
             <div class="stage-complete__actions">
-              <button id="stageBackButton" class="secondary" type="button">
-                <span class="action-title">Back</span>
-                <span class="action-key">(Q)</span>
+              <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
+                <img class="action-icon" src="imgs/menu_button.png" alt="" />
               </button>
-              <button id="stageNextButton" class="secondary" type="button">
-                <span class="action-title">Next</span>
-                <span class="action-key">(N)</span>
+              <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (N)">
+                <img class="action-icon" src="imgs/next_button.png" alt="" />
               </button>
-              <button id="stageRetryButton" class="secondary" type="button">
-                <span class="action-title">Retry</span>
-                <span class="action-key">(R)</span>
+              <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
+                <img class="action-icon" src="imgs/retry_button.png" alt="" />
+              </button>
+              <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
+                <img class="action-icon" src="imgs/home_button.png" alt="" />
               </button>
             </div>
           </div>
