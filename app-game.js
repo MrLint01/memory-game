@@ -1,4 +1,5 @@
-function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
+
+      function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
         clearInterval(timerId);
         const endTime = performance.now() + seconds * 1000;
         timerState = { endTime, seconds, totalSeconds, label, onComplete };
@@ -753,23 +754,3 @@ function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
           beginRecallPhase();
         });
       }
-
-      // Remove misplaced tracking function calls and ensure they are placed inside relevant functions only
-      // Example: Call when a level is attempted
-      if (typeof trackLevelAttempt === 'function') {
-        trackLevelAttempt(stageState.index, (stageState.attempts || 1));
-        stageState.attempts = (stageState.attempts || 1) + 1;
-      }
-
-      // Example: Call when a level is completed
-      if (typeof trackLevelCompleted === 'function') {
-        trackLevelCompleted(stageState.index, stars, elapsedSeconds);
-      }
-
-      // Example: Call when card results are available
-      if (typeof trackCardBreakdown === 'function') {
-        trackCardBreakdown(stageState.index, round, entries);
-      }
-    }
-  }
-}
