@@ -150,6 +150,127 @@
         return enabled.length ? enabled.join(", ") : "None";
       }
 
+      let stageIntroPendingIndex = null;
+
+      function closeStageIntro() {
+        stageIntroPendingIndex = null;
+        setModalState(stageIntroModal, false);
+      }
+
+      function openStageIntro(index) {
+        if (!stageIntroModal || !stageIntroTitle || !stageIntroList) return false;
+        const stage = window.getStageConfig ? window.getStageConfig(index) : null;
+        if (!stage) return false;
+        const stageName = stage.name ? String(stage.name) : `Stage ${index + 1}`;
+        stageIntroTitle.textContent = stageName;
+        if (stageIntroStars) {
+          stageIntroStars.innerHTML = "";
+          const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+          const starsEarned = window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0;
+          [1, 2, 3].forEach((value) => {
+            const star = document.createElement("span");
+            star.className = `stage-star${starsEarned >= value ? " is-filled" : ""}`;
+            star.textContent = "✦";
+            stageIntroStars.appendChild(star);
+          });
+          if (starsEarned >= 4) {
+            const secret = document.createElement("span");
+            secret.className = "stage-star is-filled is-secret";
+            secret.textContent = "✦";
+            stageIntroStars.appendChild(secret);
+          }
+        }
+        if (stageIntroBest) {
+          const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+          const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[stageKey]);
+          stageIntroBest.textContent = Number.isFinite(bestSeconds)
+            ? `Best: ${bestSeconds.toFixed(2)}s`
+            : "Best: —";
+        }
+        if (stageIntroSubtitle) {
+          const rounds = stage.rounds || 1;
+          const cards = window.getStageCardCount ? window.getStageCardCount(stage) : stage.cards || 1;
+          const revealSeconds = Number(stage.revealSeconds) || Number(revealInput.value) || 5;
+          const recallSeconds = Number(stage.recallSeconds) || Number(recallInput.value) || 5;
+          stageIntroSubtitle.innerHTML = "";
+          const chips = [
+            { label: "Rounds", value: rounds },
+            { label: "Cards", value: cards },
+            { label: "Reveal", value: `${revealSeconds}s` },
+            { label: "Recall", value: `${recallSeconds}s` }
+          ];
+          chips.forEach((chip) => {
+            const pill = document.createElement("span");
+            pill.className = "stage-intro-chip";
+            pill.textContent = chip.label;
+            pill.dataset.value = chip.value;
+            stageIntroSubtitle.appendChild(pill);
+          });
+        }
+        if (stageIntroGoals) {
+          stageIntroGoals.innerHTML = "";
+        }
+        stageIntroList.innerHTML = "";
+        const categories = window.getStageCategories ? window.getStageCategories(stage) : stage.categories || [];
+        const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : stage.modifiers || {};
+        const cardIconMap = {
+          numbers: { label: "Numbers", src: "imgs/icons/card-numbers.svg" },
+          colors: { label: "Colors", src: "imgs/icons/card-colors.svg" },
+          letters: { label: "Letters", src: "imgs/icons/card-letters.svg" },
+          directions: { label: "Directions", src: "imgs/icons/card-directions.svg" },
+          shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" }
+        };
+        const modifierIconMap = {
+          mathOps: { label: "Math ops", src: "imgs/icons/mod-mathops.svg" },
+          misleadColors: { label: "Mislead", src: "imgs/icons/mod-misleadcolors.svg" },
+          backgroundColor: { label: "Background", src: "imgs/icons/mod-backgroundcolor.svg" },
+          swapCards: { label: "Swap", src: "imgs/icons/mod-swapcards.svg" },
+          platformer: { label: "Platformer", src: "imgs/icons/mod-platformer.svg" },
+          glitch: { label: "Glitch", src: "imgs/icons/mod-glitch.svg" },
+          fog: { label: "Fog", src: "imgs/icons/mod-fog.svg" },
+          ads: { label: "Ads", src: "imgs/icons/mod-ads.svg" }
+        };
+        const renderIconSection = (title, items) => {
+          const section = document.createElement("div");
+          section.className = "stage-intro-section-block";
+          const heading = document.createElement("div");
+          heading.className = "stage-intro-section";
+          heading.textContent = title;
+          const grid = document.createElement("div");
+          grid.className = "stage-intro-icon-grid";
+          items.forEach((item) => {
+            const tile = document.createElement("div");
+            tile.className = "stage-intro-icon";
+            const img = document.createElement("img");
+            img.src = item.src;
+            img.alt = item.label;
+            img.loading = "lazy";
+            const label = document.createElement("span");
+            label.textContent = item.label;
+            tile.appendChild(img);
+            tile.appendChild(label);
+            grid.appendChild(tile);
+          });
+          section.appendChild(heading);
+          section.appendChild(grid);
+          stageIntroList.appendChild(section);
+        };
+        const categoryKeys = categories.length ? categories : ["numbers"];
+        const cardItems = categoryKeys
+          .map((key) => cardIconMap[key])
+          .filter(Boolean);
+        renderIconSection("Card Types", cardItems);
+        const modifierItems = Object.keys(modifierIconMap)
+          .filter((key) => modifiers && modifiers[key])
+          .map((key) => modifierIconMap[key]);
+        if (modifierItems.length) {
+          renderIconSection("Modifiers", modifierItems);
+        }
+        stageIntroPendingIndex = index;
+        setModalState(stageIntroModal, true);
+        return true;
+      }
+
       function isStageUnlocked(stageIndex) {
         if (window.unlockAllStages) return true;
         if (window.lockAllStagesExceptFirst) return stageIndex === 0;
@@ -210,10 +331,6 @@
               window.stageBestTimes && window.stageBestTimes[stageKey]
             );
             const isCompleted = window.stageCompleted && window.stageCompleted[stageKey];
-            const bestTimeText =
-              isCompleted && Number.isFinite(bestTimeSeconds)
-                ? `${bestTimeSeconds.toFixed(2)}s`
-                : "—";
 
             const starsMarkup = [1, 2, 3]
               .map((value) => {
@@ -245,8 +362,7 @@
               `<div class="stage-meta stage-stars stage-meta--placeholder" aria-hidden="true">` +
               `<span class="stage-star">✦</span><span class="stage-star">✦</span><span class="stage-star">✦</span>` +
               `</div>`;
-            const placeholderBest =
-              `<div class="stage-meta stage-best stage-meta--placeholder" aria-hidden="true">Best: 00.00s</div>`;
+            const placeholderBest = `<div class="stage-meta stage-best stage-meta--placeholder" aria-hidden="true"></div>`;
 
             if (unlockedUnattempted) {
               window.stageNewSeen[stageKey] = true;
@@ -264,13 +380,7 @@
                       ? `<div class="stage-meta stage-stars">${starsMarkup}</div>`
                       : placeholderStars
                 }
-                ${
-                  showProgress
-                    ? `<div class="stage-meta stage-best">Best: ${bestTimeText}</div>`
-                    : unlockedUnattempted
-                      ? `<div class="stage-meta stage-best">Best: —</div>`
-                      : placeholderBest
-                }
+                ${placeholderBest}
               </button>
             `;
           })
@@ -296,7 +406,11 @@
         updatePracticeLock();
       }
 
-      function startStage(index) {
+      function startStage(index, options = {}) {
+        const { skipIntro = false } = options;
+        if (!skipIntro && openStageIntro(index)) {
+          return;
+        }
         stageState.active = false;
         stageState.index = index;
         stageState.startTime = performance.now();
@@ -332,6 +446,27 @@
         referenceModal.addEventListener("click", (event) => {
           if (event.target === referenceModal) {
             setModalState(referenceModal, false);
+          }
+        });
+      }
+      if (stageIntroClose && stageIntroModal) {
+        stageIntroClose.addEventListener("click", () => {
+          closeStageIntro();
+        });
+      }
+      if (stageIntroStart && stageIntroModal) {
+        stageIntroStart.addEventListener("click", () => {
+          const index = stageIntroPendingIndex;
+          closeStageIntro();
+          if (Number.isFinite(index)) {
+            startStage(index, { skipIntro: true });
+          }
+        });
+      }
+      if (stageIntroModal) {
+        stageIntroModal.addEventListener("click", (event) => {
+          if (event.target === stageIntroModal) {
+            closeStageIntro();
           }
         });
       }
@@ -662,13 +797,7 @@
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const nextIndex = stageState.index + 1;
           if (!stages[nextIndex]) return;
-          stageState.failed = false;
-          stageState.completed = false;
-          stageState.startTime = performance.now();
-          stageState.active = false;
-          stageState.index = nextIndex;
-          resetGame();
-          startRound({ advanceRound: true });
+          startStage(nextIndex, { skipIntro: true });
           return;
         }
         const practiceBack = event.target.closest("#practiceBackButton");
@@ -696,12 +825,7 @@
         }
         const retryButton = event.target.closest("#stageRetryButton");
         if (!retryButton) return;
-        stageState.failed = false;
-        stageState.completed = false;
-        stageState.startTime = performance.now();
-        stageState.active = false;
-        resetGame();
-        startRound({ advanceRound: true });
+        startStage(stageState.index, { skipIntro: true });
         return;
       }
 
@@ -738,6 +862,21 @@
           if (event.key === "Escape") {
             event.preventDefault();
             setModalState(referenceModal, false);
+          }
+          return;
+        }
+        if (stageIntroModal && stageIntroModal.classList.contains("show")) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeStageIntro();
+            return;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (stageIntroStart) {
+              stageIntroStart.click();
+            }
+            return;
           }
           return;
         }

@@ -6,3 +6,26 @@ asdasdas
 
 
 Stages/Levels -> 3 Stars, time based
+
+
+
+transform: translateY(-1%);
+
+level_attempt
+card_result
+scroll
+user_engagement
+page_view	
+card_guessed_correctly
+level_session
+session_start
+attempted_level
+level_completion_details
+
+you get data in batches
+    - record page hits
+    - different frequencies
+    - tracking progression within level is very hard.
+    
+Fill out the form is outlier.
+    - 

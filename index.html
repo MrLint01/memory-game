@@ -34,7 +34,7 @@
               <button id="playStart" class="mode-card primary" type="button">
                 <strong>Play</strong>
               </button>
-              <button id="practiceStart" class="mode-card" type="button">
+              <button id="practiceStart" class="mode-card mode-card--locked" type="button" disabled>
                 <strong>Sandbox</strong>
                 <span class="mode-card__lock" aria-hidden="true"></span>
               </button>
@@ -163,6 +163,7 @@
     </div>
     <div data-include="ui/settings.html"></div>
     <div data-include="ui/stats.html"></div>
+    <div data-include="ui/stage-intro.html"></div>
     <div class="modal modal--pause" id="pauseModal" aria-hidden="true">
       <div class="modal-card">
         <h3>Paused</h3>
@@ -174,7 +175,7 @@
       </div>
     </div>
     <div data-include="ui/reference.html"></div>
-    <div class="interrupt-modal" id="interruptModal" aria-hidden="true">
+    <div class="interrupt-modal" id="interruptModal" aria-hidden="true" hidden>
       <div class="interrupt-card">
         <div class="interrupt-header">
           <button class="interrupt-close" id="interruptClose" type="button">X</button>
@@ -190,13 +191,16 @@
     <button class="hud-pause" id="pauseButton" type="button">Pause</button>
     <canvas class="fog-overlay" id="fogCanvas"></canvas>
     <div class="success-toast" id="successToast" aria-hidden="true">All correct!</div>
-    <div class="config-hidden">
+    <div class="config-hidden" hidden>
       <select id="modeSelect">
         <option value="practice" selected>Practice</option>
         <option value="stages">Stages</option>
       </select>
     </div>
     <script src="analytics.js?v=1"></script>
+    <script>
+      window.unlockAllStages = true;
+    </script>
     <script src="ui-loader.js?v=1"></script>
   </body>
 </html>
