@@ -626,7 +626,13 @@ const revealInput = document.getElementById("revealTime");
         }
         if (item.category === "directions") {
           const initial = expected.charAt(0);
-          return actual === expected || actual === initial;
+          const arrowMap = {
+            up: "↑",
+            down: "↓",
+            left: "←",
+            right: "→"
+          }
+          return actual === expected || actual === initial || actual === arrowMap[expected];
         }
         if (item.category === "shapes") {
           if (expected === "square") {
