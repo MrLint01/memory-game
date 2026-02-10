@@ -1,4 +1,5 @@
-function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
+
+      function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
         clearInterval(timerId);
         const endTime = performance.now() + seconds * 1000;
         timerState = { endTime, seconds, totalSeconds, label, onComplete };
@@ -436,10 +437,6 @@ function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
           };
         });
         window.__lastEntries = entries;
-        // Analytics: Track card breakdown for every round
-        if (typeof trackCardBreakdown === 'function') {
-          trackCardBreakdown(gameMode === 'stages' ? stageState.index : 'practice', round, entries);
-        }
         const allCorrect =
           (!platformerRequired || (platformerState.completed && !platformerState.failed)) &&
           entries.every((entry) => entry.correct);
@@ -462,12 +459,8 @@ function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
                 : (performance.now() - (stageState.startTime || performance.now())) / 1000;
               stageState.elapsedMs = elapsedSeconds * 1000;
               const stars = getStageStars(elapsedSeconds, stage);
-              stageState.lastStars = stars;
-              saveStageStars(stage, stars, elapsedSeconds);
-              // Analytics: Track level completed
-              if (typeof trackLevelCompleted === 'function') {
-                trackLevelCompleted(stageState.index, stars, elapsedSeconds);
-              }
+          stageState.lastStars = stars;
+          saveStageStars(stage, stars, elapsedSeconds);
               lockInputs(true);
               renderCards(true);
               showStageComplete(elapsedSeconds, stars, stage);
@@ -701,11 +694,6 @@ function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
             stageState.completed = false;
             stageState.failed = false;
             startStageStopwatch();
-            // Analytics: Track level attempt
-            if (typeof trackLevelAttempt === 'function') {
-              trackLevelAttempt(stageState.index, (stageState.attempts || 1));
-              stageState.attempts = (stageState.attempts || 1) + 1;
-            }
           }
           const stageRounds = stage.rounds || 1;
           if (advanceRound && round >= stageRounds) {
@@ -766,6 +754,3 @@ function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
           beginRecallPhase();
         });
       }
-    }
-  }
-}
