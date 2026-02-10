@@ -1,57 +1,62 @@
 // analytics.js
-// Google Analytics event tracking helpers for Flash Recall
+// Google Analytics event tracking for Flash Recall
+// Data structure:
+// - Attempted level
+//   - level_number (int)
+//   - passed (bool)
+//   - stars (int)
+//   - time (float) - total time for level
+//   - rounds (array)
+//     - round_number (int)
+//     - passed (bool)
+//     - time_spent (float)
+//   - cards_failed (array)
+//     - expected (string)
+//     - actual (string)
+// - Time per session (float)
+// - Last level completed when quitting (int)
 
-// Track level session with comprehensive stats
-function trackLevelSession(stageIndex, stars, elapsedSeconds, entries, attemptNumber) {
-  if (!entries || entries.length === 0) return;
-  
-  const correctCards = entries.filter(e => e.correct);
-  const incorrectCards = entries.filter(e => !e.correct);
-  const totalCards = entries.length;
-  
-  // Main level session event with aggregate stats
-  gtag('event', 'level_session', {
-    level: stageIndex,
-    attempt_number: attemptNumber,
-    completed: 'true',
-    stars_earned: stars,
-    time_spent_seconds: elapsedSeconds,
-    total_cards: totalCards,
-    cards_correct: correctCards.length,
-    cards_incorrect: incorrectCards.length,
-    success_rate: ((correctCards.length / totalCards) * 100).toFixed(1)
-  });
-  
-  // Send individual card events
-  // Correctly guessed cards
-  correctCards.forEach((card, index) => {
-    gtag('event', 'card_guessed_correctly', {
-      level: stageIndex,
-      attempt_number: attemptNumber,
-      card_category: card.category,
-      card_value: card.answer,
-      card_position: card.displayIndex,
-      time_spent_seconds: elapsedSeconds
-    });
-  });
-  
-  // Incorrectly guessed cards
-  incorrectCards.forEach((card, index) => {
-    gtag('event', 'card_guessed_incorrectly', {
-      level: stageIndex,
-      attempt_number: attemptNumber,
-      card_category: card.category,
-      correct_answer: card.answer,
-      player_answer: card.userAnswer || 'blank',
-      card_position: card.displayIndex,
-      time_spent_seconds: elapsedSeconds
-    });
+// Accumulate rounds data for current level
+let roundsForCurrentLevel = [];
+
+// Track round completion - call this when each round within a level finishes
+function trackRoundCompletion(roundNumber, passed, timeSpent) {
+  roundsForCurrentLevel.push({
+    round_number: roundNumber,
+    passed: passed,
+    time_spent: parseFloat(timeSpent.toFixed(2))
   });
 }
 
-function trackLevelAttempt(stageIndex, attemptNumber) {
-  gtag('event', 'level_attempt', {
-    level: stageIndex,
-    attempt_number: attemptNumber
+// Main level tracking - sent when level completes
+function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, entries) {
+  if (!entries || entries.length === 0) return;
+  
+  const failedCards = entries.filter(e => !e.correct).map(card => ({
+    expected: card.answer,
+    actual: card.userAnswer || 'blank'
+  }));
+  
+  // Main attempted level event with nested rounds and failed cards
+  gtag('event', 'attempted_level', {
+    level_number: levelNumber,
+    passed: passed ? 'true' : 'false',
+    stars: stars,
+    time: parseFloat(elapsedSeconds.toFixed(2)),
+    rounds: JSON.stringify(roundsForCurrentLevel),
+    cards_failed: JSON.stringify(failedCards),
+    total_cards: entries.length,
+    cards_failed_count: failedCards.length
+  });
+  
+  // Reset rounds for next level
+  roundsForCurrentLevel = [];
+}
+
+// Track session end with total time and last completed level
+function trackSessionEnd(totalSessionSeconds, lastLevelCompleted) {
+  gtag('event', 'session_end', {
+    time_per_session_seconds: parseFloat(totalSessionSeconds.toFixed(2)),
+    last_level_completed: lastLevelCompleted
   });
 }

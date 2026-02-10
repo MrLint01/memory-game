@@ -73,6 +73,7 @@ const revealInput = document.getElementById("revealTime");
 
       let phase = "idle";
       let round = 0;
+      let roundStartTime = 0;
       let streak = 0;
       let timerId = null;
       let stageTimerId = null;

@@ -569,6 +569,16 @@
 
       pauseQuit.addEventListener("click", () => {
         closePauseModal();
+        // Analytics: Track level quit
+        if (gameMode === "stages" && stageState.active) {
+          const quitElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
+            ? stageState.elapsedSeconds
+            : (performance.now() - (stageState.startTime || performance.now())) / 1000;
+          const quitEntries = window.__lastEntries || [];
+          if (typeof trackLevelSession === 'function') {
+            trackLevelSession(stageState.index, false, 0, quitElapsedSeconds, quitEntries);
+          }
+        }
         if (gameMode === "stages") {
           resetStageProgress();
         }
@@ -632,6 +642,16 @@
       function handleResultActionClick(event) {
         const menuButton = event.target.closest("#stageMenuButton, #stageBackButton");
         if (menuButton) {
+          // Analytics: Track level quit via back button
+          if (gameMode === "stages" && stageState.active && !stageState.completed) {
+            const backElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
+              ? stageState.elapsedSeconds
+              : (performance.now() - (stageState.startTime || performance.now())) / 1000;
+            const backEntries = window.__lastEntries || [];
+            if (typeof trackLevelSession === 'function') {
+              trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries);
+            }
+          }
           resetStageProgress();
           resetGame();
           openStagesScreen();

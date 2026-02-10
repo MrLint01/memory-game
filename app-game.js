@@ -461,9 +461,9 @@
               const stars = getStageStars(elapsedSeconds, stage);
           stageState.lastStars = stars;
           saveStageStars(stage, stars, elapsedSeconds);
-              // Analytics: Track level session with comprehensive stats
+              // Analytics: Track level session
               if (typeof trackLevelSession === 'function') {
-                trackLevelSession(stageState.index, stars, elapsedSeconds, entries, (stageState.attempts || 1));
+                trackLevelSession(stageState.index, true, stars, elapsedSeconds, entries);
               }
               lockInputs(true);
               renderCards(true);
@@ -478,6 +478,11 @@
               setPhase("Stage complete", "result");
               updateScore();
               return;
+            }
+            // Track the current successful round before moving to next
+            const roundTimeSpent = (performance.now() - roundStartTime) / 1000;
+            if (typeof trackRoundCompletion === 'function') {
+              trackRoundCompletion(round, true, roundTimeSpent);
             }
             startRound();
             return;
@@ -510,6 +515,18 @@
           stageState.active = false;
           stopStageStopwatch();
           streak = 0;
+          // Analytics: Track level failure
+          const failedEntries = roundItems.map((item) => ({
+            expected: buildExpectedLabel(item),
+            actual: "",
+            correct: false
+          }));
+          const failedElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
+            ? stageState.elapsedSeconds
+            : (performance.now() - (stageState.startTime || performance.now())) / 1000;
+          if (typeof trackLevelSession === 'function') {
+            trackLevelSession(stageState.index, false, 0, failedElapsedSeconds, failedEntries);
+          }
           setPhase("Round complete", "result");
           updateScore();
           return;
@@ -698,11 +715,7 @@
             stageState.completed = false;
             stageState.failed = false;
             startStageStopwatch();
-            // Analytics: Track level attempt
-            if (typeof trackLevelAttempt === 'function') {
-              trackLevelAttempt(stageState.index, (stageState.attempts || 1));
-              stageState.attempts = (stageState.attempts || 1) + 1;
-            }
+            stageState.attempts = (stageState.attempts || 1) + 1;
           }
           const stageRounds = stage.rounds || 1;
           if (advanceRound && round >= stageRounds) {
@@ -718,6 +731,7 @@
         if (advanceRound) {
           round += 1;
         }
+        roundStartTime = performance.now();
         updateScore();
         resetBoard();
         if (!reuseItems) {
