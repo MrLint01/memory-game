@@ -33,8 +33,9 @@ function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, entries) 
   if (!entries || entries.length === 0) return;
   
   const failedCards = entries.filter(e => !e.correct).map(card => ({
-    expected: card.answer,
-    actual: card.userAnswer || 'blank'
+    card_type: card.category || 'unknown',
+    expected: card.answer || card.expected || 'unknown',
+    actual: card.userAnswer || card.actual || 'blank'
   }));
   
   // Main attempted level event with nested rounds and failed cards

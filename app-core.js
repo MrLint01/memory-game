@@ -141,6 +141,8 @@ const revealInput = document.getElementById("revealTime");
         lastStars: 0,
         page: 0
       };
+      let sessionStartTime = performance.now();
+      let lastCompletedLevel = 0;
       let dragSelecting = false;
       let dragTargetState = null;
       function getSelectedCategories() {

@@ -579,6 +579,11 @@
             trackLevelSession(stageState.index, false, 0, quitElapsedSeconds, quitEntries);
           }
         }
+        // Track session end
+        const totalSessionSeconds = (performance.now() - sessionStartTime) / 1000;
+        if (typeof trackSessionEnd === 'function') {
+          trackSessionEnd(totalSessionSeconds, lastCompletedLevel);
+        }
         if (gameMode === "stages") {
           resetStageProgress();
         }
@@ -842,3 +847,11 @@
           setSuccessAnimationEnabled(successAnimationToggle.checked);
         });
       }
+
+      // Track session end on page unload
+      window.addEventListener("beforeunload", () => {
+        const totalSessionSeconds = (performance.now() - sessionStartTime) / 1000;
+        if (typeof trackSessionEnd === 'function') {
+          trackSessionEnd(totalSessionSeconds, lastCompletedLevel);
+        }
+      });
