@@ -51,6 +51,15 @@ const revealInput = document.getElementById("revealTime");
       const statsClose = document.getElementById("statsClose");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
+      const stageIntroModal = document.getElementById("stageIntroModal");
+      const stageIntroTitle = document.getElementById("stageIntroTitle");
+      const stageIntroSubtitle = document.getElementById("stageIntroSubtitle");
+      const stageIntroStars = document.getElementById("stageIntroStars");
+      const stageIntroBest = document.getElementById("stageIntroBest");
+      const stageIntroGoals = document.getElementById("stageIntroGoals");
+      const stageIntroList = document.getElementById("stageIntroList");
+      const stageIntroClose = document.getElementById("stageIntroClose");
+      const stageIntroStart = document.getElementById("stageIntroStart");
       const modeSelect = document.getElementById("modeSelect");
       const timerBar = document.getElementById("timerBar");
       const timerFill = document.getElementById("timerFill");
@@ -628,7 +637,13 @@ const revealInput = document.getElementById("revealTime");
         }
         if (item.category === "directions") {
           const initial = expected.charAt(0);
-          return actual === expected || actual === initial;
+          const arrowMap = {
+            up: "↑",
+            down: "↓",
+            left: "←",
+            right: "→"
+          }
+          return actual === expected || actual === initial || actual === arrowMap[expected];
         }
         if (item.category === "shapes") {
           if (expected === "square") {

@@ -773,7 +773,7 @@
       recallSeconds: 15,
       categories: ["numbers", "colors", "letters", "directions", "shapes"],
       modifiers: {
-        mathOps: true,
+        mathOps: true
       },
       starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
     },
@@ -910,8 +910,9 @@
       categories: ["numbers", "colors", "letters", "directions", "shapes"],
       modifiers: {
         backgroundColor: true,
-        backgroundColorChance: 1.0,
-        backgroundPromptChance: 0.5
+        backgroundColorChance: 0.7,
+        backgroundPromptChance: 0.5,
+        mathOps: true
       },
       starTimes: { platinum: 10, gold: 16, silver: 20, bronze: 30 }
     },
