@@ -437,6 +437,10 @@
           };
         });
         window.__lastEntries = entries;
+        // Analytics: Track card breakdown
+        if (typeof trackCardBreakdown === 'function') {
+          trackCardBreakdown(gameMode === 'stages' ? stageState.index : 'practice', round, entries);
+        }
         const allCorrect =
           (!platformerRequired || (platformerState.completed && !platformerState.failed)) &&
           entries.every((entry) => entry.correct);
@@ -461,6 +465,10 @@
               const stars = getStageStars(elapsedSeconds, stage);
           stageState.lastStars = stars;
           saveStageStars(stage, stars, elapsedSeconds);
+              // Analytics: Track level completed
+              if (typeof trackLevelCompleted === 'function') {
+                trackLevelCompleted(stageState.index, stars, elapsedSeconds);
+              }
               lockInputs(true);
               renderCards(true);
               showStageComplete(elapsedSeconds, stars, stage);
@@ -694,6 +702,11 @@
             stageState.completed = false;
             stageState.failed = false;
             startStageStopwatch();
+            // Analytics: Track level attempt
+            if (typeof trackLevelAttempt === 'function') {
+              trackLevelAttempt(stageState.index, (stageState.attempts || 1));
+              stageState.attempts = (stageState.attempts || 1) + 1;
+            }
           }
           const stageRounds = stage.rounds || 1;
           if (advanceRound && round >= stageRounds) {
