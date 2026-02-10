@@ -465,9 +465,9 @@
               const stars = getStageStars(elapsedSeconds, stage);
           stageState.lastStars = stars;
           saveStageStars(stage, stars, elapsedSeconds);
-              // Analytics: Track level completed
-              if (typeof trackLevelCompleted === 'function') {
-                trackLevelCompleted(stageState.index, stars, elapsedSeconds);
+              // Analytics: Track level completed with detailed card breakdown
+              if (typeof trackLevelCompletionDetails === 'function') {
+                trackLevelCompletionDetails(stageState.index, stars, elapsedSeconds, entries);
               }
               lockInputs(true);
               renderCards(true);
