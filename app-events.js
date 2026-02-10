@@ -687,6 +687,38 @@
       });
 
       platformerLoop();
+      
+      document.addEventListener("keydown", (event) => {
+        // Only allow arrow key input during recall phase in game view
+        if (phase !== "recall") return;
+        // Get the focused input field
+        const activeInput = document.querySelector('input[type="text"]:focus');
+        if (!activeInput) return;
+        
+        // Map arrow keys to arrow characters - clear and replace
+        switch(event.key) {
+          case "ArrowUp":
+            event.preventDefault();
+            activeInput.value = "↑";
+            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            break;
+          case "ArrowDown":
+            event.preventDefault();
+            activeInput.value = "↓";
+            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            break;
+          case "ArrowLeft":
+            event.preventDefault();
+            activeInput.value = "←";
+            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            break;
+          case "ArrowRight":
+            event.preventDefault();
+            activeInput.value = "→";
+            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            break;
+        }
+      });
 
       pauseResume.addEventListener("click", () => {
         closePauseModal();
