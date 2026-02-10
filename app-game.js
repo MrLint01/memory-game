@@ -437,10 +437,6 @@
           };
         });
         window.__lastEntries = entries;
-        // Analytics: Track card breakdown
-        if (typeof trackCardBreakdown === 'function') {
-          trackCardBreakdown(gameMode === 'stages' ? stageState.index : 'practice', round, entries);
-        }
         const allCorrect =
           (!platformerRequired || (platformerState.completed && !platformerState.failed)) &&
           entries.every((entry) => entry.correct);
@@ -465,9 +461,9 @@
               const stars = getStageStars(elapsedSeconds, stage);
           stageState.lastStars = stars;
           saveStageStars(stage, stars, elapsedSeconds);
-              // Analytics: Track level completed with detailed card breakdown
-              if (typeof trackLevelCompletionDetails === 'function') {
-                trackLevelCompletionDetails(stageState.index, stars, elapsedSeconds, entries);
+              // Analytics: Track level session with comprehensive stats
+              if (typeof trackLevelSession === 'function') {
+                trackLevelSession(stageState.index, stars, elapsedSeconds, entries, (stageState.attempts || 1));
               }
               lockInputs(true);
               renderCards(true);
