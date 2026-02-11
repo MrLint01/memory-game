@@ -456,7 +456,9 @@
             expected: buildExpectedLabel(expectedItem),
             actual,
             raw,
-            correct: isCorrectAnswer(expectedItem, raw)
+            correct: isCorrectAnswer(expectedItem, raw),
+            category: expectedItem.category,
+            answer: expectedItem.label || expectedItem
           };
         });
         window.__lastEntries = entries;
@@ -488,6 +490,7 @@
               if (typeof trackLevelSession === 'function') {
                 trackLevelSession(stageState.index, true, stars, elapsedSeconds, entries);
               }
+              lastCompletedLevel = stageState.index + 1;
               lockInputs(true);
               renderCards(true);
               showStageComplete(elapsedSeconds, stars, stage);

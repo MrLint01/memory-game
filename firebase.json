@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "public": "../memory-game",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

@@ -358,15 +358,23 @@ h1 {
       button:hover:not(:disabled) {
         transform: translateY(-2px);
       }
-      button.icon-button {
-        width: 52px;
-        height: 52px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 0;
-      }
+button.icon-button {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.stage-intro-start {
+  width: 140px !important;
+  height: 52px;
+  padding: 0;
+  position: absolute;
+  transform: translateY(-1%);
+  bottom: -1.8rem;
+}
       .action-icon {
         width: 28px;
         height: 28px;
@@ -1004,7 +1012,7 @@ body[data-state="paused"] .hud-pause {
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap: 1rem;
       }
-      .card {
+.card {
         border: 2px solid var(--border);
         border-radius: 0;
         padding: 1.1rem;
@@ -1026,13 +1034,13 @@ body[data-state="paused"] .hud-pause {
         height: 80px;
         display: block;
       }
-      .shape-svg .shape-stroke {
-        fill: none;
-        stroke: #0f172a;
-        stroke-width: 8;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-      }
+.shape-svg .shape-stroke {
+  fill: none;
+  stroke: #0f172a;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
       .card small {
         display: block;
         font-size: 0.7rem;
@@ -1434,6 +1442,7 @@ body[data-state="paused"] .hud-pause {
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
+  margin-top: -0.7rem;
 }
 .stage-star {
   font-size: 2.2rem;
@@ -1501,15 +1510,16 @@ body[data-state="paused"] .hud-pause {
       .bad {
         background: #fef2f2;
       }
-      .modal {
-        position: fixed;
-        inset: 0;
-        display: none;
-        place-items: center;
-        background: rgba(17, 24, 39, 0.25);
-        z-index: 10;
-        padding: 1.5rem;
-      }
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.25);
+  backdrop-filter: blur(8px);
+  z-index: 10;
+  padding: 1.5rem;
+}
 .modal--pause {
   background: rgba(17, 24, 39, 0.5);
   z-index: 20;
@@ -1560,6 +1570,122 @@ body.pause-active .interrupt-close {
   width: min(980px, 96vw);
   max-height: 80vh;
   overflow-y: auto;
+}
+.modal-card--intro {
+  width: min(720px, 94vw);
+  background: #ffffff;
+  border: 2px solid var(--border);
+  box-shadow: none;
+  padding: 1.1rem 1.2rem;
+  position: relative;
+}
+.stage-intro-close {
+  position: absolute;
+  top: -0.8rem;
+  left: -0.8rem;
+}
+.stage-intro-close,
+.stage-intro-start {
+  border-width: 2px;
+}
+.stage-intro-shell {
+  display: grid;
+  gap: 0.9rem;
+  padding-bottom: 1.0rem;
+}
+.stage-intro-header {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  margin-top: 0.2rem;
+}
+.stage-intro-header h3 {
+  margin: 0;
+  font-size: 2.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.stage-intro-stars {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.stage-intro-stars-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+.stage-intro-best {
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stage-intro-stars .stage-star {
+  font-size: 3.8rem;
+}
+.stage-intro-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+.stage-intro-chip {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.7rem 0.8rem;
+  border: 2px solid var(--border);
+  background: #ffffff;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.stage-intro-chip::after {
+  content: attr(data-value);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #111827;
+}
+.stage-intro-icons {
+  display: grid;
+  gap: 0.9rem;
+}
+.stage-intro-section-block {
+  display: grid;
+  gap: 0.6rem;
+}
+.stage-intro-section {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-align: center;
+}
+.stage-intro-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 0.6rem;
+}
+.stage-intro-icon {
+  border: 2px solid var(--border);
+  background: #ffffff;
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 0.7rem 0.6rem;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+}
+.stage-intro-icon img {
+  width: 44px;
+  height: 44px;
+}
+.stage-intro-icon--none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
 }
 .reference-header {
   display: flex;
@@ -1877,6 +2003,9 @@ body.pause-active .interrupt-close {
         letter-spacing: 0.06em;
         text-transform: uppercase;
       }
+      .modal-card--intro h3 {
+        margin: 0;
+      }
 .modal-card .controls {
   gap: 0.9rem;
   justify-items: stretch;
@@ -1891,12 +2020,15 @@ body.pause-active .interrupt-close {
   color: var(--muted);
   font-size: 0.9rem;
 }
-      .modal-actions {
-        display: flex;
-        gap: 0.8rem;
-        justify-content: flex-end;
-        margin-top: 1rem;
-      }
+.modal-actions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  margin-top: 1.4rem;
+}
+.modal-card--intro .modal-actions {
+  margin-top: 0.6rem;
+}
       .interrupt-modal {
         position: fixed;
         display: none;
@@ -1938,13 +2070,13 @@ body.pause-active .interrupt-close {
       .config-hidden {
         display: none;
       }
-      .fog-overlay {
-        position: fixed;
-        inset: 0;
-        display: none;
-        z-index: 20;
-        pointer-events: none;
-      }
+.fog-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 20;
+  pointer-events: none;
+}
       @keyframes rise {
         from {
           opacity: 0;
