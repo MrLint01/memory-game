@@ -384,6 +384,9 @@
               <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
               ${stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : ""}
             </div>
+            <div class="stage-complete__bar-track">
+              <div class="stage-complete__bar-fill" data-stars="${stars}"></div>
+            </div>
             <div class="stage-complete__actions">
               <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
@@ -401,6 +404,26 @@
           </div>
         `;
         resultsPanel.classList.add("show");
+
+        // Trigger bar fill animation after a short delay so the browser paints width:0 first
+
+        const barFills = document.querySelectorAll("#resultsPanel .stage-complete__bar-fill");
+
+        barFills.forEach(barFill => {
+          const stars = parseInt(barFill.dataset.stars, 10) || 0;
+
+          // set the final width based on stars
+          let targetWidth = 0;
+          if (stars === 1) targetWidth = 33.33;
+          else if (stars === 2) targetWidth = 55;
+          else if (stars >= 3) targetWidth = 100;
+          barFill.style.width = "0";
+          barFill.offsetWidth; // force browser to register width:0
+            // Trigger transition
+          setTimeout(() => {
+            barFill.style.width = targetWidth + "%";
+          }, 20); // small delay ensures browser painted initial width
+        });
       }
 
       function lockInputs(locked) {
