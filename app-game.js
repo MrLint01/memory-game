@@ -281,7 +281,7 @@
           }
         });
         const title = mode === "stages" ? "Stage failed" : "Round failed";
-        const subtitle = "";
+        const subtitle = mode === "stages" ? "" : `Streak ${streak}`;
         const buttons =
           mode === "stages"
             ? `<button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">

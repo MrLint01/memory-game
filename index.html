@@ -87,7 +87,7 @@
       </section>
     </main>
     <div class="modal" id="practiceModal" aria-hidden="true">
-      <div class="modal-card">
+      <div class="modal-card modal-card--sandbox">
         <h3>Sandbox Settings</h3>
         <div class="controls">
           <div class="control-row settings-row">
@@ -112,43 +112,103 @@
                 <button id="practiceDeselectAll" class="link-button" type="button">Deselect all</button>
               </div>
             </div>
-            <div class="checkboxes">
-              <label><input type="checkbox" value="numbers" checked />Numbers</label>
-              <label><input type="checkbox" value="colors" checked />Colors</label>
-              <label><input type="checkbox" value="letters" checked />Letters</label>
-              <label><input type="checkbox" value="directions" checked />Directions</label>
-              <label><input type="checkbox" value="shapes" checked />Shapes</label>
+            <div class="checkboxes icon-choices">
+              <label class="icon-choice">
+                <input type="checkbox" value="numbers" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/card-numbers.svg" alt="" />
+                  <span>Numbers</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input type="checkbox" value="colors" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/card-colors.svg" alt="" />
+                  <span>Colors</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input type="checkbox" value="letters" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/card-letters.svg" alt="" />
+                  <span>Letters</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input type="checkbox" value="directions" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/card-directions.svg" alt="" />
+                  <span>Directions</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input type="checkbox" value="shapes" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/card-shapes.svg" alt="" />
+                  <span>Shapes</span>
+                </span>
+              </label>
             </div>
           </div>
           <div class="control-group">
             <label>Modifiers</label>
-            <div class="checkboxes">
-              <label><input id="practiceMathOps" type="checkbox" checked />Math ops</label>
-              <label><input id="practiceMisleadColors" type="checkbox" checked />Misleading colors</label>
-              <label><input id="practiceBackgroundColor" type="checkbox" checked />Background color</label>
-              <label><input id="practiceSwap" type="checkbox" checked />Card swap</label>
-              <label><input id="practicePlatformer" type="checkbox" checked />Platformer recall</label>
-              <label><input id="practiceGlitch" type="checkbox" checked />Glitching reveal</label>
-              <label><input id="practiceFog" type="checkbox" checked />Fog reveal</label>
-              <label><input id="practiceAds" type="checkbox" checked />Pop-up ads</label>
-            </div>
-            <div class="control-row settings-row">
-              <div class="stat-field">
-                <label for="practiceMathChance">Math ops %</label>
-                <input id="practiceMathChance" type="number" min="0" max="1" step="0.05" value="0.7" />
-              </div>
-              <div class="stat-field">
-                <label for="practiceMisleadChance">Mislead %</label>
-                <input id="practiceMisleadChance" type="number" min="0" max="1" step="0.05" value="0.6" />
-              </div>
-              <div class="stat-field">
-                <label for="practiceBackgroundChance">Background %</label>
-                <input id="practiceBackgroundChance" type="number" min="0" max="1" step="0.05" value="0.35" />
-              </div>
-              <div class="stat-field">
-                <label for="practiceSwapChance">Swap %</label>
-                <input id="practiceSwapChance" type="number" min="0" max="1" step="0.05" value="1" />
-              </div>
+            <div class="checkboxes icon-choices">
+              <label class="icon-choice">
+                <input id="practiceMathOps" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-mathops.svg" alt="" />
+                  <span>Math ops</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practiceMisleadColors" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-misleadcolors.svg" alt="" />
+                  <span>Mislead</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practiceBackgroundColor" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-backgroundcolor.svg" alt="" />
+                  <span>Background</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practiceSwap" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-swapcards.svg" alt="" />
+                  <span>Swap</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practicePlatformer" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-platformer.svg" alt="" />
+                  <span>Platformer</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practiceGlitch" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-glitch.svg" alt="" />
+                  <span>Glitch</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practiceFog" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-fog.svg" alt="" />
+                  <span>Fog</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practiceAds" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-ads.svg" alt="" />
+                  <span>Ads</span>
+                </span>
+              </label>
             </div>
           </div>
         </div>
