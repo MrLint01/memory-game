@@ -339,7 +339,7 @@
         return window.stageCompleted[prevStageKey] === true;
       }
 
-      function renderStageList() {
+      function renderStageList(animate = false) {
         if (!stageList) return;
         if (!window.stageNewSeen) {
           window.stageNewSeen = {};
@@ -369,6 +369,7 @@
           return;
         }
         stageState.page = 0;
+        stageList.classList.add("stage-list--hidden");
         stageList.innerHTML = stages
           .map((stage, offset) => {
             const index = offset;
@@ -423,7 +424,7 @@
             }
 
             return `
-              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}"${lockedAttr}>
+              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${index}"${lockedAttr}>
                 ${unlocked ? `<strong>${name}</strong>` : ""}
                 ${lockIcon}
                 ${lockedLabel}
@@ -443,10 +444,55 @@
         if (stagesFooter) {
           stagesFooter.textContent = "";
         }
+        if (animate) {
+          stageList.classList.add("stage-list--hidden");
+          const headerDelayMs = 280;
+          requestAnimationFrame(() => {
+            window.setTimeout(() => {
+              stageList.classList.remove("stage-list--hidden");
+              stageList.querySelectorAll(".stage-card").forEach((card, idx) => {
+                const animIndex = Number(card.dataset.animIndex);
+                const delay = Number.isFinite(animIndex) ? animIndex : idx;
+                card.style.setProperty("--stage-anim-delay", `${delay * 100}ms`);
+                card.classList.remove("stage-card--animate");
+                void card.offsetWidth;
+                card.classList.add("stage-card--animate");
+              });
+              const cards = stageList.querySelectorAll(".stage-card");
+              const maxIndex = Math.max(0, cards.length - 1);
+              const totalDelay = headerDelayMs + maxIndex * 100;
+              window.setTimeout(() => {
+                stageList
+                  .querySelectorAll(".stage-stars")
+                  .forEach((stars) => {
+                    stars.classList.remove("stage-stars--shine");
+                    void stars.offsetWidth;
+                    stars.classList.add("stage-stars--shine");
+                  });
+              }, totalDelay);
+            }, headerDelayMs);
+          });
+        } else {
+          stageList.classList.remove("stage-list--hidden");
+          stageList.querySelectorAll(".stage-card").forEach((card) => {
+            card.classList.remove("stage-card--animate");
+            card.style.removeProperty("--stage-anim-delay");
+          });
+          stageList.querySelectorAll(".stage-stars").forEach((stars) => {
+            stars.classList.remove("stage-stars--shine");
+          });
+        }
       }
 
-      function openStagesScreen() {
-        renderStageList();
+      function openStagesScreen(animate = false) {
+        if (stagesScreen) {
+          stagesScreen.classList.remove("stages-anim");
+          if (animate) {
+            void stagesScreen.offsetWidth;
+            stagesScreen.classList.add("stages-anim");
+          }
+        }
+        renderStageList(animate);
         if (stagesScreen) {
           stagesScreen.removeAttribute("aria-hidden");
         }
@@ -539,13 +585,13 @@
 
       if (playStart) {
         playStart.addEventListener("click", () => {
-          openStagesScreen();
+          openStagesScreen(true);
         });
       }
 
       if (stagesOpen) {
         stagesOpen.addEventListener("click", () => {
-          openStagesScreen();
+          openStagesScreen(true);
         });
       }
 
@@ -833,7 +879,7 @@
             if (stageState.completed) {
               resetStageProgress();
               resetGame();
-              openStagesScreen();
+              openStagesScreen(false);
               return;
             }
             if (stageState.failed) {
@@ -865,7 +911,7 @@
           }
           resetStageProgress();
           resetGame();
-          openStagesScreen();
+          openStagesScreen(false);
           return;
         }
         const nextButton = event.target.closest("#stageNextButton");
