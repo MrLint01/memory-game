@@ -549,8 +549,8 @@ body.stage-fail #resultsPanel .stage-fail-bar__text {
   text-align: center;
 }
 body.stage-fail #resultsPanel .stage-fail-bar__text strong {
-  font-size: clamp(1.4rem, 2.2vw, 1.8rem);
-  letter-spacing: 0.12em;
+  font-size: 1.3rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 body.stage-fail #resultsPanel .stage-fail-bar__actions {
@@ -583,6 +583,7 @@ body.stage-fail .stage-fail-actions {
   gap: 0.7rem;
   width: fit-content;
   margin-top: 1.2rem;
+  padding-bottom: 1.1rem;
   justify-content: center;
   justify-items: center;
   margin-left: auto;
@@ -607,6 +608,77 @@ body.stage-fail .stage-fail-actions .icon-button {
   font-size: inherit;
   letter-spacing: inherit;
   text-transform: none;
+  position: relative;
+}
+body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button {
+  position: relative;
+}
+.tab-key-hint {
+  position: fixed;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.9);
+  animation: tabKeyHintPop 2600ms ease-out forwards;
+}
+.tab-key-hint .tab-keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  height: 48px;
+  padding: 0 1.1rem;
+  border: 2px solid var(--border);
+  background: #f8fafc;
+  box-shadow: inset 0 -4px 0 #e2e8f0, 4px 4px 0 var(--border);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+@keyframes tabKeyHintPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -60%) scale(0.85);
+  }
+  35% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -70%) scale(0.95);
+  }
+}
+body.stage-fail .stage-fail-actions .action-key-hint,
+body[data-state="result"] #resultsPanel .stage-complete__actions .action-key-hint {
+  position: absolute;
+  left: 50%;
+  bottom: -0.85rem;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
+}
+body.stage-fail .stage-fail-actions .icon-button:hover .action-key-hint,
+body.stage-fail .stage-fail-actions .icon-button:focus-visible .action-key-hint,
+body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button:hover .action-key-hint,
+body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button:focus-visible .action-key-hint {
+  opacity: 1;
+  transform: translateX(-50%) translateY(2px);
+}
+body.stage-fail .stage-fail-actions:hover .action-key-hint,
+body.stage-fail .stage-fail-actions:focus-within .action-key-hint,
+body[data-state="result"] #resultsPanel .stage-complete__actions:hover .action-key-hint,
+body[data-state="result"] #resultsPanel .stage-complete__actions:focus-within .action-key-hint {
+  opacity: 1;
+  transform: translateX(-50%) translateY(2px);
 }
 @media (max-width: 720px) {
   body.stage-fail #resultsPanel .stage-fail-bar {
@@ -650,7 +722,7 @@ body[data-state="result"] #resultsPanel .stage-complete__header {
   justify-items: center;
 }
 body[data-state="result"] #resultsPanel .stage-complete__header strong {
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1389,6 +1461,16 @@ body[data-state="paused"] .hud-pause {
   box-shadow: 4px 4px 0 var(--border);
   border-radius: 0;
 }
+.stage-type-icon {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0.9;
+}
 .stage-lock {
   position: absolute;
   inset: 50% auto auto 50%;
@@ -1513,12 +1595,16 @@ body[data-state="paused"] .hud-pause {
 .modal {
   position: fixed;
   inset: 0;
-  display: none;
+  display: grid;
   place-items: center;
   background: rgba(17, 24, 39, 0.25);
   backdrop-filter: blur(8px);
   z-index: 10;
   padding: 1.5rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms ease;
 }
 .modal--pause {
   background: rgba(17, 24, 39, 0.5);
@@ -1553,7 +1639,9 @@ body.pause-active .interrupt-close {
   border-width: 1px;
 }
       .modal.show {
-        display: grid;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
       }
 .modal-card {
   width: min(520px, 92vw);
@@ -1562,6 +1650,14 @@ body.pause-active .interrupt-close {
   border-radius: 0;
   padding: 1.4rem;
   box-shadow: none;
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 220ms ease;
+  transition-delay: 40ms;
+}
+.modal.show .modal-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 .modal-card--muted {
   background: var(--panel-muted);
@@ -1578,6 +1674,19 @@ body.pause-active .interrupt-close {
   box-shadow: none;
   padding: 1.1rem 1.2rem;
   position: relative;
+}
+.modal.show .modal-card--intro.intro-animate {
+  animation: stageIntroExpand 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes stageIntroExpand {
+  0% {
+    transform:
+      translate(var(--intro-from-x, 0px), var(--intro-from-y, 12px))
+      scale(var(--intro-from-scale, 0.98));
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
 }
 .stage-intro-close {
   position: absolute;

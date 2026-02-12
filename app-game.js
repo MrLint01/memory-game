@@ -286,24 +286,31 @@
           mode === "stages"
             ? `<button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(Q)</span>
                </button>
                <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
                  <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(R)</span>
                </button>
                <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
                  <img class="action-icon" src="imgs/home_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(H)</span>
                </button>`
-            : `<button id="practiceBackButton" class="secondary" type="button">
-                 <span class="action-title">Back</span>
-                 <span class="action-key">(Q)</span>
+            : `<button id="practiceRetryButton" class="secondary icon-button" type="button" aria-label="Restart (R)">
+                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(R)</span>
                </button>
-               <button id="practiceRetryButton" class="secondary" type="button">
-                 <span class="action-title">Retry</span>
-                 <span class="action-key">(R)</span>
+               <button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
+                 <img class="action-icon" src="imgs/sandbox_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(S)</span>
+               </button>
+               <button id="practiceBackButton" class="secondary icon-button" type="button" aria-label="Home (Q)">
+                 <img class="action-icon" src="imgs/home_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(Q)</span>
                </button>`;
         const actions = document.querySelector(".stage .actions");
         if (actions) {
-          actions.innerHTML = mode === "stages" ? `<div class="stage-fail-actions">${buttons}</div>` : "";
+          actions.innerHTML = `<div class="stage-fail-actions">${buttons}</div>`;
         }
         resultsPanel.innerHTML = `
           <div class="stage-fail-bar">
@@ -390,15 +397,19 @@
             <div class="stage-complete__actions">
               <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(Q)</span>
               </button>
               <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (N)">
                 <img class="action-icon" src="imgs/next_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(N)</span>
               </button>
               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(R)</span>
               </button>
               <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
                 <img class="action-icon" src="imgs/home_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(H)</span>
               </button>
             </div>
           </div>

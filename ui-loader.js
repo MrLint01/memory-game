@@ -29,6 +29,7 @@
 
   const scriptList = [
     'data.js',
+    'stages-instructions.js',
     'stages-data.js',
     'stages-mode.js',
     'app-core.js',

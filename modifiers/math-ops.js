@@ -39,10 +39,32 @@
           [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
         }
         const result = items.map((item) => ({ ...item }));
+        const min =
+          typeof options.mathMinCount === "number" ? Math.max(0, Math.floor(options.mathMinCount)) : null;
+        let max =
+          typeof options.mathMaxCount === "number" ? Math.max(0, Math.floor(options.mathMaxCount)) : null;
+        const defaultMax = 2;
+        const limit = max !== null ? max : defaultMax;
+        if (min !== null && limit < min) {
+          max = min;
+        }
+        const finalLimit = max !== null ? max : defaultMax;
+        const chance =
+          typeof options.mathChance === "number" ? Math.max(0, Math.min(1, options.mathChance)) : 0.7;
         let applied = 0;
+        const appliedIndices = new Set();
+        if (min !== null) {
+          for (const entry of candidates) {
+            if (applied >= min) break;
+            result[entry.index] = applyNumberChallenge(entry.item);
+            applied += 1;
+            appliedIndices.add(entry.index);
+          }
+        }
         for (const entry of candidates) {
-          if (applied >= 2) break;
-          if (Math.random() >= options.mathChance) continue;
+          if (applied >= finalLimit) break;
+          if (appliedIndices.has(entry.index)) continue;
+          if (Math.random() >= chance) continue;
           result[entry.index] = applyNumberChallenge(entry.item);
           applied += 1;
         }

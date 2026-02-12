@@ -116,6 +116,7 @@
       }
 
       function isPracticeUnlocked() {
+        if (window.unlockSandbox) return true;
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         const unlockStageIndex = 4; // Stage 5 (0-based index)
         const unlockStage = stages[unlockStageIndex];
@@ -151,13 +152,57 @@
       }
 
       let stageIntroPendingIndex = null;
+      let stageIntroOriginEl = null;
+      let tabTutorialShown = false;
+      let tabTutorialActive = false;
+      let tabTutorialDisabledInputs = [];
+      let tabTutorialHintEl = null;
+      let tabTutorialHintTimeout = null;
+      const tabTutorialStageId = 2;
+
+      function applyStageIntroOrigin(originEl) {
+        if (!stageIntroModal || !stageIntroCard) return;
+        stageIntroCard.classList.remove("intro-animate");
+        stageIntroCard.style.removeProperty("--intro-from-x");
+        stageIntroCard.style.removeProperty("--intro-from-y");
+        stageIntroCard.style.removeProperty("--intro-from-scale");
+        if (!originEl) {
+          return;
+        }
+        const originRect = originEl.getBoundingClientRect();
+        requestAnimationFrame(() => {
+          if (!stageIntroModal.classList.contains("show")) return;
+          const modalRect = stageIntroCard.getBoundingClientRect();
+          if (!modalRect.width || !modalRect.height) return;
+          const originCenterX = originRect.left + originRect.width / 2;
+          const originCenterY = originRect.top + originRect.height / 2;
+          const modalCenterX = modalRect.left + modalRect.width / 2;
+          const modalCenterY = modalRect.top + modalRect.height / 2;
+          const dx = originCenterX - modalCenterX;
+          const dy = originCenterY - modalCenterY;
+          const scale = Math.min(originRect.width / modalRect.width, originRect.height / modalRect.height, 1);
+          stageIntroCard.style.setProperty("--intro-from-x", `${dx}px`);
+          stageIntroCard.style.setProperty("--intro-from-y", `${dy}px`);
+          stageIntroCard.style.setProperty("--intro-from-scale", `${Math.max(0.6, scale)}`);
+          stageIntroCard.classList.remove("intro-animate");
+          void stageIntroCard.offsetWidth;
+          stageIntroCard.classList.add("intro-animate");
+        });
+      }
 
       function closeStageIntro() {
         stageIntroPendingIndex = null;
+        stageIntroOriginEl = null;
+        if (stageIntroCard) {
+          stageIntroCard.classList.remove("intro-animate");
+          stageIntroCard.style.removeProperty("--intro-from-x");
+          stageIntroCard.style.removeProperty("--intro-from-y");
+          stageIntroCard.style.removeProperty("--intro-from-scale");
+        }
         setModalState(stageIntroModal, false);
       }
 
-      function openStageIntro(index) {
+      function openStageIntro(index, originEl = null) {
         if (!stageIntroModal || !stageIntroTitle || !stageIntroList) return false;
         const stage = window.getStageConfig ? window.getStageConfig(index) : null;
         if (!stage) return false;
@@ -267,7 +312,9 @@
           renderIconSection("Modifiers", modifierItems);
         }
         stageIntroPendingIndex = index;
+        stageIntroOriginEl = originEl;
         setModalState(stageIntroModal, true);
+        applyStageIntroOrigin(stageIntroOriginEl);
         return true;
       }
 
@@ -331,6 +378,13 @@
               window.stageBestTimes && window.stageBestTimes[stageKey]
             );
             const isCompleted = window.stageCompleted && window.stageCompleted[stageKey];
+            const stageType = stage && stage.stageType ? String(stage.stageType).toLowerCase() : "";
+            const stageTypeIcon =
+              stageType === "flash"
+                ? { src: "imgs/flash_icon.png", label: "Flash level" }
+                : stageType === "tutorial"
+                  ? { src: "imgs/tutorial_icon.png", label: "Tutorial level" }
+                  : null;
 
             const starsMarkup = [1, 2, 3]
               .map((value) => {
@@ -381,6 +435,7 @@
                       : placeholderStars
                 }
                 ${placeholderBest}
+                ${unlocked && stageTypeIcon ? `<img class="stage-type-icon" src="${stageTypeIcon.src}" alt="${stageTypeIcon.label}" />` : ""}
               </button>
             `;
           })
@@ -407,8 +462,10 @@
       }
 
       function startStage(index, options = {}) {
-        const { skipIntro = false } = options;
-        if (!skipIntro && openStageIntro(index)) {
+        const { skipIntro = false, originEl = null } = options;
+        tabTutorialShown = false;
+        tabTutorialActive = false;
+        if (!skipIntro && openStageIntro(index, originEl)) {
           return;
         }
         stageState.active = false;
@@ -516,7 +573,49 @@
             return;
           }
           
-          startStage(index);
+          startStage(index, { originEl: button });
+        });
+      }
+
+      if (inputGrid) {
+        inputGrid.addEventListener("input", (event) => {
+          if (tabTutorialShown || tabTutorialActive) return;
+          if (gameMode !== "stages" || phase !== "recall") return;
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (!stage || stage.id !== tabTutorialStageId) return;
+          const input = event.target && event.target.closest('input[data-index="0"]');
+          if (!input || !input.value) return;
+          tabTutorialShown = true;
+          tabTutorialActive = true;
+          tabTutorialDisabledInputs = [];
+          inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
+            const idx = Number(field.dataset.index);
+            if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
+              field.disabled = true;
+              tabTutorialDisabledInputs.push(field);
+            }
+          });
+        });
+        inputGrid.addEventListener("pointerdown", (event) => {
+          if (!tabTutorialActive) return;
+          const targetInput = event.target.closest("input[data-index]");
+          if (!targetInput) return;
+          const idx = Number(targetInput.dataset.index);
+          if (Number.isFinite(idx) && idx > 0) {
+            event.preventDefault();
+            const firstInput = inputGrid.querySelector('input[data-index="0"]');
+            if (firstInput) firstInput.focus();
+          }
+        });
+        inputGrid.addEventListener("focusin", (event) => {
+          if (!tabTutorialActive) return;
+          const targetInput = event.target.closest("input[data-index]");
+          if (!targetInput) return;
+          const idx = Number(targetInput.dataset.index);
+          if (Number.isFinite(idx) && idx > 0) {
+            const firstInput = inputGrid.querySelector('input[data-index="0"]');
+            if (firstInput) firstInput.focus();
+          }
         });
       }
 
@@ -720,67 +819,7 @@
         }
       });
 
-      pauseResume.addEventListener("click", () => {
-        closePauseModal();
-        resumeFromPause();
-      });
-
-      pauseRestart.addEventListener("click", () => {
-        closePauseModal();
-        if (gameMode === "stages") {
-          resetStageProgress();
-        }
-        resetGame();
-        startRound();
-      });
-
-      pauseQuit.addEventListener("click", () => {
-        closePauseModal();
-        // Analytics: Track level quit
-        if (gameMode === "stages" && stageState.active) {
-          const quitElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
-            ? stageState.elapsedSeconds
-            : (performance.now() - (stageState.startTime || performance.now())) / 1000;
-          const quitEntries = window.__lastEntries || [];
-          if (typeof trackLevelSession === 'function') {
-            trackLevelSession(stageState.index, false, 0, quitElapsedSeconds, quitEntries);
-          }
-        }
-        // Track session end
-        const totalSessionSeconds = (performance.now() - sessionStartTime) / 1000;
-        if (typeof trackSessionEnd === 'function') {
-          trackSessionEnd(totalSessionSeconds, lastCompletedLevel);
-        }
-        if (gameMode === "stages") {
-          resetStageProgress();
-        }
-        resetGame();
-      });
-
-      pauseModal.addEventListener("click", (event) => {
-        if (event.target === pauseModal) {
-          closePauseModal();
-          resumeFromPause();
-        }
-      });
-      if (pauseButton) {
-        pauseButton.addEventListener("click", () => {
-          openPauseModal();
-        });
-      }
-      document.addEventListener("mousemove", (event) => {
-        if (phase === "idle") {
-          document.body.classList.remove("show-pause");
-          return;
-        }
-        const nearLeft = event.clientX < 140;
-        const nearTop = event.clientY < 120;
-        if (nearLeft && nearTop) {
-          document.body.classList.add("show-pause");
-        } else {
-          document.body.classList.remove("show-pause");
-        }
-      });
+      // Pause UI removed.
 
       if (submitBtn) {
         submitBtn.addEventListener("click", () => {
@@ -849,6 +888,11 @@
           startRound({ reuseItems: false, advanceRound: false });
           return;
         }
+        const practiceSettings = event.target.closest("#practiceSettingsButton");
+        if (practiceSettings) {
+          openPracticeModal();
+          return;
+        }
         const homeButton = event.target.closest("#stageHomeButton");
         if (homeButton) {
           resetStageProgress();
@@ -883,17 +927,17 @@
 
       document.addEventListener("keydown", (event) => {
         const keyLower = event.key.toLowerCase();
-        if (pauseModal.classList.contains("show") && event.key === "Escape") {
-          event.preventDefault();
-          closePauseModal();
-          resumeFromPause();
-          return;
-        }
-        if (pauseModal.classList.contains("show")) {
-          if (event.key === "Enter") {
-            event.preventDefault();
+        if (tabTutorialActive) {
+          if (event.key === "Tab") {
+            tabTutorialActive = false;
+            if (tabTutorialDisabledInputs.length) {
+              tabTutorialDisabledInputs.forEach((field) => {
+                field.disabled = false;
+              });
+              tabTutorialDisabledInputs = [];
+            }
+            return;
           }
-          return;
         }
         if (referenceModal && referenceModal.classList.contains("show")) {
           if (event.key === "Escape") {
@@ -935,8 +979,6 @@
           return;
         }
         if (event.key === "Escape") {
-          event.preventDefault();
-          openPauseModal();
           return;
         }
         if (phase === "result" && gameMode === "stages") {
@@ -945,6 +987,12 @@
             const menuBtn =
               document.getElementById("stageMenuButton") || document.getElementById("stageBackButton");
             if (menuBtn) menuBtn.click();
+            return;
+          }
+          if (keyLower === "h") {
+            event.preventDefault();
+            const homeBtn = document.getElementById("stageHomeButton");
+            if (homeBtn) homeBtn.click();
             return;
           }
           if (keyLower === "n") {
@@ -957,6 +1005,26 @@
             event.preventDefault();
             const retryBtn = document.getElementById("stageRetryButton");
             if (retryBtn) retryBtn.click();
+            return;
+          }
+        }
+        if (phase === "result" && gameMode === "practice") {
+          if (keyLower === "q") {
+            event.preventDefault();
+            const backBtn = document.getElementById("practiceBackButton");
+            if (backBtn) backBtn.click();
+            return;
+          }
+          if (keyLower === "r") {
+            event.preventDefault();
+            const retryBtn = document.getElementById("practiceRetryButton");
+            if (retryBtn) retryBtn.click();
+            return;
+          }
+          if (keyLower === "s") {
+            event.preventDefault();
+            const settingsBtn = document.getElementById("practiceSettingsButton");
+            if (settingsBtn) settingsBtn.click();
             return;
           }
         }
@@ -1000,6 +1068,38 @@
           startRound();
         }
       });
+
+      function showTabKeyHint() {
+        const hud = document.getElementById("hudCluster");
+        if (!hud) return;
+        const rect = hud.getBoundingClientRect();
+        if (!tabTutorialHintEl) {
+          tabTutorialHintEl = document.createElement("div");
+          tabTutorialHintEl.className = "tab-key-hint";
+          tabTutorialHintEl.innerHTML = `<span class="tab-keycap">TAB</span>`;
+          document.body.appendChild(tabTutorialHintEl);
+        }
+        tabTutorialHintEl.style.left = `${rect.left + rect.width / 2}px`;
+        tabTutorialHintEl.style.top = `${rect.bottom + 170}px`;
+        tabTutorialHintEl.style.animation = "none";
+        void tabTutorialHintEl.offsetWidth;
+        tabTutorialHintEl.style.animation = "";
+        if (tabTutorialHintTimeout) {
+          clearTimeout(tabTutorialHintTimeout);
+        }
+        tabTutorialHintTimeout = window.setTimeout(() => {
+          if (tabTutorialHintEl) {
+            tabTutorialHintEl.remove();
+            tabTutorialHintEl = null;
+          }
+          tabTutorialHintTimeout = null;
+        }, 2600);
+      }
+
+      document.addEventListener("pointerdown", (event) => {
+        if (!tabTutorialActive) return;
+        showTabKeyHint();
+      }, { capture: true });
 
       updateModeUI();
       updatePracticeLock();

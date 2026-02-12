@@ -6,7 +6,7 @@
         const { reuseSnapshot = false } = options;
         if (!adEnabled) return;
         if (adActive) return;
-        if (pauseModal.classList.contains("show")) return;
+        if (pauseModal && pauseModal.classList.contains("show")) return;
         if (phase !== "show") return;
         if (!interruptModal) return;
         if (document.activeElement && document.activeElement.blur) {
