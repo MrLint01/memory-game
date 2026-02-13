@@ -159,6 +159,11 @@
       let tabTutorialHintEl = null;
       let tabTutorialHintTimeout = null;
       const tabTutorialStageId = 2;
+      let stageListAnimTimeout = null;
+      let stageListStarTimeout = null;
+      let stageListAnimActive = false;
+      let stageListMouseListenerAttached = false;
+      let stageListSkipListener = null;
 
       function applyStageIntroOrigin(originEl) {
         if (!stageIntroModal || !stageIntroCard) return;
@@ -344,6 +349,20 @@
         if (!window.stageNewSeen) {
           window.stageNewSeen = {};
         }
+        stageListAnimActive = false;
+        stageListMouseListenerAttached = false;
+        if (stageListSkipListener) {
+          window.removeEventListener("mousemove", stageListSkipListener);
+          stageListSkipListener = null;
+        }
+        if (stageListAnimTimeout) {
+          clearTimeout(stageListAnimTimeout);
+          stageListAnimTimeout = null;
+        }
+        if (stageListStarTimeout) {
+          clearTimeout(stageListStarTimeout);
+          stageListStarTimeout = null;
+        }
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         const lockIconSrc = "imgs/lock.png";
         const stagesTotal = document.getElementById("stagesTotal");
@@ -424,7 +443,7 @@
             }
 
             return `
-              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${index}"${lockedAttr}>
+              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${index}" data-anim-state="pending"${lockedAttr}>
                 ${unlocked ? `<strong>${name}</strong>` : ""}
                 ${lockIcon}
                 ${lockedLabel}
@@ -446,22 +465,80 @@
         }
         if (animate) {
           stageList.classList.add("stage-list--hidden");
+          stageListAnimActive = true;
           const headerDelayMs = 280;
+          stageListSkipListener = () => {
+            if (!stageListAnimActive || !stageList) return;
+            if (stageListAnimTimeout) {
+              clearTimeout(stageListAnimTimeout);
+              stageListAnimTimeout = null;
+            }
+            if (stageListStarTimeout) {
+              clearTimeout(stageListStarTimeout);
+              stageListStarTimeout = null;
+            }
+            stageListAnimActive = false;
+            stageListMouseListenerAttached = false;
+            stageList.classList.remove("stage-list--hidden");
+            const pendingCards = Array.from(
+              stageList.querySelectorAll('.stage-card[data-anim-state="pending"]')
+            );
+            pendingCards.forEach((card) => {
+              card.dataset.animState = "done";
+              card.classList.remove("stage-card--animate");
+              card.classList.remove("stage-card--fadein");
+              void card.offsetWidth;
+              card.classList.add("stage-card--fadein");
+            });
+            const pendingCount = pendingCards.length;
+            const fadeDelay = 240;
+            stageListStarTimeout = window.setTimeout(() => {
+              stageList
+                .querySelectorAll(".stage-stars")
+                .forEach((stars) => {
+                  stars.classList.remove("stage-stars--shine");
+                  void stars.offsetWidth;
+                  stars.classList.add("stage-stars--shine");
+                });
+            }, pendingCount ? fadeDelay : 0);
+            if (stageListSkipListener) {
+              window.removeEventListener("mousemove", stageListSkipListener);
+              stageListSkipListener = null;
+            }
+          };
+          if (!stageListMouseListenerAttached) {
+            stageListMouseListenerAttached = true;
+            window.addEventListener("mousemove", stageListSkipListener);
+          }
           requestAnimationFrame(() => {
-            window.setTimeout(() => {
+            stageListAnimTimeout = window.setTimeout(() => {
               stageList.classList.remove("stage-list--hidden");
               stageList.querySelectorAll(".stage-card").forEach((card, idx) => {
                 const animIndex = Number(card.dataset.animIndex);
                 const delay = Number.isFinite(animIndex) ? animIndex : idx;
                 card.style.setProperty("--stage-anim-delay", `${delay * 100}ms`);
+                card.dataset.animState = "pending";
                 card.classList.remove("stage-card--animate");
                 void card.offsetWidth;
                 card.classList.add("stage-card--animate");
+                const onStart = (event) => {
+                  if (event.animationName !== "stageCardPop") return;
+                  card.dataset.animState = "animating";
+                  card.removeEventListener("animationstart", onStart);
+                };
+                const onEnd = (event) => {
+                  if (event.animationName !== "stageCardPop") return;
+                  card.dataset.animState = "done";
+                  card.removeEventListener("animationend", onEnd);
+                };
+                card.addEventListener("animationstart", onStart);
+                card.addEventListener("animationend", onEnd);
               });
               const cards = stageList.querySelectorAll(".stage-card");
               const maxIndex = Math.max(0, cards.length - 1);
               const totalDelay = headerDelayMs + maxIndex * 100;
-              window.setTimeout(() => {
+              stageListStarTimeout = window.setTimeout(() => {
+                stageListAnimActive = false;
                 stageList
                   .querySelectorAll(".stage-stars")
                   .forEach((stars) => {
@@ -469,13 +546,24 @@
                     void stars.offsetWidth;
                     stars.classList.add("stage-stars--shine");
                   });
+                if (stageListSkipListener) {
+                  window.removeEventListener("mousemove", stageListSkipListener);
+                  stageListSkipListener = null;
+                }
               }, totalDelay);
             }, headerDelayMs);
           });
         } else {
+          stageListMouseListenerAttached = false;
+          if (stageListSkipListener) {
+            window.removeEventListener("mousemove", stageListSkipListener);
+            stageListSkipListener = null;
+          }
           stageList.classList.remove("stage-list--hidden");
           stageList.querySelectorAll(".stage-card").forEach((card) => {
             card.classList.remove("stage-card--animate");
+            card.classList.remove("stage-card--fadein");
+            card.dataset.animState = "done";
             card.style.removeProperty("--stage-anim-delay");
           });
           stageList.querySelectorAll(".stage-stars").forEach((stars) => {
@@ -722,6 +810,22 @@
           }
         });
       }
+      const debugResetProgress = document.getElementById("debugResetProgress");
+      if (debugResetProgress) {
+        debugResetProgress.addEventListener("click", () => {
+          window.stageStars = {};
+          window.stageBestTimes = {};
+          window.stageCompleted = {};
+          window.stageNewSeen = {};
+          window.localStorage.removeItem("flashRecallStageStars");
+          if (typeof window.saveStageStars === "function") {
+            window.saveStageStars();
+          }
+          if (stagesScreen && document.body.dataset.view === "stages") {
+            renderStageList(false);
+          }
+        });
+      }
       if (statsOpen && statsModal) {
         statsOpen.addEventListener("click", () => {
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
@@ -759,6 +863,33 @@
       }
 
       practiceConfirm.addEventListener("click", () => {
+        const selectedTypes = Array.from(
+          practiceModal.querySelectorAll(".control-group .checkboxes input[type=\"checkbox\"][value]")
+        ).filter((input) => input.checked);
+        if (!selectedTypes.length) {
+          const error = document.getElementById("practiceTypeError");
+          if (error) {
+            error.hidden = false;
+            error.classList.remove("show");
+            void error.offsetWidth;
+            error.classList.add("show");
+            if (error.dataset.hideTimer) {
+              clearTimeout(Number(error.dataset.hideTimer));
+            }
+            const timerId = window.setTimeout(() => {
+              error.hidden = true;
+              error.classList.remove("show");
+              error.dataset.hideTimer = "";
+            }, 3000);
+            error.dataset.hideTimer = String(timerId);
+          }
+          return;
+        }
+        const error = document.getElementById("practiceTypeError");
+        if (error) {
+          error.hidden = true;
+          error.classList.remove("show");
+        }
         modeSelect.value = "practice";
         updateModeUI();
         resetGame();
@@ -771,6 +902,22 @@
           closePracticeModal();
         }
       });
+
+      if (practiceModal) {
+        practiceModal.addEventListener("change", (event) => {
+          const target = event.target;
+          if (!(target && target.matches("input[type=\"checkbox\"][value]"))) return;
+          const error = document.getElementById("practiceTypeError");
+          if (!error) return;
+          const anyChecked = Array.from(
+            practiceModal.querySelectorAll(".control-group .checkboxes input[type=\"checkbox\"][value]")
+          ).some((input) => input.checked);
+          if (anyChecked) {
+            error.hidden = true;
+            error.classList.remove("show");
+          }
+        });
+      }
 
       interruptClose.addEventListener("click", () => {
         hideAd();
