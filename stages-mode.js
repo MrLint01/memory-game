@@ -1,35 +1,47 @@
 (() => {
-  const storageKey = "flashRecallStageStars";
+  const progressKey = "flashRecallStageProgress";
   window.stagesConfig = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
   window.stageStars = {};
   window.stageBestTimes = {};
+  window.stageCompleted = {};
 
-  function loadStageStars() {
+  function loadStageProgress() {
     try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return;
+      const raw = window.localStorage.getItem(progressKey);
+      if (!raw) return false;
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        window.stageStars = parsed;
+      if (!parsed || typeof parsed !== "object") return false;
+      if (parsed.stars && typeof parsed.stars === "object") {
+        window.stageStars = parsed.stars;
       }
+      if (parsed.completed && typeof parsed.completed === "object") {
+        window.stageCompleted = parsed.completed;
+      }
+      if (parsed.bestTimes && typeof parsed.bestTimes === "object") {
+        window.stageBestTimes = parsed.bestTimes;
+      }
+      return true;
     } catch (error) {
-      console.warn("Failed to load stage stars", error);
+      console.warn("Failed to load stage progress", error);
+      return false;
     }
   }
 
-  function saveStageStars() {
+  function saveStageProgress() {
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(window.stageStars));
+      const payload = {
+        stars: window.stageStars,
+        completed: window.stageCompleted,
+        bestTimes: window.stageBestTimes
+      };
+      window.localStorage.setItem(progressKey, JSON.stringify(payload));
     } catch (error) {
-      console.warn("Failed to save stage stars", error);
+      console.warn("Failed to save stage progress", error);
     }
   }
+  loadStageProgress();
 
-  loadStageStars();
-
-  window.saveStageStars = saveStageStars;
-
-  window.saveStageBestTimes = function saveStageBestTimes() {};
+  window.saveStageProgress = saveStageProgress;
 
   window.getStageConfig = function getStageConfig(index) {
     if (!Array.isArray(window.stagesConfig)) return null;

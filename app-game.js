@@ -338,8 +338,9 @@
         const key = stage.id ? String(stage.id) : String(stageState.index + 1);
         
         // Save stars (keep the highest)
-        const current = window.stageStars[key] || 0;
-        if (stars > current) {
+        const hasEntry = Object.prototype.hasOwnProperty.call(window.stageStars, key);
+        const current = hasEntry ? Number(window.stageStars[key]) : null;
+        if (!hasEntry || stars > current) {
           window.stageStars[key] = stars;
         }
         
@@ -348,10 +349,10 @@
           window.stageCompleted = {};
         }
         window.stageCompleted[key] = true;
-        
+
         // Call the global save function if it exists
-        if (window.saveStageStars) {
-          window.saveStageStars();
+        if (window.saveStageProgress) {
+          window.saveStageProgress();
         }
 
         if (Number.isFinite(elapsedSeconds)) {
@@ -362,8 +363,8 @@
           if (!Number.isFinite(currentBest) || elapsedSeconds < currentBest) {
             window.stageBestTimes[key] = elapsedSeconds;
           }
-          if (window.saveStageBestTimes) {
-            window.saveStageBestTimes();
+          if (window.saveStageProgress) {
+            window.saveStageProgress();
           }
         }
       }

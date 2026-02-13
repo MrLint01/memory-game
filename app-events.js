@@ -819,9 +819,8 @@
           window.stageBestTimes = {};
           window.stageCompleted = {};
           window.stageNewSeen = {};
-          window.localStorage.removeItem("flashRecallStageStars");
-          if (typeof window.saveStageStars === "function") {
-            window.saveStageStars();
+          if (typeof window.saveStageProgress === "function") {
+            window.saveStageProgress();
           }
           if (stagesScreen && document.body.dataset.view === "stages") {
             renderStageList(false);
