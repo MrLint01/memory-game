@@ -487,7 +487,9 @@
               card.dataset.animState = "done";
               card.classList.remove("stage-card--animate");
               card.classList.remove("stage-card--fadein");
-              void card.offsetWidth;
+            });
+            void stageList.offsetWidth;
+            pendingCards.forEach((card) => {
               card.classList.add("stage-card--fadein");
             });
             const pendingCount = pendingCards.length;
