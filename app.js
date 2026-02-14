@@ -472,6 +472,8 @@ const revealInput = document.getElementById("revealTime");
             return "Color";
           case "directions":
             return "Direction";
+          case "diagonal":
+            return "Diagonal";
           case "shapes":
             return "Shape";
           default:
@@ -501,6 +503,38 @@ const revealInput = document.getElementById("revealTime");
         `;
       }
 
+      function getDirectionRotation(label) {
+        const direction = String(label || "").toLowerCase();
+        switch (direction) {
+          case "up":
+            return -90;
+          case "right":
+            return 0;
+          case "down":
+            return 90;
+          case "left":
+            return 180;
+          default:
+            return 0;
+        }
+      }
+
+      function getDiagonalRotation(label) {
+        const direction = String(label || "").toLowerCase();
+        switch (direction) {
+          case "ne":
+            return -45;
+          case "se":
+            return 45;
+          case "sw":
+            return 135;
+          case "nw":
+            return -135;
+          default:
+            return 0;
+        }
+      }
+
       function isCorrectAnswer(item, actualValue) {
         const actual = normalize(actualValue);
         const expected = normalize(item.answer ?? item.label);
@@ -510,7 +544,13 @@ const revealInput = document.getElementById("revealTime");
         }
         if (item.category === "directions") {
           const initial = expected.charAt(0);
-          return actual === expected || actual === initial;
+          const cardinalMap = { up: "n", right: "e", down: "s", left: "w" };
+          const cardinal = cardinalMap[expected] || "";
+          return actual === expected || actual === initial || (cardinal && actual === cardinal);
+        }
+        if (item.category === "diagonal") {
+          const normalized = expected.replace(/\s+/g, "");
+          return actual === expected || actual === normalized;
         }
         if (item.category === "shapes") {
           if (expected === "square") {
@@ -650,7 +690,27 @@ const revealInput = document.getElementById("revealTime");
           card.dataset.index = index;
           if (show) {
             if (item.category === "directions") {
-              card.innerHTML = `<small>${item.category}</small><span class="direction-symbol">${item.symbol}</span>`;
+              const rotation = getDirectionRotation(item.label);
+              card.innerHTML = `
+                <small>${item.category}</small>
+                <img
+                  class="direction-arrow"
+                  src="imgs/arrow.png"
+                  alt="${item.label}"
+                  style="transform: rotate(${rotation}deg);"
+                />
+              `;
+            } else if (item.category === "diagonal") {
+              const rotation = getDiagonalRotation(item.label);
+              card.innerHTML = `
+                <small>${item.category}</small>
+                <img
+                  class="direction-arrow"
+                  src="imgs/arrow.png"
+                  alt="${item.label}"
+                  style="transform: rotate(${rotation}deg);"
+                />
+              `;
             } else if (item.category === "shapes") {
               card.innerHTML = `<small>${item.category}</small>${renderShapeSVG(item.shape)}`;
             } else {

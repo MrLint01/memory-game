@@ -131,7 +131,7 @@
       recallSeconds: 15,
       categories: ["directions"],
       modifiers: {
-        mathOps: true,
+        mathOps: false,
         misleadColors: false,
         backgroundColor: false,
         swapCards: false,

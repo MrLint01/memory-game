@@ -276,6 +276,7 @@
           colors: { label: "Colors", src: "imgs/icons/card-colors.svg" },
           letters: { label: "Letters", src: "imgs/icons/card-letters.svg" },
           directions: { label: "Directions", src: "imgs/icons/card-directions.svg" },
+          diagonal: { label: "Diagonal", src: "imgs/icons/card-diagonal.svg" },
           shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" }
         };
         const modifierIconMap = {

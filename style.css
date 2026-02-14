@@ -2264,8 +2264,11 @@ body.pause-active .interrupt-close {
 .ref-arrow {
   font-size: 1.1rem;
 }
-.direction-symbol {
-  font-weight: 900;
+.direction-arrow {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  display: block;
 }
 .ref-mini {
   font-size: 0.8rem;
