@@ -645,6 +645,7 @@ const revealInput = document.getElementById("revealTime");
           const card = document.createElement("div");
           const hintClass = !show && item.recallHint ? " hidden-card hint" : " hidden-card";
           card.className = `card ${show ? "" : hintClass}`.trim();
+          card.classList.add("card--rise");
           card.style.order = index;
           card.dataset.index = index;
           if (show) {

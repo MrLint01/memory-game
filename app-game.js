@@ -238,6 +238,9 @@
       }
 
       function showReviewFailure(entries, mode, swapOrder = null) {
+        if (typeof window.clearTabKeyHint === "function") {
+          window.clearTabKeyHint();
+        }
         document.body.classList.add("stage-fail");
         const originalItems = roundItems;
         const useSwapOrder =
@@ -304,9 +307,9 @@
                  <img class="action-icon" src="imgs/sandbox_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(S)</span>
                </button>
-               <button id="practiceBackButton" class="secondary icon-button" type="button" aria-label="Home (Q)">
+               <button id="practiceBackButton" class="secondary icon-button" type="button" aria-label="Home (H)">
                  <img class="action-icon" src="imgs/home_button.png" alt="" />
-                 <span class="action-key-hint" aria-hidden="true">(Q)</span>
+                 <span class="action-key-hint" aria-hidden="true">(H)</span>
                </button>`;
         const actions = document.querySelector(".stage .actions");
         if (actions) {
@@ -370,6 +373,9 @@
       }
 
       function showStageComplete(elapsedSeconds, stars, stage) {
+        if (typeof window.clearTabKeyHint === "function") {
+          window.clearTabKeyHint();
+        }
         stopStageStopwatch();
         document.body.classList.remove("stage-fail");
         cardGrid.innerHTML = "";
@@ -740,6 +746,9 @@
 
       function startRound(options = {}) {
         const { reuseItems = false, advanceRound = true } = options;
+        if (typeof window.clearTabKeyHint === "function") {
+          window.clearTabKeyHint();
+        }
         document.body.classList.remove("stage-fail");
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;

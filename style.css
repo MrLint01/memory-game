@@ -46,7 +46,19 @@ main {
         border: 2px solid var(--border);
         box-shadow: none;
         padding: 2rem;
+        position: relative;
+        transform-style: preserve-3d;
       }
+main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  backface-visibility: hidden;
+  transform: rotateX(180deg) translateZ(1px);
+  pointer-events: none;
+  z-index: 1;
+}
 body[data-view="stages"] main {
   border: none;
 }
@@ -60,6 +72,73 @@ body[data-view="stages"][data-state="idle"] main {
 }
 body[data-view="home"][data-state="idle"] main {
   background: #ffffff;
+}
+body[data-view="home"].home-anim {
+  perspective: 1200px;
+}
+body[data-view="home"].home-anim main {
+  animation: homePanelFade 400ms ease-out both;
+  background: #ffffff;
+  border: 2px solid var(--border);
+  transform: translateZ(0);
+  clip-path: inset(0 0 0 0);
+}
+body[data-view="home"].home-anim main > * {
+  position: relative;
+  z-index: 3;
+  animation: homePanelContentIn 300ms ease-out both;
+}
+@keyframes homePanelContentIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes homePanelFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes panelClearIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(1px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes panelFailIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 header {
   display: flex;
@@ -498,6 +577,7 @@ body[data-state="result"] .layout {
       }
 body[data-state="result"] #resultsPanel {
   display: block;
+  animation: panelClearIn 880ms ease-out both;
 }
 body.stage-fail #inputGrid {
   display: grid;
@@ -536,6 +616,7 @@ body.stage-fail #resultsPanel {
   background: var(--panel-muted);
   box-shadow: 6px 6px 0 var(--border);
   padding: 1.2rem 1.4rem;
+  animation: panelFailIn 680ms ease-out both;
 }
 body.stage-fail #resultsPanel .stage-fail-bar {
   display: grid;
@@ -620,7 +701,7 @@ body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button {
   pointer-events: none;
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.9);
-  animation: tabKeyHintPop 2600ms ease-out forwards;
+  animation: tabKeyHintPop 1200ms ease-out forwards;
 }
 .tab-key-hint .tab-keycap {
   display: inline-flex;
@@ -643,7 +724,11 @@ body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button {
     opacity: 0;
     transform: translate(-50%, -60%) scale(0.85);
   }
-  35% {
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  58% {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
@@ -1100,8 +1185,11 @@ body[data-state="paused"] .hud-pause {
         text-transform: uppercase;
         color: var(--ink);
         box-shadow: none;
-        animation: rise 0.4s ease;
+        animation: none;
       }
+.card--rise {
+  animation: rise 0.4s ease;
+}
       .shape-svg {
         width: 80px;
         height: 80px;
@@ -1290,6 +1378,7 @@ body[data-state="paused"] .hud-pause {
   display: grid;
   gap: 1rem;
   justify-items: stretch;
+  perspective: 900px;
 }
 .mode-card {
   width: 100%;
@@ -1306,6 +1395,13 @@ body[data-state="paused"] .hud-pause {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 4px 4px 0 var(--border);
   position: relative;
+  transform-style: preserve-3d;
+}
+.home-anim .mode-card {
+  animation: none;
+}
+.home-anim .mode-card.primary {
+  animation: playPulse 2.2s ease-in-out infinite;
 }
 .mode-card span.mode-card__lock {
   display: none;
@@ -1448,6 +1544,7 @@ body[data-state="paused"] .hud-pause {
   background: var(--panel);
   padding: 1.4rem 1.2rem;
   overflow: hidden;
+  perspective: 900px;
 }
 .stages-footer {
   margin-top: 1.1rem;
@@ -1476,6 +1573,10 @@ body[data-state="paused"] .hud-pause {
   min-height: 120px;
   box-shadow: 4px 4px 0 var(--border);
   border-radius: 0;
+  transform-style: preserve-3d;
+  transform-origin: top center;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
 }
 .stage-card--animate {
   animation: stageCardPop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -1487,21 +1588,21 @@ body[data-state="paused"] .hud-pause {
 @keyframes stageCardPop {
   0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.96);
+    transform: rotateX(90deg) translateY(8px) scale(0.99);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: rotateX(0deg) translateY(0) scale(1);
   }
 }
 @keyframes stageCardFadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.98);
+    transform: rotateX(75deg) translateY(4px) scale(0.995);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: rotateX(0deg) translateY(0) scale(1);
   }
 }
 .stage-type-icon {
@@ -1734,6 +1835,7 @@ body.pause-active .interrupt-close {
   box-shadow: none;
   padding: 1.1rem 1.2rem;
   position: relative;
+  will-change: transform, opacity;
 }
 .modal-card--sandbox {
   width: min(980px, 96vw);
@@ -1837,7 +1939,7 @@ body.pause-active .interrupt-close {
 }
 .stage-intro-icon-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 0.6rem;
 }
 .stage-intro-icon {
@@ -1850,6 +1952,9 @@ body.pause-active .interrupt-close {
   text-transform: uppercase;
   font-size: 0.8rem;
   letter-spacing: 0.12em;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
 }
 .stage-intro-icon img {
   width: 44px;

@@ -153,7 +153,7 @@
 
       let stageIntroPendingIndex = null;
       let stageIntroOriginEl = null;
-      let tabTutorialShown = false;
+      let tabTutorialShownRound = null;
       let tabTutorialActive = false;
       let tabTutorialDisabledInputs = [];
       let tabTutorialHintEl = null;
@@ -211,6 +211,14 @@
         if (!stageIntroModal || !stageIntroTitle || !stageIntroList) return false;
         const stage = window.getStageConfig ? window.getStageConfig(index) : null;
         if (!stage) return false;
+        if (!window.__stageIntroWarmed && stageIntroModal) {
+          window.__stageIntroWarmed = true;
+          stageIntroModal.style.visibility = "hidden";
+          stageIntroModal.style.display = "grid";
+          stageIntroModal.offsetHeight;
+          stageIntroModal.style.display = "";
+          stageIntroModal.style.visibility = "";
+        }
         const stageName = stage.name ? String(stage.name) : `Stage ${index + 1}`;
         stageIntroTitle.textContent = stageName;
         if (stageIntroStars) {
@@ -589,18 +597,26 @@
         document.body.dataset.view = "stages";
       }
 
-      function closeStagesScreen() {
+      function closeStagesScreen(animateHome = true) {
         if (stagesScreen) {
           stagesScreen.setAttribute("aria-hidden", "true");
         }
         document.body.dataset.view = "home";
+        if (animateHome) {
+          document.body.classList.remove("home-anim");
+          void document.body.offsetWidth;
+          document.body.classList.add("home-anim");
+        } else {
+          document.body.classList.remove("home-anim");
+        }
         updatePracticeLock();
       }
 
       function startStage(index, options = {}) {
         const { skipIntro = false, originEl = null } = options;
-        tabTutorialShown = false;
+        tabTutorialShownRound = null;
         tabTutorialActive = false;
+        clearTabKeyHint();
         if (!skipIntro && openStageIntro(index, originEl)) {
           return;
         }
@@ -614,7 +630,7 @@
         modeSelect.value = "stages";
         updateModeUI();
         resetGame();
-        closeStagesScreen();
+        closeStagesScreen(false);
         startRound({ advanceRound: true });
       }
 
@@ -715,13 +731,14 @@
 
       if (inputGrid) {
         inputGrid.addEventListener("input", (event) => {
-          if (tabTutorialShown || tabTutorialActive) return;
+          if (tabTutorialActive) return;
           if (gameMode !== "stages" || phase !== "recall") return;
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (!stage || stage.id !== tabTutorialStageId) return;
+          if (tabTutorialShownRound === round) return;
           const input = event.target && event.target.closest('input[data-index="0"]');
           if (!input || !input.value) return;
-          tabTutorialShown = true;
+          tabTutorialShownRound = round;
           tabTutorialActive = true;
           tabTutorialDisabledInputs = [];
           inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
@@ -1074,6 +1091,10 @@
         if (practiceBack) {
           resetGame();
           setPhase("Waiting to start", "idle");
+          document.body.dataset.view = "home";
+          document.body.classList.remove("home-anim");
+          void document.body.offsetWidth;
+          document.body.classList.add("home-anim");
           return;
         }
         const practiceRetry = event.target.closest("#practiceRetryButton");
@@ -1095,6 +1116,9 @@
           modeSelect.value = "practice";
           updateModeUI();
           document.body.dataset.view = "home";
+          document.body.classList.remove("home-anim");
+          void document.body.offsetWidth;
+          document.body.classList.add("home-anim");
           updatePracticeLock();
           return;
         }
@@ -1148,6 +1172,7 @@
           }
           if (event.key === "Enter") {
             event.preventDefault();
+            clearTabKeyHint();
             if (stageIntroStart) {
               stageIntroStart.click();
             }
@@ -1203,7 +1228,7 @@
           }
         }
         if (phase === "result" && gameMode === "practice") {
-          if (keyLower === "q") {
+          if (keyLower === "h") {
             event.preventDefault();
             const backBtn = document.getElementById("practiceBackButton");
             if (backBtn) backBtn.click();
@@ -1236,30 +1261,7 @@
         } else if (phase === "recall") {
           checkAnswers();
         } else if (phase === "result") {
-          if (gameMode === "stages" && stageState.failed) {
-            stageState.failed = false;
-            stageState.completed = false;
-            stageState.startTime = performance.now();
-            stageState.active = false;
-            resetGame();
-            startRound({ advanceRound: true });
-            return;
-          }
-          if (gameMode === "stages" && stageState.completed) {
-            stageState.failed = false;
-            stageState.completed = false;
-            stageState.startTime = performance.now();
-            stageState.active = false;
-            resetGame();
-            startRound({ advanceRound: true });
-            return;
-          }
-          if (gameMode === "practice") {
-            resetForRetryRound();
-            startRound({ reuseItems: false, advanceRound: false });
-            return;
-          }
-          startRound();
+          return;
         }
       });
 
@@ -1267,14 +1269,20 @@
         const hud = document.getElementById("hudCluster");
         if (!hud) return;
         const rect = hud.getBoundingClientRect();
+        let left = rect.left + rect.width / 2;
+        let top = rect.bottom + 170;
+        if (!Number.isFinite(left) || rect.width === 0) {
+          left = window.innerWidth / 2;
+          top = 120;
+        }
         if (!tabTutorialHintEl) {
           tabTutorialHintEl = document.createElement("div");
           tabTutorialHintEl.className = "tab-key-hint";
           tabTutorialHintEl.innerHTML = `<span class="tab-keycap">TAB</span>`;
           document.body.appendChild(tabTutorialHintEl);
         }
-        tabTutorialHintEl.style.left = `${rect.left + rect.width / 2}px`;
-        tabTutorialHintEl.style.top = `${rect.bottom + 170}px`;
+        tabTutorialHintEl.style.left = `${left}px`;
+        tabTutorialHintEl.style.top = `${top}px`;
         tabTutorialHintEl.style.animation = "none";
         void tabTutorialHintEl.offsetWidth;
         tabTutorialHintEl.style.animation = "";
@@ -1287,7 +1295,7 @@
             tabTutorialHintEl = null;
           }
           tabTutorialHintTimeout = null;
-        }, 2600);
+        }, 1200);
       }
 
       document.addEventListener("pointerdown", (event) => {
@@ -1320,3 +1328,14 @@
           trackSessionEnd(totalSessionSeconds, lastCompletedLevel);
         }
       });
+      function clearTabKeyHint() {
+        if (tabTutorialHintTimeout) {
+          clearTimeout(tabTutorialHintTimeout);
+          tabTutorialHintTimeout = null;
+        }
+        if (tabTutorialHintEl) {
+          tabTutorialHintEl.remove();
+          tabTutorialHintEl = null;
+        }
+      }
+      window.clearTabKeyHint = clearTabKeyHint;
