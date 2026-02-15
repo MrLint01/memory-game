@@ -145,6 +145,7 @@
           { key: "platformer", label: "Platformer" },
           { key: "glitch", label: "Glitch" },
           { key: "fog", label: "Fog" },
+          { key: "blur", label: "Blur" },
           { key: "ads", label: "Ads" }
         ];
         const enabled = entries.filter((entry) => modifiers && modifiers[entry.key]).map((entry) => entry.label);
@@ -271,6 +272,11 @@
         stageIntroList.innerHTML = "";
         const categories = window.getStageCategories ? window.getStageCategories(stage) : stage.categories || [];
         const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : stage.modifiers || {};
+        const glitchSvg =
+          '<svg class="glitch-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">' +
+          '<rect class="glitch-card-fill" x="6" y="6" width="52" height="52" rx="8" fill="#ffffff" stroke="#111111" stroke-width="3"/>' +
+          '<text x="32" y="42" text-anchor="middle" font-family="\'Arial Black\', sans-serif" font-size="28" fill="#111">7</text>' +
+          "</svg>";
         const cardIconMap = {
           numbers: { label: "Numbers", src: "imgs/icons/card-numbers.svg" },
           colors: { label: "Colors", src: "imgs/icons/card-colors.svg" },
@@ -285,8 +291,9 @@
           backgroundColor: { label: "Background", src: "imgs/icons/mod-backgroundcolor.svg" },
           swapCards: { label: "Swap", src: "imgs/icons/mod-swapcards.svg" },
           platformer: { label: "Platformer", src: "imgs/icons/mod-platformer.svg" },
-          glitch: { label: "Glitch", src: "imgs/icons/mod-glitch.svg" },
+          glitch: { label: "Glitch", inlineSvg: glitchSvg },
           fog: { label: "Fog", src: "imgs/icons/mod-fog.svg" },
+          blur: { label: "Blur", src: "imgs/icons/mod-blur.svg" },
           ads: { label: "Ads", src: "imgs/icons/mod-ads.svg" }
         };
         const renderIconSection = (title, items) => {
@@ -300,13 +307,24 @@
           items.forEach((item) => {
             const tile = document.createElement("div");
             tile.className = "stage-intro-icon";
-            const img = document.createElement("img");
-            img.src = item.src;
-            img.alt = item.label;
-            img.loading = "lazy";
+            let visual;
+            if (item.inlineSvg) {
+              const wrapper = document.createElement("span");
+              wrapper.innerHTML = item.inlineSvg;
+              visual = wrapper.firstElementChild;
+            } else {
+              const img = document.createElement("img");
+              img.src = item.src;
+              img.alt = item.label;
+              img.loading = "lazy";
+              if (item.className) {
+                img.classList.add(item.className);
+              }
+              visual = img;
+            }
             const label = document.createElement("span");
             label.textContent = item.label;
-            tile.appendChild(img);
+            tile.appendChild(visual);
             tile.appendChild(label);
             grid.appendChild(tile);
           });
@@ -963,10 +981,33 @@
         fogLastMove = { x, y, t: now };
       });
 
+      window.addEventListener("mousemove", (event) => {
+        if (!blurActive) return;
+        const now = performance.now();
+        const x = event.clientX;
+        const y = event.clientY;
+        if (blurLastMove.x !== null) {
+          const dx = x - blurLastMove.x;
+          const dy = y - blurLastMove.y;
+          const dt = Math.max(1, now - blurLastMove.t);
+          const speed = Math.hypot(dx, dy) / dt;
+          if (speed >= 0.25) {
+            clearBlurAt(x, y, speed, blurLastMove.x, blurLastMove.y);
+          }
+        }
+        blurLastMove = { x, y, t: now };
+      });
+
       window.addEventListener("resize", () => {
         if (!fogActive) return;
         resizeFog();
         drawFog();
+      });
+
+      window.addEventListener("resize", () => {
+        if (!blurActive) return;
+        resizeBlur();
+        drawBlur();
       });
 
       window.addEventListener("keydown", (event) => {

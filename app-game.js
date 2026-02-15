@@ -68,6 +68,7 @@
           timer: null,
           adWasActive: false,
           fogWasActive: false,
+          blurWasActive: false,
           adSnapshot: null,
           glitchWasActive: false,
           swapRemaining: null,
@@ -94,6 +95,10 @@
         if (fogActive) {
           pausedState.fogWasActive = true;
           stopFog();
+        }
+        if (blurActive) {
+          pausedState.blurWasActive = true;
+          stopBlur();
         }
         if (phase === "show" && getChallengeOptions(round).enableGlitch) {
           pausedState.glitchWasActive = true;
@@ -189,6 +194,9 @@
           if (pausedState.fogWasActive) {
             startFog();
           }
+          if (pausedState.blurWasActive) {
+            startBlur();
+          }
           if (pausedState.glitchWasActive) {
             startGlitching();
           }
@@ -241,6 +249,9 @@
         if (typeof window.clearTabKeyHint === "function") {
           window.clearTabKeyHint();
         }
+        stopFog();
+        stopBlur();
+        stopGlitching();
         document.body.classList.add("stage-fail");
         const originalItems = roundItems;
         const useSwapOrder =
@@ -376,6 +387,9 @@
         if (typeof window.clearTabKeyHint === "function") {
           window.clearTabKeyHint();
         }
+        stopFog();
+        stopBlur();
+        stopGlitching();
         stopStageStopwatch();
         document.body.classList.remove("stage-fail");
         cardGrid.innerHTML = "";
@@ -647,6 +661,7 @@
         }
         hideAd();
         stopFog();
+        stopBlur();
         stopGlitching();
         if (platformerState.required && !platformerState.completed) {
           platformerState.failed = true;
@@ -801,6 +816,7 @@
         platformerState.required = isPlatformerEnabled();
         adEnabled = isAdEnabled();
         fogEnabled = isFogEnabled();
+        blurEnabled = isBlurEnabled();
         swapEnabled = isSwapEnabled();
         swapChance = getSwapChance();
         adShownThisRound = false;
@@ -817,6 +833,11 @@
           startFog();
         } else {
           stopFog();
+        }
+        if (blurEnabled) {
+          startBlur();
+        } else {
+          stopBlur();
         }
         const revealSeconds = getRevealSeconds();
         scheduleAd(revealSeconds);

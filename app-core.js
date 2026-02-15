@@ -24,6 +24,7 @@ const revealInput = document.getElementById("revealTime");
       const practicePlatformer = document.getElementById("practicePlatformer");
       const practiceGlitch = document.getElementById("practiceGlitch");
       const practiceFog = document.getElementById("practiceFog");
+      const practiceBlur = document.getElementById("practiceBlur");
       const practiceAds = document.getElementById("practiceAds");
       const practiceSwap = document.getElementById("practiceSwap");
       const practiceMathChance = document.getElementById("practiceMathChance");
@@ -131,6 +132,9 @@ const revealInput = document.getElementById("revealTime");
       let fogEnabled = false;
       let fogActive = false;
       let fogLastMove = { x: null, y: null, t: 0 };
+      let blurEnabled = false;
+      let blurActive = false;
+      let blurLastMove = { x: null, y: null, t: 0 };
       let glitchTimer = null;
       let swapEnabled = false;
       let swapChance = 1;
@@ -234,6 +238,15 @@ const revealInput = document.getElementById("revealTime");
         return Boolean(practiceFog.checked);
       }
 
+      function isBlurEnabled() {
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : null;
+          return Boolean(modifiers && modifiers.blur);
+        }
+        return Boolean(practiceBlur && practiceBlur.checked);
+      }
+
       function isSwapEnabled() {
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
@@ -300,6 +313,9 @@ const revealInput = document.getElementById("revealTime");
           }
           if (practiceFog) {
             practiceFog.disabled = false;
+          }
+          if (practiceBlur) {
+            practiceBlur.disabled = false;
           }
           if (practiceAds) {
             practiceAds.disabled = false;
@@ -931,7 +947,6 @@ const revealInput = document.getElementById("revealTime");
             if (item.category === "directions") {
               const rotation = getDirectionRotation(item.label);
               card.innerHTML = `
-                <small>${item.category}</small>
                 <img
                   class="direction-arrow"
                   src="imgs/arrow.png"
@@ -942,7 +957,6 @@ const revealInput = document.getElementById("revealTime");
             } else if (item.category === "diagonal") {
               const rotation = getDiagonalRotation(item.label);
               card.innerHTML = `
-                <small>${item.category}</small>
                 <img
                   class="direction-arrow"
                   src="imgs/arrow.png"
@@ -951,11 +965,11 @@ const revealInput = document.getElementById("revealTime");
                 />
               `;
             } else if (item.category === "shapes") {
-              card.innerHTML = `<small>${item.category}</small>${renderShapeSVG(item.shape)}`;
+              card.innerHTML = `${renderShapeSVG(item.shape)}`;
             } else {
               const cardLabel = item.textLabel ?? item.label;
               const symbol = item.symbol ? `${item.symbol} ` : "";
-              card.innerHTML = `<small>${item.category}</small>${symbol}${cardLabel}`;
+              card.innerHTML = `${symbol}${cardLabel}`;
             }
             if (item.color) {
               card.style.background = item.color;

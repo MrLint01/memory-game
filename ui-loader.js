@@ -38,6 +38,7 @@
     'modifiers/math-ops.js',
     'modifiers/glitch.js',
     'modifiers/fog.js',
+    'modifiers/blur.js',
     'modifiers/ads.js',
     'modifiers/swap.js',
     'modifiers/platformer.js',

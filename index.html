@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Flash Recall</title>
-    <link rel="stylesheet" href="style.css?v=20260202" />
+    <link rel="stylesheet" href="style.css" />
     <link rel="preload" href="imgs/back_button.png" as="image" />
     <link rel="preload" href="imgs/chain_1.png" as="image" />
     <link rel="preload" href="imgs/chain_2.png" as="image" />
@@ -34,6 +34,7 @@
     <link rel="preload" href="imgs/icons/mod-ads.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-backgroundcolor.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-fog.svg" as="image" />
+    <link rel="preload" href="imgs/icons/mod-blur.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-glitch.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-mathops.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-misleadcolors.svg" as="image" />
@@ -233,7 +234,10 @@
               <label class="icon-choice">
                 <input id="practiceGlitch" type="checkbox" />
                 <span class="icon-tile">
-                  <img src="imgs/icons/mod-glitch.svg" alt="" />
+                  <svg class="glitch-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">
+                    <rect class="glitch-card-fill" x="6" y="6" width="52" height="52" rx="8" fill="#ffffff" stroke="#111111" stroke-width="3"/>
+                    <text x="32" y="42" text-anchor="middle" font-family="'Arial Black', sans-serif" font-size="28" fill="#111">7</text>
+                  </svg>
                   <span>Glitch</span>
                 </span>
               </label>
@@ -242,6 +246,13 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-fog.svg" alt="" />
                   <span>Fog</span>
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input id="practiceBlur" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-blur.svg" alt="" />
+                  <span>Blur</span>
                 </span>
               </label>
               <label class="icon-choice">
@@ -278,6 +289,7 @@
     </div>
     <div class="pill hud-streak" id="streakPill">STREAK 0</div>
     <canvas class="fog-overlay" id="fogCanvas"></canvas>
+    <div class="fog-blur" id="fogBlur" aria-hidden="true"></div>
     <div class="success-toast" id="successToast" aria-hidden="true">All correct!</div>
     <div class="config-hidden" hidden>
       <select id="modeSelect">

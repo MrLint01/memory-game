@@ -692,7 +692,6 @@ const revealInput = document.getElementById("revealTime");
             if (item.category === "directions") {
               const rotation = getDirectionRotation(item.label);
               card.innerHTML = `
-                <small>${item.category}</small>
                 <img
                   class="direction-arrow"
                   src="imgs/arrow.png"
@@ -703,7 +702,6 @@ const revealInput = document.getElementById("revealTime");
             } else if (item.category === "diagonal") {
               const rotation = getDiagonalRotation(item.label);
               card.innerHTML = `
-                <small>${item.category}</small>
                 <img
                   class="direction-arrow"
                   src="imgs/arrow.png"
@@ -712,11 +710,11 @@ const revealInput = document.getElementById("revealTime");
                 />
               `;
             } else if (item.category === "shapes") {
-              card.innerHTML = `<small>${item.category}</small>${renderShapeSVG(item.shape)}`;
+              card.innerHTML = `${renderShapeSVG(item.shape)}`;
             } else {
               const cardLabel = item.textLabel ?? item.label;
               const symbol = item.symbol ? `${item.symbol} ` : "";
-              card.innerHTML = `<small>${item.category}</small>${symbol}${cardLabel}`;
+              card.innerHTML = `${symbol}${cardLabel}`;
             }
             if (item.color) {
               card.style.background = item.color;

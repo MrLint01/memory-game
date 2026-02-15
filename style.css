@@ -1960,6 +1960,48 @@ body.pause-active .interrupt-close {
   width: 44px;
   height: 44px;
 }
+.stage-intro-icon svg {
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+.glitch-icon {
+  animation: glitchIconFlash 700ms steps(2, end) infinite;
+}
+@keyframes glitchIconFlash {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.glitch-icon .glitch-card-fill {
+  animation: glitchCardFlash 700ms steps(2, end) infinite;
+}
+@keyframes glitchCardFlash {
+  0%,
+  45% {
+    fill: #ffffff;
+  }
+  50%,
+  75% {
+    fill: #111111;
+  }
+  100% {
+    fill: #ffffff;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glitch-icon {
+    animation: none;
+  }
+}
 .stage-intro-icon--none {
   display: flex;
   align-items: center;
@@ -2454,6 +2496,18 @@ body.pause-active .interrupt-close {
   z-index: 20;
   pointer-events: none;
 }
+.fog-blur {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 19;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 120px, black 180px);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 120px, black 180px);
+  transition: opacity 120ms ease-out;
+}
       @keyframes rise {
         from {
           opacity: 0;
@@ -2470,3 +2524,7 @@ body.pause-active .interrupt-close {
         }
       }
     
+.icon-tile svg.glitch-icon {
+  width: 40px;
+  height: 40px;
+}
