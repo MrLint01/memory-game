@@ -114,6 +114,8 @@
         <div class="stage-board">
           <div class="stage-list stage-grid" id="stageList"></div>
         </div>
+        <button id="stagesPrev" class="stages-page-prev" type="button" aria-label="Previous page"></button>
+        <button id="stagesNext" class="stages-page-next" type="button" aria-label="Next page"></button>
         <div class="stages-footer">
           <div id="stagesFooter"></div>
         </div>
@@ -279,6 +281,25 @@
     <div data-include="ui/stats.html"></div>
     <div data-include="ui/stage-intro.html"></div>
     <div data-include="ui/reference.html"></div>
+    <div class="modal" id="flashStageModal" aria-hidden="true">
+      <div class="modal-card modal-card--muted modal-card--flash">
+        <h3>Flash Level</h3>
+        <p class="modal-note">Reveal time is extremely short. Get ready.</p>
+        <label class="checkbox-inline flash-optout">
+          <input id="flashStageSkip" type="checkbox" />
+          Don't show again
+        </label>
+        <div class="modal-actions">
+          <button id="flashStageStart" class="secondary icon-button" type="button" aria-label="Start (Enter)">
+            <img class="action-icon" src="imgs/play_button.png" alt="" />
+            <span class="action-key-hint" aria-hidden="true">(Enter)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="flash-countdown" id="flashCountdown" aria-hidden="true">
+      <div class="flash-countdown__num">3</div>
+    </div>
     <div class="interrupt-modal" id="interruptModal" aria-hidden="true" hidden>
       <div class="interrupt-card">
         <div class="interrupt-header">

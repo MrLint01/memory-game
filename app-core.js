@@ -50,8 +50,13 @@ const revealInput = document.getElementById("revealTime");
       const settingsClose = document.getElementById("settingsClose");
       const statsModal = document.getElementById("statsModal");
       const statsClose = document.getElementById("statsClose");
+      const flashCountdownToggle = document.getElementById("flashCountdownToggle");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
+      const flashStageModal = document.getElementById("flashStageModal");
+      const flashStageStart = document.getElementById("flashStageStart");
+      const flashCountdown = document.getElementById("flashCountdown");
+      const flashStageSkip = document.getElementById("flashStageSkip");
       const stageIntroModal = document.getElementById("stageIntroModal");
       const stageIntroTitle = document.getElementById("stageIntroTitle");
       const stageIntroSubtitle = document.getElementById("stageIntroSubtitle");
@@ -147,6 +152,9 @@ const revealInput = document.getElementById("revealTime");
       let swapRemaining = null;
       let swapStartRecall = null;
       let swapCleanup = null;
+      let stageCategoryQueue = null;
+      let stageCategoryQueueIndex = 0;
+      let stageCategoryQueueStageId = null;
       const stageState = {
         active: false,
         index: 0,
@@ -596,6 +604,14 @@ const revealInput = document.getElementById("revealTime");
         return Math.min(max, Math.max(min, value));
       }
 
+      function shuffleArray(list) {
+        for (let i = list.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [list[i], list[j]] = [list[j], list[i]];
+        }
+        return list;
+      }
+
 
       function resetBoard() {
         cardGrid.innerHTML = "";
@@ -874,12 +890,42 @@ const revealInput = document.getElementById("revealTime");
             ? window.getStageCardCounts(stage)
             : null;
         let categories = getActiveCategories(round);
+        let forcedCategory = null;
+        if (gameMode === "stages" && stage && Number(stage.rounds) > 1) {
+          const perRoundGuarantee = Array.isArray(stage.roundCategoryGuarantee)
+            ? stage.roundCategoryGuarantee.filter((key) => typeof key === "string")
+            : null;
+          const cardCount = window.getStageCardCount ? window.getStageCardCount(stage) : stage.cards || 1;
+          if (perRoundGuarantee && perRoundGuarantee.length && Number(cardCount) === 1) {
+            const stageCategories = window.getStageCategories ? window.getStageCategories(stage) : categories;
+            const required = perRoundGuarantee.filter((key) => stageCategories.includes(key));
+            if (stageCategoryQueueStageId !== stage.id || round === 1) {
+              const queue = shuffleArray([...required]);
+              const totalRounds = Number(stage.rounds) || 1;
+              const remaining = Math.max(0, totalRounds - queue.length);
+              for (let i = 0; i < remaining; i += 1) {
+                const pick = stageCategories[Math.floor(Math.random() * stageCategories.length)];
+                queue.push(pick);
+              }
+              stageCategoryQueue = queue;
+              stageCategoryQueueIndex = 0;
+              stageCategoryQueueStageId = stage.id;
+            }
+            if (Array.isArray(stageCategoryQueue) && stageCategoryQueue.length) {
+              forcedCategory = stageCategoryQueue[stageCategoryQueueIndex] || null;
+              stageCategoryQueueIndex = Math.min(stageCategoryQueueIndex + 1, stageCategoryQueue.length);
+            }
+          }
+        }
         if (cardCounts && typeof cardCounts === "object") {
           const extra = Object.keys(cardCounts).filter((key) => dataSets[key]);
           categories = Array.from(new Set([...categories, ...extra]));
         }
         if (!categories.length) {
           categories = ["numbers"];
+        }
+        if (forcedCategory && categories.includes(forcedCategory)) {
+          categories = [forcedCategory];
         }
         const count =
           gameMode === "practice"
@@ -927,6 +973,10 @@ const revealInput = document.getElementById("revealTime");
         while (chosen.length < targetCount) {
           const category = categories[Math.floor(Math.random() * categories.length)];
           pickFromCategory(category);
+        }
+        for (let i = chosen.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
         }
         const plan = planModifierAssignments(chosen, options);
         const built = chosen.map((item, index) => buildChallenge(item, options, plan[index]));

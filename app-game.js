@@ -774,6 +774,13 @@
           window.clearFirstLetterHint();
         }
         document.body.classList.remove("stage-fail");
+        if (gameMode === "stages" && !options.__flashOverride) {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (stage && String(stage.stageType).toLowerCase() === "flash" && typeof window.startFlashRound === "function") {
+            window.startFlashRound();
+            return;
+          }
+        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (!stage) {
