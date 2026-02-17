@@ -2,7 +2,20 @@
   <div class="modal-card modal-card--muted">
     <h3>Stats</h3>
     <div class="controls">
-      <p class="modal-note">Stats are coming soon.</p>
+      <div class="control-group">
+        <label>Progress</label>
+        <div class="checkboxes">
+          <div class="stat-row">Stages cleared: <strong id="statsStagesCleared">0</strong>/<span id="statsStagesTotal">0</span></div>
+          <div class="stat-row">Stars earned: <strong id="statsStarsEarned">0</strong></div>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Performance</label>
+        <div class="checkboxes">
+          <div class="stat-row">Avg time per card: <strong id="statsAvgPerCard">—</strong></div>
+          <div class="stat-row">Avg best time per card: <strong id="statsAvgBestPerCard">—</strong></div>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button id="statsClose" class="secondary" type="button">Close</button>

@@ -1048,6 +1048,8 @@
           window.stageBestTimes = {};
           window.stageCompleted = {};
           window.stageNewSeen = {};
+          window.flashRecallSessionStats = { totalSeconds: 0, totalCards: 0 };
+          window.localStorage.removeItem("flashRecallStats");
           window.localStorage.removeItem("flashRecallFlashWarning");
           if (typeof window.saveStageProgress === "function") {
             window.saveStageProgress();
@@ -1063,6 +1065,8 @@
           const stagesClearedEl = document.getElementById("statsStagesCleared");
           const stagesTotalEl = document.getElementById("statsStagesTotal");
           const starsEarnedEl = document.getElementById("statsStarsEarned");
+          const avgPerCardEl = document.getElementById("statsAvgPerCard");
+          const avgBestPerCardEl = document.getElementById("statsAvgBestPerCard");
           if (stagesClearedEl || stagesTotalEl || starsEarnedEl) {
             const totalStages = stages.length;
             const stagesCleared = stages.reduce((sum, stage, index) => {
@@ -1076,6 +1080,55 @@
             if (stagesClearedEl) stagesClearedEl.textContent = String(stagesCleared);
             if (stagesTotalEl) stagesTotalEl.textContent = String(totalStages);
             if (starsEarnedEl) starsEarnedEl.textContent = String(starsEarned);
+          }
+          if (avgPerCardEl) {
+            const key = "flashRecallStats";
+            let avgText = "—";
+            try {
+              const raw = window.localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                const totalSeconds = Number(parsed && parsed.totalSeconds) || 0;
+                const totalCards = Number(parsed && parsed.totalCards) || 0;
+                if (totalCards > 0) {
+                  const avg = totalSeconds / totalCards;
+                  avgText = `${avg.toFixed(2)}s`;
+                }
+              }
+            } catch (error) {
+              avgText = "—";
+            }
+            if (avgText === "—") {
+              const sessionStats = window.flashRecallSessionStats;
+              const totalSeconds = Number(sessionStats && sessionStats.totalSeconds) || 0;
+              const totalCards = Number(sessionStats && sessionStats.totalCards) || 0;
+              if (totalCards > 0) {
+                avgText = `${(totalSeconds / totalCards).toFixed(2)}s`;
+              }
+            }
+            avgPerCardEl.textContent = avgText;
+          }
+          if (avgBestPerCardEl) {
+            const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+            const totals = stages.reduce(
+              (acc, stage, index) => {
+                const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+                const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[stageKey]);
+                if (!Number.isFinite(bestSeconds)) return acc;
+                const rounds = Number(stage.rounds) || 1;
+                const cards = window.getStageCardCount ? window.getStageCardCount(stage) : stage.cards || 1;
+                const totalCards = Math.max(1, rounds * (Number(cards) || 1));
+                acc.seconds += bestSeconds;
+                acc.cards += totalCards;
+                return acc;
+              },
+              { seconds: 0, cards: 0 }
+            );
+            if (totals.cards > 0) {
+              avgBestPerCardEl.textContent = `${(totals.seconds / totals.cards).toFixed(2)}s`;
+            } else {
+              avgBestPerCardEl.textContent = "—";
+            }
           }
           setModalState(statsModal, true);
         });

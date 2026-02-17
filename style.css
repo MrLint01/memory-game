@@ -2689,6 +2689,10 @@ body.pause-active .interrupt-close {
 .modal-card .controls span {
   user-select: none;
 }
+.modal-card--muted #settingsModal .checkboxes label,
+.modal-card--muted .checkboxes label {
+  font-weight: 400;
+}
 .modal-card--sandbox .controls {
   overflow-y: auto;
   min-height: 0;
@@ -2712,6 +2716,13 @@ body.pause-active .interrupt-close {
   margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--ink);
 }
 .modal-actions {
   display: flex;
