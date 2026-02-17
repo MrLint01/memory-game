@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /game_sessions/{sessionId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth.uid == resource.data.user_id;
+    }
+    match /game_sessions/{sessionId}/attempts/{attemptId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth.uid == resource.data.user_id;
+    }
+  }
+}
