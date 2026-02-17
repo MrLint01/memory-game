@@ -33,12 +33,15 @@ Core areas include:
 - npm
 - Firebase CLI (`npm install -g firebase-tools`)
 
-### Option A: Firebase Hosting emulator (for testing)
+### Firebase Setup: 
 ```bash
+npm install -g firebase-tools
 firebase login
 firebase use flash-recall-df7d9
-firebase emulators:start --only hosting
 ```
+
+### Option A: Firebase Hosting emulator (for testing)
+`firebase emulators:start --only hosting`
 
 ## Option B: Firebase Hosting
 The current hosting config serves from the repository root:
@@ -47,10 +50,10 @@ You may server a different root depending on your file structure
 
 Deploy steps:
 ```bash
-firebase login
-firebase use flash-recall-df7d9
 firebase deploy --only hosting
 ```
+
+Make sure to re host the server whenever the application is updated. Consider refreshing the browser each time as well.
 
 ## Firestore Rules Deployment (not necessary for testing)
 Deploy Firestore rules with:

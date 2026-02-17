@@ -7,8 +7,8 @@ const firebaseConfig = {
   authDomain: "flash-recall-df7d9.firebaseapp.com",
   projectId: "flash-recall-df7d9",
   storageBucket: "flash-recall-df7d9.firebasestorage.app",
-  messagingSenderId: "8423907454",
-  appId: "1:8423907454:web:265f87be6b4b9df8ccc35f"
+  messagingSenderId: "84239074574",
+  appId: "1:84239074574:web:265f87be6b4b9df8ccc35f"
 };
 
 let firebaseApp = null;
@@ -159,3 +159,4 @@ if (document.readyState === 'loading') {
 } else {
   initializeFirebase();
 }
+
