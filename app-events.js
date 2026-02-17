@@ -107,10 +107,8 @@
       }
 
       function openPracticeModal() {
-        document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
-          input.disabled = false;
-        });
         setModalState(practiceModal, true);
+        updateCategoryControls();
       }
 
       function closePracticeModal() {
@@ -370,7 +368,8 @@
           letters: { label: "Letters", src: "imgs/icons/card-letters.svg" },
           directions: { label: "Directions", src: "imgs/icons/card-directions.svg" },
           diagonal: { label: "Diagonal", src: "imgs/icons/card-diagonal.svg" },
-          shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" }
+          shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" },
+          fruits: { label: "Fruits", src: "imgs/apple.png" }
         };
         const modifierIconMap = {
           mathOps: { label: "Math ops", src: "imgs/icons/mod-mathops.svg" },

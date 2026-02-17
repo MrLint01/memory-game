@@ -32,6 +32,13 @@ const dataSets = {
           { label: "NW" },
           { label: "SE" },
           { label: "SW" }
+        ],
+        fruits: [
+          { label: "Apple", image: "imgs/apple.png" },
+          { label: "Banana", image: "imgs/banana.png" },
+          { label: "Grape", image: "imgs/grape.png" },
+          { label: "Strawberry", image: "imgs/strawberry.png" },
+          { label: "Watermelon", image: "imgs/watermelon.png" }
         ]
       };
       const backgroundColors = [

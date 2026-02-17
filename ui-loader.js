@@ -29,6 +29,7 @@
 
   const scriptList = [
     'data.js',
+    'sandbox-unlocks.js',
     'stages-instructions.js',
     'stages-data.js',
     'stages-mode.js',

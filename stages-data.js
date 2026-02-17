@@ -627,7 +627,6 @@
   ];
 })();
 
-
   // mathOps: true,
   // mathChance: 0.9,
   // misleadColors: true,

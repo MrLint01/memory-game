@@ -2522,6 +2522,18 @@ body.pause-active .interrupt-close {
   object-fit: contain;
   display: block;
 }
+.fruit-image {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  display: block;
+}
+.ref-fruit img {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  display: block;
+}
 .ref-arrow img,
 .ref-diagonal img {
   width: 26px;
@@ -2572,6 +2584,21 @@ body.pause-active .interrupt-close {
   position: relative;
   display: grid;
   width: 100%;
+}
+.icon-choice .lock-icon {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  pointer-events: none;
+}
+.icon-choice input:disabled + .icon-tile {
+  opacity: 0.45;
+}
+.icon-choice input:disabled + .icon-tile .lock-icon {
+  opacity: 1;
 }
 .icon-choice input {
   position: absolute;

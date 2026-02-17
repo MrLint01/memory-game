@@ -300,38 +300,39 @@ const revealInput = document.getElementById("revealTime");
 
       function updateCategoryControls() {
         const disabled = gameMode !== "practice";
+        const unlocks = window.sandboxUnlocks || {};
+        const cardUnlocks = unlocks.cardTypes || {};
+        const modifierUnlocks = unlocks.modifiers || {};
+        const isStageCompleted = (requiredId) => {
+          if (!Number.isFinite(requiredId)) return false;
+          const key = String(requiredId);
+          return Boolean(window.stageCompleted && window.stageCompleted[key]);
+        };
         document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
-          input.disabled = disabled;
+          if (disabled) {
+            input.disabled = true;
+            return;
+          }
+          const value = input.value;
+          const id = input.id;
+          let requiredStage = null;
+          if (value && dataSets[value]) {
+            requiredStage = cardUnlocks[value];
+          } else if (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id)) {
+            requiredStage = modifierUnlocks[id];
+          }
+          const unlocked =
+            (value && dataSets[value] && window.unlockSandbox) ||
+            (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id) && window.unlockAllModifiers) ||
+            isStageCompleted(requiredStage);
+          input.disabled = !unlocked;
+          if (!unlocked) {
+            input.checked = false;
+          }
         });
         document.querySelectorAll("#practiceModal .stat-field input").forEach((input) => {
           input.disabled = disabled;
         });
-        if (!disabled) {
-          if (practiceMathOps) {
-            practiceMathOps.disabled = false;
-          }
-          if (practiceMisleadColors) {
-            practiceMisleadColors.disabled = false;
-          }
-          if (practiceBackgroundColor) {
-            practiceBackgroundColor.disabled = false;
-          }
-          if (practiceGlitch) {
-            practiceGlitch.disabled = false;
-          }
-          if (practiceFog) {
-            practiceFog.disabled = false;
-          }
-          if (practiceBlur) {
-            practiceBlur.disabled = false;
-          }
-          if (practiceAds) {
-            practiceAds.disabled = false;
-          }
-          if (practiceSwap) {
-            practiceSwap.disabled = false;
-          }
-        }
       }
 
       function setPhase(text, nextState) {
@@ -641,6 +642,8 @@ const revealInput = document.getElementById("revealTime");
             return "Diagonal";
           case "shapes":
             return "Shape";
+          case "fruits":
+            return "Fruit";
           default:
             return category ? category[0].toUpperCase() + category.slice(1) : "Card";
         }
@@ -729,6 +732,10 @@ const revealInput = document.getElementById("revealTime");
         if (item.category === "diagonal") {
           const normalized = expected.replace(/\s+/g, "");
           return actual === expected || actual === normalized;
+        }
+        if (item.category === "fruits") {
+          const initial = expected.charAt(0);
+          return actual === expected || actual === initial;
         }
         if (item.category === "shapes") {
           if (expected === "square") {
@@ -1016,6 +1023,11 @@ const revealInput = document.getElementById("revealTime");
               `;
             } else if (item.category === "shapes") {
               card.innerHTML = `${renderShapeSVG(item.shape)}`;
+            } else if (item.category === "fruits") {
+              const src = item.image || "";
+              card.innerHTML = `
+                <img class="fruit-image" src="${src}" alt="${item.label}" />
+              `;
             } else {
               const cardLabel = item.textLabel ?? item.label;
               const symbol = item.symbol ? `${item.symbol} ` : "";
