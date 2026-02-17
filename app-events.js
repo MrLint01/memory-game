@@ -116,6 +116,7 @@
       }
 
       function isPracticeUnlocked() {
+        if (window.unlockSandbox) return true;
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         const unlockStageIndex = 4; // Stage 5 (0-based index)
         const unlockStage = stages[unlockStageIndex];
@@ -144,6 +145,7 @@
           { key: "platformer", label: "Platformer" },
           { key: "glitch", label: "Glitch" },
           { key: "fog", label: "Fog" },
+          { key: "blur", label: "Blur" },
           { key: "ads", label: "Ads" }
         ];
         const enabled = entries.filter((entry) => modifiers && modifiers[entry.key]).map((entry) => entry.label);
@@ -151,16 +153,81 @@
       }
 
       let stageIntroPendingIndex = null;
+      let stageIntroOriginEl = null;
+      let tabTutorialShownRound = null;
+      let tabTutorialActive = false;
+      let tabTutorialDisabledInputs = [];
+      let tabTutorialHintEl = null;
+      let tabTutorialHintTimeout = null;
+      const tabTutorialStageIds = new Set([2, 3]);
+      let firstLetterHintCooldown = 0;
+      let firstLetterHintEl = null;
+      let firstLetterHintTimeout = null;
+      const firstLetterHintStageMessages = {
+        5: "FIRST LETTER\n(Triangle -> T, Circle -> C, Square -> S)",
+        6: "FIRST LETTER\n(Right -> R, Left -> L, Up -> U, ...)",
+        7: "FIRST LETTER\n(White -> W, Red -> R, Blue -> B, ...)"
+      };
+      let stageListAnimTimeout = null;
+      let stageListStarTimeout = null;
+      let stageListAnimActive = false;
+      let stageListMouseListenerAttached = false;
+      let stageListSkipListener = null;
+
+      function applyStageIntroOrigin(originEl) {
+        if (!stageIntroModal || !stageIntroCard) return;
+        stageIntroCard.classList.remove("intro-animate");
+        stageIntroCard.style.removeProperty("--intro-from-x");
+        stageIntroCard.style.removeProperty("--intro-from-y");
+        stageIntroCard.style.removeProperty("--intro-from-scale");
+        if (!originEl) {
+          return;
+        }
+        const originRect = originEl.getBoundingClientRect();
+        requestAnimationFrame(() => {
+          if (!stageIntroModal.classList.contains("show")) return;
+          const modalRect = stageIntroCard.getBoundingClientRect();
+          if (!modalRect.width || !modalRect.height) return;
+          const originCenterX = originRect.left + originRect.width / 2;
+          const originCenterY = originRect.top + originRect.height / 2;
+          const modalCenterX = modalRect.left + modalRect.width / 2;
+          const modalCenterY = modalRect.top + modalRect.height / 2;
+          const dx = originCenterX - modalCenterX;
+          const dy = originCenterY - modalCenterY;
+          const scale = Math.min(originRect.width / modalRect.width, originRect.height / modalRect.height, 1);
+          stageIntroCard.style.setProperty("--intro-from-x", `${dx}px`);
+          stageIntroCard.style.setProperty("--intro-from-y", `${dy}px`);
+          stageIntroCard.style.setProperty("--intro-from-scale", `${Math.max(0.6, scale)}`);
+          stageIntroCard.classList.remove("intro-animate");
+          void stageIntroCard.offsetWidth;
+          stageIntroCard.classList.add("intro-animate");
+        });
+      }
 
       function closeStageIntro() {
         stageIntroPendingIndex = null;
+        stageIntroOriginEl = null;
+        if (stageIntroCard) {
+          stageIntroCard.classList.remove("intro-animate");
+          stageIntroCard.style.removeProperty("--intro-from-x");
+          stageIntroCard.style.removeProperty("--intro-from-y");
+          stageIntroCard.style.removeProperty("--intro-from-scale");
+        }
         setModalState(stageIntroModal, false);
       }
 
-      function openStageIntro(index) {
+      function openStageIntro(index, originEl = null) {
         if (!stageIntroModal || !stageIntroTitle || !stageIntroList) return false;
         const stage = window.getStageConfig ? window.getStageConfig(index) : null;
         if (!stage) return false;
+        if (!window.__stageIntroWarmed && stageIntroModal) {
+          window.__stageIntroWarmed = true;
+          stageIntroModal.style.visibility = "hidden";
+          stageIntroModal.style.display = "grid";
+          stageIntroModal.offsetHeight;
+          stageIntroModal.style.display = "";
+          stageIntroModal.style.visibility = "";
+        }
         const stageName = stage.name ? String(stage.name) : `Stage ${index + 1}`;
         stageIntroTitle.textContent = stageName;
         if (stageIntroStars) {
@@ -213,11 +280,17 @@
         stageIntroList.innerHTML = "";
         const categories = window.getStageCategories ? window.getStageCategories(stage) : stage.categories || [];
         const modifiers = window.getStageModifiers ? window.getStageModifiers(stage) : stage.modifiers || {};
+        const glitchSvg =
+          '<svg class="glitch-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">' +
+          '<rect class="glitch-card-fill" x="6" y="6" width="52" height="52" rx="8" fill="#ffffff" stroke="#111111" stroke-width="3"/>' +
+          '<text x="32" y="42" text-anchor="middle" font-family="\'Arial Black\', sans-serif" font-size="28" fill="#111">7</text>' +
+          "</svg>";
         const cardIconMap = {
           numbers: { label: "Numbers", src: "imgs/icons/card-numbers.svg" },
           colors: { label: "Colors", src: "imgs/icons/card-colors.svg" },
           letters: { label: "Letters", src: "imgs/icons/card-letters.svg" },
           directions: { label: "Directions", src: "imgs/icons/card-directions.svg" },
+          diagonal: { label: "Diagonal", src: "imgs/icons/card-diagonal.svg" },
           shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" }
         };
         const modifierIconMap = {
@@ -226,8 +299,9 @@
           backgroundColor: { label: "Background", src: "imgs/icons/mod-backgroundcolor.svg" },
           swapCards: { label: "Swap", src: "imgs/icons/mod-swapcards.svg" },
           platformer: { label: "Platformer", src: "imgs/icons/mod-platformer.svg" },
-          glitch: { label: "Glitch", src: "imgs/icons/mod-glitch.svg" },
+          glitch: { label: "Glitch", inlineSvg: glitchSvg },
           fog: { label: "Fog", src: "imgs/icons/mod-fog.svg" },
+          blur: { label: "Blur", src: "imgs/icons/mod-blur.svg" },
           ads: { label: "Ads", src: "imgs/icons/mod-ads.svg" }
         };
         const renderIconSection = (title, items) => {
@@ -241,13 +315,24 @@
           items.forEach((item) => {
             const tile = document.createElement("div");
             tile.className = "stage-intro-icon";
-            const img = document.createElement("img");
-            img.src = item.src;
-            img.alt = item.label;
-            img.loading = "lazy";
+            let visual;
+            if (item.inlineSvg) {
+              const wrapper = document.createElement("span");
+              wrapper.innerHTML = item.inlineSvg;
+              visual = wrapper.firstElementChild;
+            } else {
+              const img = document.createElement("img");
+              img.src = item.src;
+              img.alt = item.label;
+              img.loading = "lazy";
+              if (item.className) {
+                img.classList.add(item.className);
+              }
+              visual = img;
+            }
             const label = document.createElement("span");
             label.textContent = item.label;
-            tile.appendChild(img);
+            tile.appendChild(visual);
             tile.appendChild(label);
             grid.appendChild(tile);
           });
@@ -267,7 +352,9 @@
           renderIconSection("Modifiers", modifierItems);
         }
         stageIntroPendingIndex = index;
+        stageIntroOriginEl = originEl;
         setModalState(stageIntroModal, true);
+        applyStageIntroOrigin(stageIntroOriginEl);
         return true;
       }
 
@@ -292,10 +379,24 @@
         return window.stageCompleted[prevStageKey] === true;
       }
 
-      function renderStageList() {
+      function renderStageList(animate = false) {
         if (!stageList) return;
         if (!window.stageNewSeen) {
           window.stageNewSeen = {};
+        }
+        stageListAnimActive = false;
+        stageListMouseListenerAttached = false;
+        if (stageListSkipListener) {
+          window.removeEventListener("mousemove", stageListSkipListener);
+          stageListSkipListener = null;
+        }
+        if (stageListAnimTimeout) {
+          clearTimeout(stageListAnimTimeout);
+          stageListAnimTimeout = null;
+        }
+        if (stageListStarTimeout) {
+          clearTimeout(stageListStarTimeout);
+          stageListStarTimeout = null;
         }
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         const lockIconSrc = "imgs/lock.png";
@@ -322,6 +423,7 @@
           return;
         }
         stageState.page = 0;
+        stageList.classList.add("stage-list--hidden");
         stageList.innerHTML = stages
           .map((stage, offset) => {
             const index = offset;
@@ -331,6 +433,13 @@
               window.stageBestTimes && window.stageBestTimes[stageKey]
             );
             const isCompleted = window.stageCompleted && window.stageCompleted[stageKey];
+            const stageType = stage && stage.stageType ? String(stage.stageType).toLowerCase() : "";
+            const stageTypeIcon =
+              stageType === "flash"
+                ? { src: "imgs/flash_icon.png", label: "Flash level" }
+                : stageType === "tutorial"
+                  ? { src: "imgs/tutorial_icon.png", label: "Tutorial level" }
+                  : null;
 
             const starsMarkup = [1, 2, 3]
               .map((value) => {
@@ -369,7 +478,7 @@
             }
 
             return `
-              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}"${lockedAttr}>
+              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${index}" data-anim-state="pending"${lockedAttr}>
                 ${unlocked ? `<strong>${name}</strong>` : ""}
                 ${lockIcon}
                 ${lockedLabel}
@@ -381,6 +490,7 @@
                       : placeholderStars
                 }
                 ${placeholderBest}
+                ${unlocked && stageTypeIcon ? `<img class="stage-type-icon" src="${stageTypeIcon.src}" alt="${stageTypeIcon.label}" />` : ""}
               </button>
             `;
           })
@@ -388,27 +498,156 @@
         if (stagesFooter) {
           stagesFooter.textContent = "";
         }
+        if (animate) {
+          stageList.classList.add("stage-list--hidden");
+          stageListAnimActive = true;
+          const headerDelayMs = 280;
+          stageListSkipListener = () => {
+            if (!stageListAnimActive || !stageList) return;
+            if (stageListAnimTimeout) {
+              clearTimeout(stageListAnimTimeout);
+              stageListAnimTimeout = null;
+            }
+            if (stageListStarTimeout) {
+              clearTimeout(stageListStarTimeout);
+              stageListStarTimeout = null;
+            }
+            stageListAnimActive = false;
+            stageListMouseListenerAttached = false;
+            stageList.classList.remove("stage-list--hidden");
+            const pendingCards = Array.from(
+              stageList.querySelectorAll('.stage-card[data-anim-state="pending"]')
+            );
+            pendingCards.forEach((card) => {
+              card.dataset.animState = "done";
+              card.classList.remove("stage-card--animate");
+              card.classList.remove("stage-card--fadein");
+            });
+            void stageList.offsetWidth;
+            pendingCards.forEach((card) => {
+              card.classList.add("stage-card--fadein");
+            });
+            const pendingCount = pendingCards.length;
+            const fadeDelay = 240;
+            stageListStarTimeout = window.setTimeout(() => {
+              stageList
+                .querySelectorAll(".stage-stars")
+                .forEach((stars) => {
+                  stars.classList.remove("stage-stars--shine");
+                  void stars.offsetWidth;
+                  stars.classList.add("stage-stars--shine");
+                });
+            }, pendingCount ? fadeDelay : 0);
+            if (stageListSkipListener) {
+              window.removeEventListener("mousemove", stageListSkipListener);
+              stageListSkipListener = null;
+            }
+          };
+          if (!stageListMouseListenerAttached) {
+            stageListMouseListenerAttached = true;
+            window.addEventListener("mousemove", stageListSkipListener);
+          }
+          requestAnimationFrame(() => {
+            stageListAnimTimeout = window.setTimeout(() => {
+              stageList.classList.remove("stage-list--hidden");
+              stageList.querySelectorAll(".stage-card").forEach((card, idx) => {
+                const animIndex = Number(card.dataset.animIndex);
+                const delay = Number.isFinite(animIndex) ? animIndex : idx;
+                card.style.setProperty("--stage-anim-delay", `${delay * 100}ms`);
+                card.dataset.animState = "pending";
+                card.classList.remove("stage-card--animate");
+                void card.offsetWidth;
+                card.classList.add("stage-card--animate");
+                const onStart = (event) => {
+                  if (event.animationName !== "stageCardPop") return;
+                  card.dataset.animState = "animating";
+                  card.removeEventListener("animationstart", onStart);
+                };
+                const onEnd = (event) => {
+                  if (event.animationName !== "stageCardPop") return;
+                  card.dataset.animState = "done";
+                  card.removeEventListener("animationend", onEnd);
+                };
+                card.addEventListener("animationstart", onStart);
+                card.addEventListener("animationend", onEnd);
+              });
+              const cards = stageList.querySelectorAll(".stage-card");
+              const maxIndex = Math.max(0, cards.length - 1);
+              const totalDelay = headerDelayMs + maxIndex * 100;
+              stageListStarTimeout = window.setTimeout(() => {
+                stageListAnimActive = false;
+                stageList
+                  .querySelectorAll(".stage-stars")
+                  .forEach((stars) => {
+                    stars.classList.remove("stage-stars--shine");
+                    void stars.offsetWidth;
+                    stars.classList.add("stage-stars--shine");
+                  });
+                if (stageListSkipListener) {
+                  window.removeEventListener("mousemove", stageListSkipListener);
+                  stageListSkipListener = null;
+                }
+              }, totalDelay);
+            }, headerDelayMs);
+          });
+        } else {
+          stageListMouseListenerAttached = false;
+          if (stageListSkipListener) {
+            window.removeEventListener("mousemove", stageListSkipListener);
+            stageListSkipListener = null;
+          }
+          stageList.classList.remove("stage-list--hidden");
+          stageList.querySelectorAll(".stage-card").forEach((card) => {
+            card.classList.remove("stage-card--animate");
+            card.classList.remove("stage-card--fadein");
+            card.dataset.animState = "done";
+            card.style.removeProperty("--stage-anim-delay");
+          });
+          stageList.querySelectorAll(".stage-stars").forEach((stars) => {
+            stars.classList.remove("stage-stars--shine");
+          });
+        }
       }
 
-      function openStagesScreen() {
-        renderStageList();
+      function openStagesScreen(animate = false) {
+        if (stagesScreen) {
+          stagesScreen.classList.remove("stages-anim");
+          if (animate) {
+            void stagesScreen.offsetWidth;
+            stagesScreen.classList.add("stages-anim");
+          }
+        }
+        renderStageList(animate);
         if (stagesScreen) {
           stagesScreen.removeAttribute("aria-hidden");
         }
         document.body.dataset.view = "stages";
       }
 
-      function closeStagesScreen() {
+      function closeStagesScreen(animateHome = true) {
         if (stagesScreen) {
           stagesScreen.setAttribute("aria-hidden", "true");
         }
         document.body.dataset.view = "home";
+        clearFirstLetterHint();
+        if (animateHome) {
+          document.body.classList.remove("home-anim");
+          void document.body.offsetWidth;
+          document.body.classList.add("home-anim");
+        } else {
+          document.body.classList.remove("home-anim");
+        }
         updatePracticeLock();
       }
 
       function startStage(index, options = {}) {
-        const { skipIntro = false } = options;
-        if (!skipIntro && openStageIntro(index)) {
+        const { skipIntro = false, originEl = null } = options;
+        tabTutorialShownRound = null;
+        tabTutorialActive = false;
+        firstLetterHintCooldown = 0;
+        clearTabKeyHint();
+        clearFirstLetterHint();
+        if (!skipIntro && openStageIntro(index, originEl)) {
           return;
         }
         stageState.active = false;
@@ -421,7 +660,7 @@
         modeSelect.value = "stages";
         updateModeUI();
         resetGame();
-        closeStagesScreen();
+        closeStagesScreen(false);
         startRound({ advanceRound: true });
       }
 
@@ -482,13 +721,13 @@
 
       if (playStart) {
         playStart.addEventListener("click", () => {
-          openStagesScreen();
+          openStagesScreen(true);
         });
       }
 
       if (stagesOpen) {
         stagesOpen.addEventListener("click", () => {
-          openStagesScreen();
+          openStagesScreen(true);
         });
       }
 
@@ -516,7 +755,69 @@
             return;
           }
           
-          startStage(index);
+          startStage(index, { originEl: button });
+        });
+      }
+
+      if (inputGrid) {
+        inputGrid.addEventListener("input", (event) => {
+          if (tabTutorialActive) return;
+          if (gameMode !== "stages" || phase !== "recall") return;
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (!stage) return;
+          if (tabTutorialStageIds.has(stage.id)) {
+            if (tabTutorialShownRound === round) return;
+            const input = event.target && event.target.closest('input[data-index="0"]');
+            if (!input || !input.value) return;
+            tabTutorialShownRound = round;
+            tabTutorialActive = true;
+            tabTutorialDisabledInputs = [];
+            inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
+              const idx = Number(field.dataset.index);
+              if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
+                field.disabled = true;
+                tabTutorialDisabledInputs.push(field);
+              }
+            });
+            return;
+          }
+          const hintMessage = firstLetterHintStageMessages[stage.id];
+          if (!hintMessage) return;
+          const targetInput = event.target && event.target.closest('input[data-index]');
+          if (!targetInput) return;
+          const rawValue = targetInput.value ? String(targetInput.value) : "";
+          const trimmed = rawValue.trim();
+          if (trimmed.length <= 1) return;
+          const firstCharMatch = trimmed.match(/[a-z0-9]/i);
+          const firstChar = firstCharMatch ? firstCharMatch[0] : trimmed.charAt(0);
+          targetInput.value = firstChar;
+          targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+          const now = performance.now();
+          if (now - firstLetterHintCooldown > 300) {
+            firstLetterHintCooldown = now;
+            showFirstLetterHint(hintMessage);
+          }
+        });
+        inputGrid.addEventListener("pointerdown", (event) => {
+          if (!tabTutorialActive) return;
+          const targetInput = event.target.closest("input[data-index]");
+          if (!targetInput) return;
+          const idx = Number(targetInput.dataset.index);
+          if (Number.isFinite(idx) && idx > 0) {
+            event.preventDefault();
+            const firstInput = inputGrid.querySelector('input[data-index="0"]');
+            if (firstInput) firstInput.focus();
+          }
+        });
+        inputGrid.addEventListener("focusin", (event) => {
+          if (!tabTutorialActive) return;
+          const targetInput = event.target.closest("input[data-index]");
+          if (!targetInput) return;
+          const idx = Number(targetInput.dataset.index);
+          if (Number.isFinite(idx) && idx > 0) {
+            const firstInput = inputGrid.querySelector('input[data-index="0"]');
+            if (firstInput) firstInput.focus();
+          }
         });
       }
 
@@ -577,6 +878,21 @@
           }
         });
       }
+      const debugResetProgress = document.getElementById("debugResetProgress");
+      if (debugResetProgress) {
+        debugResetProgress.addEventListener("click", () => {
+          window.stageStars = {};
+          window.stageBestTimes = {};
+          window.stageCompleted = {};
+          window.stageNewSeen = {};
+          if (typeof window.saveStageProgress === "function") {
+            window.saveStageProgress();
+          }
+          if (stagesScreen && document.body.dataset.view === "stages") {
+            renderStageList(false);
+          }
+        });
+      }
       if (statsOpen && statsModal) {
         statsOpen.addEventListener("click", () => {
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
@@ -614,6 +930,33 @@
       }
 
       practiceConfirm.addEventListener("click", () => {
+        const selectedTypes = Array.from(
+          practiceModal.querySelectorAll(".control-group .checkboxes input[type=\"checkbox\"][value]")
+        ).filter((input) => input.checked);
+        if (!selectedTypes.length) {
+          const error = document.getElementById("practiceTypeError");
+          if (error) {
+            error.hidden = false;
+            error.classList.remove("show");
+            void error.offsetWidth;
+            error.classList.add("show");
+            if (error.dataset.hideTimer) {
+              clearTimeout(Number(error.dataset.hideTimer));
+            }
+            const timerId = window.setTimeout(() => {
+              error.hidden = true;
+              error.classList.remove("show");
+              error.dataset.hideTimer = "";
+            }, 3000);
+            error.dataset.hideTimer = String(timerId);
+          }
+          return;
+        }
+        const error = document.getElementById("practiceTypeError");
+        if (error) {
+          error.hidden = true;
+          error.classList.remove("show");
+        }
         modeSelect.value = "practice";
         updateModeUI();
         resetGame();
@@ -626,6 +969,22 @@
           closePracticeModal();
         }
       });
+
+      if (practiceModal) {
+        practiceModal.addEventListener("change", (event) => {
+          const target = event.target;
+          if (!(target && target.matches("input[type=\"checkbox\"][value]"))) return;
+          const error = document.getElementById("practiceTypeError");
+          if (!error) return;
+          const anyChecked = Array.from(
+            practiceModal.querySelectorAll(".control-group .checkboxes input[type=\"checkbox\"][value]")
+          ).some((input) => input.checked);
+          if (anyChecked) {
+            error.hidden = true;
+            error.classList.remove("show");
+          }
+        });
+      }
 
       interruptClose.addEventListener("click", () => {
         hideAd();
@@ -652,10 +1011,33 @@
         fogLastMove = { x, y, t: now };
       });
 
+      window.addEventListener("mousemove", (event) => {
+        if (!blurActive) return;
+        const now = performance.now();
+        const x = event.clientX;
+        const y = event.clientY;
+        if (blurLastMove.x !== null) {
+          const dx = x - blurLastMove.x;
+          const dy = y - blurLastMove.y;
+          const dt = Math.max(1, now - blurLastMove.t);
+          const speed = Math.hypot(dx, dy) / dt;
+          if (speed >= 0.25) {
+            clearBlurAt(x, y, speed, blurLastMove.x, blurLastMove.y);
+          }
+        }
+        blurLastMove = { x, y, t: now };
+      });
+
       window.addEventListener("resize", () => {
         if (!fogActive) return;
         resizeFog();
         drawFog();
+      });
+
+      window.addEventListener("resize", () => {
+        if (!blurActive) return;
+        resizeBlur();
+        drawBlur();
       });
 
       window.addEventListener("keydown", (event) => {
@@ -720,67 +1102,7 @@
         }
       });
 
-      pauseResume.addEventListener("click", () => {
-        closePauseModal();
-        resumeFromPause();
-      });
-
-      pauseRestart.addEventListener("click", () => {
-        closePauseModal();
-        if (gameMode === "stages") {
-          resetStageProgress();
-        }
-        resetGame();
-        startRound();
-      });
-
-      pauseQuit.addEventListener("click", () => {
-        closePauseModal();
-        // Analytics: Track level quit
-        if (gameMode === "stages" && stageState.active) {
-          const quitElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
-            ? stageState.elapsedSeconds
-            : (performance.now() - (stageState.startTime || performance.now())) / 1000;
-          const quitEntries = window.__lastEntries || [];
-          if (typeof trackLevelSession === 'function') {
-            trackLevelSession(stageState.index, false, 0, quitElapsedSeconds, quitEntries);
-          }
-        }
-        // Track session end
-        const totalSessionSeconds = (performance.now() - sessionStartTime) / 1000;
-        if (typeof trackSessionEnd === 'function') {
-          trackSessionEnd(totalSessionSeconds, lastCompletedLevel);
-        }
-        if (gameMode === "stages") {
-          resetStageProgress();
-        }
-        resetGame();
-      });
-
-      pauseModal.addEventListener("click", (event) => {
-        if (event.target === pauseModal) {
-          closePauseModal();
-          resumeFromPause();
-        }
-      });
-      if (pauseButton) {
-        pauseButton.addEventListener("click", () => {
-          openPauseModal();
-        });
-      }
-      document.addEventListener("mousemove", (event) => {
-        if (phase === "idle") {
-          document.body.classList.remove("show-pause");
-          return;
-        }
-        const nearLeft = event.clientX < 140;
-        const nearTop = event.clientY < 120;
-        if (nearLeft && nearTop) {
-          document.body.classList.add("show-pause");
-        } else {
-          document.body.classList.remove("show-pause");
-        }
-      });
+      // Pause UI removed.
 
       if (submitBtn) {
         submitBtn.addEventListener("click", () => {
@@ -794,7 +1116,7 @@
             if (stageState.completed) {
               resetStageProgress();
               resetGame();
-              openStagesScreen();
+              openStagesScreen(false);
               return;
             }
             if (stageState.failed) {
@@ -826,7 +1148,7 @@
           }
           resetStageProgress();
           resetGame();
-          openStagesScreen();
+          openStagesScreen(false);
           return;
         }
         const nextButton = event.target.closest("#stageNextButton");
@@ -841,12 +1163,21 @@
         if (practiceBack) {
           resetGame();
           setPhase("Waiting to start", "idle");
+          document.body.dataset.view = "home";
+          document.body.classList.remove("home-anim");
+          void document.body.offsetWidth;
+          document.body.classList.add("home-anim");
           return;
         }
         const practiceRetry = event.target.closest("#practiceRetryButton");
         if (practiceRetry) {
           resetForRetryRound();
           startRound({ reuseItems: false, advanceRound: false });
+          return;
+        }
+        const practiceSettings = event.target.closest("#practiceSettingsButton");
+        if (practiceSettings) {
+          openPracticeModal();
           return;
         }
         const homeButton = event.target.closest("#stageHomeButton");
@@ -857,6 +1188,9 @@
           modeSelect.value = "practice";
           updateModeUI();
           document.body.dataset.view = "home";
+          document.body.classList.remove("home-anim");
+          void document.body.offsetWidth;
+          document.body.classList.add("home-anim");
           updatePracticeLock();
           return;
         }
@@ -883,17 +1217,17 @@
 
       document.addEventListener("keydown", (event) => {
         const keyLower = event.key.toLowerCase();
-        if (pauseModal.classList.contains("show") && event.key === "Escape") {
-          event.preventDefault();
-          closePauseModal();
-          resumeFromPause();
-          return;
-        }
-        if (pauseModal.classList.contains("show")) {
-          if (event.key === "Enter") {
-            event.preventDefault();
+        if (tabTutorialActive) {
+          if (event.key === "Tab") {
+            tabTutorialActive = false;
+            if (tabTutorialDisabledInputs.length) {
+              tabTutorialDisabledInputs.forEach((field) => {
+                field.disabled = false;
+              });
+              tabTutorialDisabledInputs = [];
+            }
+            return;
           }
-          return;
         }
         if (referenceModal && referenceModal.classList.contains("show")) {
           if (event.key === "Escape") {
@@ -910,6 +1244,7 @@
           }
           if (event.key === "Enter") {
             event.preventDefault();
+            clearTabKeyHint();
             if (stageIntroStart) {
               stageIntroStart.click();
             }
@@ -935,8 +1270,6 @@
           return;
         }
         if (event.key === "Escape") {
-          event.preventDefault();
-          openPauseModal();
           return;
         }
         if (phase === "result" && gameMode === "stages") {
@@ -945,6 +1278,12 @@
             const menuBtn =
               document.getElementById("stageMenuButton") || document.getElementById("stageBackButton");
             if (menuBtn) menuBtn.click();
+            return;
+          }
+          if (keyLower === "h") {
+            event.preventDefault();
+            const homeBtn = document.getElementById("stageHomeButton");
+            if (homeBtn) homeBtn.click();
             return;
           }
           if (keyLower === "n") {
@@ -957,6 +1296,26 @@
             event.preventDefault();
             const retryBtn = document.getElementById("stageRetryButton");
             if (retryBtn) retryBtn.click();
+            return;
+          }
+        }
+        if (phase === "result" && gameMode === "practice") {
+          if (keyLower === "h") {
+            event.preventDefault();
+            const backBtn = document.getElementById("practiceBackButton");
+            if (backBtn) backBtn.click();
+            return;
+          }
+          if (keyLower === "r") {
+            event.preventDefault();
+            const retryBtn = document.getElementById("practiceRetryButton");
+            if (retryBtn) retryBtn.click();
+            return;
+          }
+          if (keyLower === "s") {
+            event.preventDefault();
+            const settingsBtn = document.getElementById("practiceSettingsButton");
+            if (settingsBtn) settingsBtn.click();
             return;
           }
         }
@@ -974,32 +1333,96 @@
         } else if (phase === "recall") {
           checkAnswers();
         } else if (phase === "result") {
-          if (gameMode === "stages" && stageState.failed) {
-            stageState.failed = false;
-            stageState.completed = false;
-            stageState.startTime = performance.now();
-            stageState.active = false;
-            resetGame();
-            startRound({ advanceRound: true });
-            return;
-          }
-          if (gameMode === "stages" && stageState.completed) {
-            stageState.failed = false;
-            stageState.completed = false;
-            stageState.startTime = performance.now();
-            stageState.active = false;
-            resetGame();
-            startRound({ advanceRound: true });
-            return;
-          }
-          if (gameMode === "practice") {
-            resetForRetryRound();
-            startRound({ reuseItems: false, advanceRound: false });
-            return;
-          }
-          startRound();
+          return;
         }
       });
+
+      function showTabKeyHint() {
+        const hud = document.getElementById("hudCluster");
+        if (!hud) return;
+        const rect = hud.getBoundingClientRect();
+        let left = rect.left + rect.width / 2;
+        let top = rect.bottom + 170;
+        if (!Number.isFinite(left) || rect.width === 0) {
+          left = window.innerWidth / 2;
+          top = 120;
+        }
+        if (!tabTutorialHintEl) {
+          tabTutorialHintEl = document.createElement("div");
+          tabTutorialHintEl.className = "tab-key-hint";
+          tabTutorialHintEl.innerHTML = `<span class="tab-keycap">TAB</span>`;
+          document.body.appendChild(tabTutorialHintEl);
+        }
+        tabTutorialHintEl.style.left = `${left}px`;
+        tabTutorialHintEl.style.top = `${top}px`;
+        tabTutorialHintEl.style.animation = "none";
+        void tabTutorialHintEl.offsetWidth;
+        tabTutorialHintEl.style.animation = "";
+        if (tabTutorialHintTimeout) {
+          clearTimeout(tabTutorialHintTimeout);
+        }
+        tabTutorialHintTimeout = window.setTimeout(() => {
+          if (tabTutorialHintEl) {
+            tabTutorialHintEl.remove();
+            tabTutorialHintEl = null;
+          }
+          tabTutorialHintTimeout = null;
+        }, 1200);
+      }
+
+      function showFirstLetterHint(message) {
+        const hud = document.getElementById("hudCluster");
+        const rect = hud ? hud.getBoundingClientRect() : null;
+        let left = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+        let top = rect ? rect.bottom + 170 : 140;
+        if (!Number.isFinite(left)) left = window.innerWidth / 2;
+        if (!Number.isFinite(top)) top = 140;
+        if (!firstLetterHintEl) {
+          firstLetterHintEl = document.createElement("div");
+          firstLetterHintEl.className = "first-letter-hint";
+          firstLetterHintEl.innerHTML = `<span class="first-letter-pill"></span>`;
+          document.body.appendChild(firstLetterHintEl);
+        }
+        const pill = firstLetterHintEl.querySelector(".first-letter-pill");
+        if (pill) {
+          pill.textContent = message;
+          pill.style.whiteSpace = "pre-line";
+          pill.style.textAlign = "center";
+        }
+        firstLetterHintEl.style.left = `${left}px`;
+        firstLetterHintEl.style.top = `${top}px`;
+        firstLetterHintEl.style.animation = "none";
+        void firstLetterHintEl.offsetWidth;
+        firstLetterHintEl.style.animation = "";
+        if (firstLetterHintTimeout) {
+          clearTimeout(firstLetterHintTimeout);
+        }
+        firstLetterHintTimeout = window.setTimeout(() => {
+          if (firstLetterHintEl) {
+            firstLetterHintEl.remove();
+            firstLetterHintEl = null;
+          }
+          firstLetterHintTimeout = null;
+        }, 2600);
+      }
+
+      function clearFirstLetterHint() {
+        if (firstLetterHintTimeout) {
+          clearTimeout(firstLetterHintTimeout);
+          firstLetterHintTimeout = null;
+        }
+        if (firstLetterHintEl) {
+          firstLetterHintEl.remove();
+          firstLetterHintEl = null;
+        }
+      }
+      window.clearFirstLetterHint = clearFirstLetterHint;
+
+
+      document.addEventListener("pointerdown", (event) => {
+        if (!tabTutorialActive) return;
+        showTabKeyHint();
+      }, { capture: true });
 
       updateModeUI();
       updatePracticeLock();
@@ -1026,3 +1449,14 @@
           trackSessionEnd(totalSessionSeconds, lastCompletedLevel);
         }
       });
+      function clearTabKeyHint() {
+        if (tabTutorialHintTimeout) {
+          clearTimeout(tabTutorialHintTimeout);
+          tabTutorialHintTimeout = null;
+        }
+        if (tabTutorialHintEl) {
+          tabTutorialHintEl.remove();
+          tabTutorialHintEl = null;
+        }
+      }
+      window.clearTabKeyHint = clearTabKeyHint;

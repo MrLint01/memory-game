@@ -26,6 +26,12 @@ const dataSets = {
           { label: "Right", symbol: "→" },
           { label: "Left", symbol: "←" },
           { label: "Down", symbol: "↓" }
+        ],
+        diagonal: [
+          { label: "NE" },
+          { label: "NW" },
+          { label: "SE" },
+          { label: "SW" }
         ]
       };
       const backgroundColors = [

@@ -68,6 +68,7 @@
           timer: null,
           adWasActive: false,
           fogWasActive: false,
+          blurWasActive: false,
           adSnapshot: null,
           glitchWasActive: false,
           swapRemaining: null,
@@ -94,6 +95,10 @@
         if (fogActive) {
           pausedState.fogWasActive = true;
           stopFog();
+        }
+        if (blurActive) {
+          pausedState.blurWasActive = true;
+          stopBlur();
         }
         if (phase === "show" && getChallengeOptions(round).enableGlitch) {
           pausedState.glitchWasActive = true;
@@ -189,6 +194,9 @@
           if (pausedState.fogWasActive) {
             startFog();
           }
+          if (pausedState.blurWasActive) {
+            startBlur();
+          }
           if (pausedState.glitchWasActive) {
             startGlitching();
           }
@@ -238,6 +246,15 @@
       }
 
       function showReviewFailure(entries, mode, swapOrder = null) {
+        if (typeof window.clearTabKeyHint === "function") {
+          window.clearTabKeyHint();
+        }
+        if (typeof window.clearFirstLetterHint === "function") {
+          window.clearFirstLetterHint();
+        }
+        stopFog();
+        stopBlur();
+        stopGlitching();
         document.body.classList.add("stage-fail");
         const originalItems = roundItems;
         const useSwapOrder =
@@ -281,29 +298,36 @@
           }
         });
         const title = mode === "stages" ? "Stage failed" : "Round failed";
-        const subtitle = "";
+        const subtitle = mode === "stages" ? "" : `Streak ${streak}`;
         const buttons =
           mode === "stages"
             ? `<button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(Q)</span>
                </button>
                <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
                  <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(R)</span>
                </button>
                <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
                  <img class="action-icon" src="imgs/home_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(H)</span>
                </button>`
-            : `<button id="practiceBackButton" class="secondary" type="button">
-                 <span class="action-title">Back</span>
-                 <span class="action-key">(Q)</span>
+            : `<button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
+                 <img class="action-icon" src="imgs/settings_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(S)</span>
                </button>
-               <button id="practiceRetryButton" class="secondary" type="button">
-                 <span class="action-title">Retry</span>
-                 <span class="action-key">(R)</span>
+               <button id="practiceRetryButton" class="secondary icon-button" type="button" aria-label="Restart (R)">
+                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(R)</span>
+               </button>
+               <button id="practiceBackButton" class="secondary icon-button" type="button" aria-label="Home (H)">
+                 <img class="action-icon" src="imgs/home_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(H)</span>
                </button>`;
         const actions = document.querySelector(".stage .actions");
         if (actions) {
-          actions.innerHTML = mode === "stages" ? `<div class="stage-fail-actions">${buttons}</div>` : "";
+          actions.innerHTML = `<div class="stage-fail-actions">${buttons}</div>`;
         }
         resultsPanel.innerHTML = `
           <div class="stage-fail-bar">
@@ -331,8 +355,9 @@
         const key = stage.id ? String(stage.id) : String(stageState.index + 1);
         
         // Save stars (keep the highest)
-        const current = window.stageStars[key] || 0;
-        if (stars > current) {
+        const hasEntry = Object.prototype.hasOwnProperty.call(window.stageStars, key);
+        const current = hasEntry ? Number(window.stageStars[key]) : null;
+        if (!hasEntry || stars > current) {
           window.stageStars[key] = stars;
         }
         
@@ -341,10 +366,10 @@
           window.stageCompleted = {};
         }
         window.stageCompleted[key] = true;
-        
+
         // Call the global save function if it exists
-        if (window.saveStageStars) {
-          window.saveStageStars();
+        if (window.saveStageProgress) {
+          window.saveStageProgress();
         }
 
         if (Number.isFinite(elapsedSeconds)) {
@@ -355,13 +380,22 @@
           if (!Number.isFinite(currentBest) || elapsedSeconds < currentBest) {
             window.stageBestTimes[key] = elapsedSeconds;
           }
-          if (window.saveStageBestTimes) {
-            window.saveStageBestTimes();
+          if (window.saveStageProgress) {
+            window.saveStageProgress();
           }
         }
       }
 
       function showStageComplete(elapsedSeconds, stars, stage) {
+        if (typeof window.clearTabKeyHint === "function") {
+          window.clearTabKeyHint();
+        }
+        if (typeof window.clearFirstLetterHint === "function") {
+          window.clearFirstLetterHint();
+        }
+        stopFog();
+        stopBlur();
+        stopGlitching();
         stopStageStopwatch();
         document.body.classList.remove("stage-fail");
         cardGrid.innerHTML = "";
@@ -384,23 +418,50 @@
               <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
               ${stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : ""}
             </div>
+            <div class="stage-complete__bar-track">
+              <div class="stage-complete__bar-fill" data-stars="${stars}"></div>
+            </div>
             <div class="stage-complete__actions">
               <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(Q)</span>
               </button>
               <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (N)">
                 <img class="action-icon" src="imgs/next_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(N)</span>
               </button>
               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(R)</span>
               </button>
               <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
                 <img class="action-icon" src="imgs/home_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(H)</span>
               </button>
             </div>
           </div>
         `;
         resultsPanel.classList.add("show");
+
+        // Trigger bar fill animation after a short delay so the browser paints width:0 first
+
+        const barFills = document.querySelectorAll("#resultsPanel .stage-complete__bar-fill");
+
+        barFills.forEach(barFill => {
+          const stars = parseInt(barFill.dataset.stars, 10) || 0;
+
+          // set the final width based on stars
+          let targetWidth = 0;
+          if (stars === 1) targetWidth = 33.33;
+          else if (stars === 2) targetWidth = 55;
+          else if (stars >= 3) targetWidth = 100;
+          barFill.style.width = "0";
+          barFill.offsetWidth; // force browser to register width:0
+            // Trigger transition
+          setTimeout(() => {
+            barFill.style.width = targetWidth + "%";
+          }, 20); // small delay ensures browser painted initial width
+        });
       }
 
       function lockInputs(locked) {
@@ -606,6 +667,7 @@
         }
         hideAd();
         stopFog();
+        stopBlur();
         stopGlitching();
         if (platformerState.required && !platformerState.completed) {
           platformerState.failed = true;
@@ -705,6 +767,12 @@
 
       function startRound(options = {}) {
         const { reuseItems = false, advanceRound = true } = options;
+        if (typeof window.clearTabKeyHint === "function") {
+          window.clearTabKeyHint();
+        }
+        if (typeof window.clearFirstLetterHint === "function") {
+          window.clearFirstLetterHint();
+        }
         document.body.classList.remove("stage-fail");
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
@@ -757,6 +825,7 @@
         platformerState.required = isPlatformerEnabled();
         adEnabled = isAdEnabled();
         fogEnabled = isFogEnabled();
+        blurEnabled = isBlurEnabled();
         swapEnabled = isSwapEnabled();
         swapChance = getSwapChance();
         adShownThisRound = false;
@@ -773,6 +842,11 @@
           startFog();
         } else {
           stopFog();
+        }
+        if (blurEnabled) {
+          startBlur();
+        } else {
+          stopBlur();
         }
         const revealSeconds = getRevealSeconds();
         scheduleAd(revealSeconds);

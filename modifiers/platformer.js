@@ -201,7 +201,7 @@
       }
 
       function platformerLoop() {
-        if (isPlatformerLoopActive() && !pauseModal.classList.contains("show")) {
+        if (isPlatformerLoopActive() && !(pauseModal && pauseModal.classList.contains("show"))) {
           updatePlatformer();
           drawPlatformer();
         }
