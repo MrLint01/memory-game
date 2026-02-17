@@ -159,7 +159,15 @@
       let tabTutorialDisabledInputs = [];
       let tabTutorialHintEl = null;
       let tabTutorialHintTimeout = null;
-      const tabTutorialStageId = 2;
+      const tabTutorialStageIds = new Set([2, 3]);
+      let firstLetterHintCooldown = 0;
+      let firstLetterHintEl = null;
+      let firstLetterHintTimeout = null;
+      const firstLetterHintStageMessages = {
+        5: "FIRST LETTER\n(Triangle -> T, Circle -> C, Square -> S)",
+        6: "FIRST LETTER\n(Right -> R, Left -> L, Up -> U, ...)",
+        7: "FIRST LETTER\n(White -> W, Red -> R, Blue -> B, ...)"
+      };
       let stageListAnimTimeout = null;
       let stageListStarTimeout = null;
       let stageListAnimActive = false;
@@ -621,6 +629,7 @@
           stagesScreen.setAttribute("aria-hidden", "true");
         }
         document.body.dataset.view = "home";
+        clearFirstLetterHint();
         if (animateHome) {
           document.body.classList.remove("home-anim");
           void document.body.offsetWidth;
@@ -635,7 +644,9 @@
         const { skipIntro = false, originEl = null } = options;
         tabTutorialShownRound = null;
         tabTutorialActive = false;
+        firstLetterHintCooldown = 0;
         clearTabKeyHint();
+        clearFirstLetterHint();
         if (!skipIntro && openStageIntro(index, originEl)) {
           return;
         }
@@ -753,20 +764,39 @@
           if (tabTutorialActive) return;
           if (gameMode !== "stages" || phase !== "recall") return;
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
-          if (!stage || stage.id !== tabTutorialStageId) return;
-          if (tabTutorialShownRound === round) return;
-          const input = event.target && event.target.closest('input[data-index="0"]');
-          if (!input || !input.value) return;
-          tabTutorialShownRound = round;
-          tabTutorialActive = true;
-          tabTutorialDisabledInputs = [];
-          inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
-            const idx = Number(field.dataset.index);
-            if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
-              field.disabled = true;
-              tabTutorialDisabledInputs.push(field);
-            }
-          });
+          if (!stage) return;
+          if (tabTutorialStageIds.has(stage.id)) {
+            if (tabTutorialShownRound === round) return;
+            const input = event.target && event.target.closest('input[data-index="0"]');
+            if (!input || !input.value) return;
+            tabTutorialShownRound = round;
+            tabTutorialActive = true;
+            tabTutorialDisabledInputs = [];
+            inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
+              const idx = Number(field.dataset.index);
+              if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
+                field.disabled = true;
+                tabTutorialDisabledInputs.push(field);
+              }
+            });
+            return;
+          }
+          const hintMessage = firstLetterHintStageMessages[stage.id];
+          if (!hintMessage) return;
+          const targetInput = event.target && event.target.closest('input[data-index]');
+          if (!targetInput) return;
+          const rawValue = targetInput.value ? String(targetInput.value) : "";
+          const trimmed = rawValue.trim();
+          if (trimmed.length <= 1) return;
+          const firstCharMatch = trimmed.match(/[a-z0-9]/i);
+          const firstChar = firstCharMatch ? firstCharMatch[0] : trimmed.charAt(0);
+          targetInput.value = firstChar;
+          targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+          const now = performance.now();
+          if (now - firstLetterHintCooldown > 300) {
+            firstLetterHintCooldown = now;
+            showFirstLetterHint(hintMessage);
+          }
         });
         inputGrid.addEventListener("pointerdown", (event) => {
           if (!tabTutorialActive) return;
@@ -1339,6 +1369,55 @@
           tabTutorialHintTimeout = null;
         }, 1200);
       }
+
+      function showFirstLetterHint(message) {
+        const hud = document.getElementById("hudCluster");
+        const rect = hud ? hud.getBoundingClientRect() : null;
+        let left = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+        let top = rect ? rect.bottom + 170 : 140;
+        if (!Number.isFinite(left)) left = window.innerWidth / 2;
+        if (!Number.isFinite(top)) top = 140;
+        if (!firstLetterHintEl) {
+          firstLetterHintEl = document.createElement("div");
+          firstLetterHintEl.className = "first-letter-hint";
+          firstLetterHintEl.innerHTML = `<span class="first-letter-pill"></span>`;
+          document.body.appendChild(firstLetterHintEl);
+        }
+        const pill = firstLetterHintEl.querySelector(".first-letter-pill");
+        if (pill) {
+          pill.textContent = message;
+          pill.style.whiteSpace = "pre-line";
+          pill.style.textAlign = "center";
+        }
+        firstLetterHintEl.style.left = `${left}px`;
+        firstLetterHintEl.style.top = `${top}px`;
+        firstLetterHintEl.style.animation = "none";
+        void firstLetterHintEl.offsetWidth;
+        firstLetterHintEl.style.animation = "";
+        if (firstLetterHintTimeout) {
+          clearTimeout(firstLetterHintTimeout);
+        }
+        firstLetterHintTimeout = window.setTimeout(() => {
+          if (firstLetterHintEl) {
+            firstLetterHintEl.remove();
+            firstLetterHintEl = null;
+          }
+          firstLetterHintTimeout = null;
+        }, 2600);
+      }
+
+      function clearFirstLetterHint() {
+        if (firstLetterHintTimeout) {
+          clearTimeout(firstLetterHintTimeout);
+          firstLetterHintTimeout = null;
+        }
+        if (firstLetterHintEl) {
+          firstLetterHintEl.remove();
+          firstLetterHintEl = null;
+        }
+      }
+      window.clearFirstLetterHint = clearFirstLetterHint;
+
 
       document.addEventListener("pointerdown", (event) => {
         if (!tabTutorialActive) return;

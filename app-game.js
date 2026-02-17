@@ -249,6 +249,9 @@
         if (typeof window.clearTabKeyHint === "function") {
           window.clearTabKeyHint();
         }
+        if (typeof window.clearFirstLetterHint === "function") {
+          window.clearFirstLetterHint();
+        }
         stopFog();
         stopBlur();
         stopGlitching();
@@ -386,6 +389,9 @@
       function showStageComplete(elapsedSeconds, stars, stage) {
         if (typeof window.clearTabKeyHint === "function") {
           window.clearTabKeyHint();
+        }
+        if (typeof window.clearFirstLetterHint === "function") {
+          window.clearFirstLetterHint();
         }
         stopFog();
         stopBlur();
@@ -763,6 +769,9 @@
         const { reuseItems = false, advanceRound = true } = options;
         if (typeof window.clearTabKeyHint === "function") {
           window.clearTabKeyHint();
+        }
+        if (typeof window.clearFirstLetterHint === "function") {
+          window.clearFirstLetterHint();
         }
         document.body.classList.remove("stage-fail");
         if (gameMode === "stages") {

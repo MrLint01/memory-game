@@ -737,6 +737,46 @@ body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button {
     transform: translate(-50%, -70%) scale(0.95);
   }
 }
+.first-letter-hint {
+  position: fixed;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.95);
+  animation: firstLetterHintPop 2600ms ease-out forwards;
+}
+.first-letter-hint .first-letter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  border: 2px solid var(--border);
+  background: #f8fafc;
+  box-shadow: 3px 3px 0 var(--border);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+@keyframes firstLetterHintPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -60%) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -68%) scale(0.96);
+  }
+}
 body.stage-fail .stage-fail-actions .action-key-hint,
 body[data-state="result"] #resultsPanel .stage-complete__actions .action-key-hint {
   position: absolute;
