@@ -310,13 +310,13 @@
                  <img class="action-icon" src="imgs/home_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(H)</span>
                </button>`
-            : `<button id="practiceRetryButton" class="secondary icon-button" type="button" aria-label="Restart (R)">
+            : `<button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
+                 <img class="action-icon" src="imgs/settings_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(S)</span>
+               </button>
+               <button id="practiceRetryButton" class="secondary icon-button" type="button" aria-label="Restart (R)">
                  <img class="action-icon" src="imgs/retry_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(R)</span>
-               </button>
-               <button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
-                 <img class="action-icon" src="imgs/sandbox_button.png" alt="" />
-                 <span class="action-key-hint" aria-hidden="true">(S)</span>
                </button>
                <button id="practiceBackButton" class="secondary icon-button" type="button" aria-label="Home (H)">
                  <img class="action-icon" src="imgs/home_button.png" alt="" />
