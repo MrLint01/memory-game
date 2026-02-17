@@ -25,6 +25,7 @@
         if (successAnimationActive) {
           cancelSuccessAnimation();
         }
+        clearFlashCountdown();
         clearInterval(timerId);
         timerId = null;
         if (stageTimerId) {
@@ -74,6 +75,7 @@
         if (successAnimationActive) {
           cancelSuccessAnimation();
         }
+        clearFlashCountdown();
         clearInterval(timerId);
         timerId = null;
         document.body.classList.remove("stage-fail");
@@ -105,10 +107,8 @@
       }
 
       function openPracticeModal() {
-        document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
-          input.disabled = false;
-        });
         setModalState(practiceModal, true);
+        updateCategoryControls();
       }
 
       function closePracticeModal() {
@@ -154,6 +154,9 @@
 
       let stageIntroPendingIndex = null;
       let stageIntroOriginEl = null;
+      let flashStagePendingIndex = null;
+      let flashCountdownTimers = [];
+      let flashWarningEnabled = true;
       let tabTutorialShownRound = null;
       let tabTutorialActive = false;
       let tabTutorialDisabledInputs = [];
@@ -173,6 +176,7 @@
       let stageListAnimActive = false;
       let stageListMouseListenerAttached = false;
       let stageListSkipListener = null;
+      let flashCountdownEnabled = true;
 
       function applyStageIntroOrigin(originEl) {
         if (!stageIntroModal || !stageIntroCard) return;
@@ -214,6 +218,79 @@
           stageIntroCard.style.removeProperty("--intro-from-scale");
         }
         setModalState(stageIntroModal, false);
+      }
+
+      function clearFlashCountdown() {
+        flashCountdownTimers.forEach((timerId) => clearTimeout(timerId));
+        flashCountdownTimers = [];
+        if (flashCountdown) {
+          flashCountdown.classList.remove("show");
+          flashCountdown.setAttribute("aria-hidden", "true");
+        }
+        document.body.classList.remove("flash-countdown-active");
+      }
+
+      function runFlashCountdown(onComplete) {
+        if (!flashCountdownEnabled) {
+          if (typeof onComplete === "function") onComplete();
+          return;
+        }
+        if (!flashCountdown) {
+          if (typeof onComplete === "function") onComplete();
+          return;
+        }
+        clearFlashCountdown();
+        document.body.classList.add("flash-countdown-active");
+        const label = flashCountdown.querySelector(".flash-countdown__num");
+        const steps = ["3", "2", "1"];
+        const durationMs = 1000;
+        const stepInterval = durationMs / steps.length;
+        const countdownStart = performance.now();
+        if (gameMode === "stages" && stageState && stageState.active) {
+          stopStageStopwatch();
+        }
+        flashCountdown.classList.add("show");
+        flashCountdown.removeAttribute("aria-hidden");
+        steps.forEach((value, index) => {
+          const timerId = window.setTimeout(() => {
+            if (label) {
+              label.textContent = value;
+            }
+          }, Math.floor(index * stepInterval));
+          flashCountdownTimers.push(timerId);
+        });
+        const finishId = window.setTimeout(() => {
+          clearFlashCountdown();
+          if (gameMode === "stages" && stageState && typeof stageState.startTime === "number") {
+            stageState.startTime += performance.now() - countdownStart;
+            if (!document.body.classList.contains("pause-active")) {
+              startStageStopwatch();
+            }
+          }
+          if (typeof onComplete === "function") onComplete();
+        }, durationMs);
+        flashCountdownTimers.push(finishId);
+      }
+
+      function startFlashRound() {
+        runFlashCountdown(() => {
+          startRound({ advanceRound: true, __flashOverride: true });
+        });
+      }
+
+      window.startFlashRound = startFlashRound;
+
+      function openFlashStagePrompt(index) {
+        if (!flashWarningEnabled) {
+          return;
+        }
+        flashStagePendingIndex = index;
+        setModalState(flashStageModal, true);
+      }
+
+      function closeFlashStagePrompt() {
+        flashStagePendingIndex = null;
+        setModalState(flashStageModal, false);
       }
 
       function openStageIntro(index, originEl = null) {
@@ -291,7 +368,8 @@
           letters: { label: "Letters", src: "imgs/icons/card-letters.svg" },
           directions: { label: "Directions", src: "imgs/icons/card-directions.svg" },
           diagonal: { label: "Diagonal", src: "imgs/icons/card-diagonal.svg" },
-          shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" }
+          shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" },
+          fruits: { label: "Fruits", src: "imgs/apple.png" }
         };
         const modifierIconMap = {
           mathOps: { label: "Math ops", src: "imgs/icons/mod-mathops.svg" },
@@ -399,6 +477,9 @@
           stageListStarTimeout = null;
         }
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        const pageSize = 20;
+        const totalPages = Math.max(1, Math.ceil(stages.length / pageSize));
+        stageState.page = Math.max(0, Math.min(stageState.page || 0, totalPages - 1));
         const lockIconSrc = "imgs/lock.png";
         const stagesTotal = document.getElementById("stagesTotal");
         const stagesProgress = document.getElementById("stagesProgress");
@@ -422,11 +503,12 @@
           stageList.innerHTML = "<div class=\"stage-meta\">No stages configured yet.</div>";
           return;
         }
-        stageState.page = 0;
+        const pageStart = stageState.page * pageSize;
+        const pageStages = stages.slice(pageStart, pageStart + pageSize);
         stageList.classList.add("stage-list--hidden");
-        stageList.innerHTML = stages
+        stageList.innerHTML = pageStages
           .map((stage, offset) => {
-            const index = offset;
+            const index = pageStart + offset;
             const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
             const stars = window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0;
             const bestTimeSeconds = Number(
@@ -478,7 +560,7 @@
             }
 
             return `
-              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${index}" data-anim-state="pending"${lockedAttr}>
+              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${offset}" data-anim-state="pending"${lockedAttr}>
                 ${unlocked ? `<strong>${name}</strong>` : ""}
                 ${lockIcon}
                 ${lockedLabel}
@@ -496,7 +578,14 @@
           })
           .join("");
         if (stagesFooter) {
-          stagesFooter.textContent = "";
+          stagesFooter.textContent =
+            totalPages > 1 ? `Page ${stageState.page + 1} / ${totalPages}` : "";
+        }
+        if (stagesNext) {
+          stagesNext.style.display = totalPages > 1 ? "inline-flex" : "none";
+        }
+        if (stagesPrev) {
+          stagesPrev.style.display = totalPages > 1 ? "inline-flex" : "none";
         }
         if (animate) {
           stageList.classList.add("stage-list--hidden");
@@ -630,6 +719,7 @@
         }
         document.body.dataset.view = "home";
         clearFirstLetterHint();
+        clearFlashCountdown();
         if (animateHome) {
           document.body.classList.remove("home-anim");
           void document.body.offsetWidth;
@@ -641,12 +731,14 @@
       }
 
       function startStage(index, options = {}) {
-        const { skipIntro = false, originEl = null } = options;
+        const { skipIntro = false, originEl = null, deferStartRound = false } = options;
         tabTutorialShownRound = null;
         tabTutorialActive = false;
         firstLetterHintCooldown = 0;
         clearTabKeyHint();
         clearFirstLetterHint();
+        clearFlashCountdown();
+        const stage = window.getStageConfig ? window.getStageConfig(index) : null;
         if (!skipIntro && openStageIntro(index, originEl)) {
           return;
         }
@@ -661,6 +753,10 @@
         updateModeUI();
         resetGame();
         closeStagesScreen(false);
+        if (deferStartRound) {
+          setPhase("Get ready", "show");
+          return;
+        }
         startRound({ advanceRound: true });
       }
 
@@ -696,16 +792,58 @@
       if (stageIntroStart && stageIntroModal) {
         stageIntroStart.addEventListener("click", () => {
           const index = stageIntroPendingIndex;
-          closeStageIntro();
-          if (Number.isFinite(index)) {
-            startStage(index, { skipIntro: true });
+          if (!Number.isFinite(index)) return;
+          const stage = window.getStageConfig ? window.getStageConfig(index) : null;
+          if (stage && String(stage.stageType).toLowerCase() === "flash") {
+            if (flashWarningEnabled) {
+              openFlashStagePrompt(index);
+              return;
+            }
+            closeStageIntro();
+            startStage(index, { skipIntro: true, deferStartRound: true });
+            startFlashRound();
+            return;
           }
+          closeStageIntro();
+          startStage(index, { skipIntro: true });
         });
       }
       if (stageIntroModal) {
         stageIntroModal.addEventListener("click", (event) => {
           if (event.target === stageIntroModal) {
             closeStageIntro();
+          }
+        });
+      }
+      if (flashStageStart) {
+        flashStageStart.addEventListener("click", () => {
+          const index = flashStagePendingIndex;
+          closeFlashStagePrompt();
+          if (stageIntroModal && stageIntroModal.classList.contains("show")) {
+            closeStageIntro();
+          }
+          if (Number.isFinite(index)) {
+            startStage(index, { skipIntro: true, deferStartRound: true });
+            startFlashRound();
+          }
+        });
+      }
+      if (flashStageSkip) {
+        const storageKey = "flashRecallFlashWarning";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          flashWarningEnabled = saved === "1";
+          flashStageSkip.checked = saved !== "1";
+        }
+        flashStageSkip.addEventListener("change", () => {
+          flashWarningEnabled = !flashStageSkip.checked;
+          window.localStorage.setItem(storageKey, flashWarningEnabled ? "1" : "0");
+        });
+      }
+      if (flashStageModal) {
+        flashStageModal.addEventListener("click", (event) => {
+          if (event.target === flashStageModal) {
+            closeFlashStagePrompt();
           }
         });
       }
@@ -737,10 +875,22 @@
         });
       }
       if (stagesPrev) {
-        stagesPrev.remove();
+        stagesPrev.addEventListener("click", () => {
+          const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+          const pageSize = 20;
+          const totalPages = Math.max(1, Math.ceil(stages.length / pageSize));
+          stageState.page = (stageState.page - 1 + totalPages) % totalPages;
+          renderStageList(false);
+        });
       }
       if (stagesNext) {
-        stagesNext.remove();
+        stagesNext.addEventListener("click", () => {
+          const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+          const pageSize = 20;
+          const totalPages = Math.max(1, Math.ceil(stages.length / pageSize));
+          stageState.page = (stageState.page + 1) % totalPages;
+          renderStageList(false);
+        });
       }
 
       if (stageList) {
@@ -760,6 +910,19 @@
       }
 
       if (inputGrid) {
+        inputGrid.addEventListener("keydown", (event) => {
+          if (event.key !== "Tab") return;
+          if (tabTutorialActive) return;
+          if (phase !== "recall") return;
+          const inputs = Array.from(inputGrid.querySelectorAll('input[data-index]'));
+          if (!inputs.length) return;
+          const activeIndex = inputs.indexOf(document.activeElement);
+          if (activeIndex === -1) return;
+          event.preventDefault();
+          const dir = event.shiftKey ? -1 : 1;
+          const nextIndex = (activeIndex + dir + inputs.length) % inputs.length;
+          inputs[nextIndex].focus();
+        });
         inputGrid.addEventListener("input", (event) => {
           if (tabTutorialActive) return;
           if (gameMode !== "stages" || phase !== "recall") return;
@@ -885,6 +1048,9 @@
           window.stageBestTimes = {};
           window.stageCompleted = {};
           window.stageNewSeen = {};
+          window.flashRecallSessionStats = { totalSeconds: 0, totalCards: 0 };
+          window.localStorage.removeItem("flashRecallStats");
+          window.localStorage.removeItem("flashRecallFlashWarning");
           if (typeof window.saveStageProgress === "function") {
             window.saveStageProgress();
           }
@@ -899,6 +1065,8 @@
           const stagesClearedEl = document.getElementById("statsStagesCleared");
           const stagesTotalEl = document.getElementById("statsStagesTotal");
           const starsEarnedEl = document.getElementById("statsStarsEarned");
+          const avgPerCardEl = document.getElementById("statsAvgPerCard");
+          const avgBestPerCardEl = document.getElementById("statsAvgBestPerCard");
           if (stagesClearedEl || stagesTotalEl || starsEarnedEl) {
             const totalStages = stages.length;
             const stagesCleared = stages.reduce((sum, stage, index) => {
@@ -912,6 +1080,55 @@
             if (stagesClearedEl) stagesClearedEl.textContent = String(stagesCleared);
             if (stagesTotalEl) stagesTotalEl.textContent = String(totalStages);
             if (starsEarnedEl) starsEarnedEl.textContent = String(starsEarned);
+          }
+          if (avgPerCardEl) {
+            const key = "flashRecallStats";
+            let avgText = "—";
+            try {
+              const raw = window.localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                const totalSeconds = Number(parsed && parsed.totalSeconds) || 0;
+                const totalCards = Number(parsed && parsed.totalCards) || 0;
+                if (totalCards > 0) {
+                  const avg = totalSeconds / totalCards;
+                  avgText = `${avg.toFixed(2)}s`;
+                }
+              }
+            } catch (error) {
+              avgText = "—";
+            }
+            if (avgText === "—") {
+              const sessionStats = window.flashRecallSessionStats;
+              const totalSeconds = Number(sessionStats && sessionStats.totalSeconds) || 0;
+              const totalCards = Number(sessionStats && sessionStats.totalCards) || 0;
+              if (totalCards > 0) {
+                avgText = `${(totalSeconds / totalCards).toFixed(2)}s`;
+              }
+            }
+            avgPerCardEl.textContent = avgText;
+          }
+          if (avgBestPerCardEl) {
+            const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+            const totals = stages.reduce(
+              (acc, stage, index) => {
+                const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+                const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[stageKey]);
+                if (!Number.isFinite(bestSeconds)) return acc;
+                const rounds = Number(stage.rounds) || 1;
+                const cards = window.getStageCardCount ? window.getStageCardCount(stage) : stage.cards || 1;
+                const totalCards = Math.max(1, rounds * (Number(cards) || 1));
+                acc.seconds += bestSeconds;
+                acc.cards += totalCards;
+                return acc;
+              },
+              { seconds: 0, cards: 0 }
+            );
+            if (totals.cards > 0) {
+              avgBestPerCardEl.textContent = `${(totals.seconds / totals.cards).toFixed(2)}s`;
+            } else {
+              avgBestPerCardEl.textContent = "—";
+            }
           }
           setModalState(statsModal, true);
         });
@@ -1156,7 +1373,7 @@
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const nextIndex = stageState.index + 1;
           if (!stages[nextIndex]) return;
-          startStage(nextIndex, { skipIntro: true });
+          startStage(nextIndex, { skipIntro: false });
           return;
         }
         const practiceBack = event.target.closest("#practiceBackButton");
@@ -1233,6 +1450,21 @@
           if (event.key === "Escape") {
             event.preventDefault();
             setModalState(referenceModal, false);
+          }
+          return;
+        }
+        if (flashStageModal && flashStageModal.classList.contains("show")) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeFlashStagePrompt();
+            return;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (flashStageStart) {
+              flashStageStart.click();
+            }
+            return;
           }
           return;
         }
@@ -1439,6 +1671,19 @@
         successAnimationToggle.addEventListener("change", () => {
           window.localStorage.setItem(storageKey, successAnimationToggle.checked ? "1" : "0");
           setSuccessAnimationEnabled(successAnimationToggle.checked);
+        });
+      }
+
+      if (flashCountdownToggle) {
+        const storageKey = "flashRecallFlashCountdown";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          flashCountdownToggle.checked = saved === "1";
+        }
+        flashCountdownEnabled = flashCountdownToggle.checked;
+        flashCountdownToggle.addEventListener("change", () => {
+          flashCountdownEnabled = flashCountdownToggle.checked;
+          window.localStorage.setItem(storageKey, flashCountdownToggle.checked ? "1" : "0");
         });
       }
 

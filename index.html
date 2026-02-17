@@ -13,6 +13,11 @@
     <link rel="preload" href="imgs/chain_5.png" as="image" />
     <link rel="preload" href="imgs/flash_icon.png" as="image" />
     <link rel="preload" href="imgs/fullscreen_button.png" as="image" />
+    <link rel="preload" href="imgs/apple.png" as="image" />
+    <link rel="preload" href="imgs/banana.png" as="image" />
+    <link rel="preload" href="imgs/grape.png" as="image" />
+    <link rel="preload" href="imgs/strawberry.png" as="image" />
+    <link rel="preload" href="imgs/watermelon.png" as="image" />
     <link rel="preload" href="imgs/home_button.png" as="image" />
     <link rel="preload" href="imgs/lock.png" as="image" />
     <link rel="preload" href="imgs/menu_button.png" as="image" />
@@ -31,6 +36,7 @@
     <link rel="preload" href="imgs/icons/card-letters.svg" as="image" />
     <link rel="preload" href="imgs/icons/card-numbers.svg" as="image" />
     <link rel="preload" href="imgs/icons/card-shapes.svg" as="image" />
+    <link rel="preload" href="imgs/apple.png" as="image" />
     <link rel="preload" href="imgs/icons/mod-ads.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-backgroundcolor.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-fog.svg" as="image" />
@@ -114,6 +120,8 @@
         <div class="stage-board">
           <div class="stage-list stage-grid" id="stageList"></div>
         </div>
+        <button id="stagesPrev" class="stages-page-prev" type="button" aria-label="Previous page"></button>
+        <button id="stagesNext" class="stages-page-next" type="button" aria-label="Next page"></button>
         <div class="stages-footer">
           <div id="stagesFooter"></div>
         </div>
@@ -154,6 +162,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/card-numbers.svg" alt="" />
                   <span>Numbers</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -161,6 +170,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/card-colors.svg" alt="" />
                   <span>Colors</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -168,6 +178,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/card-letters.svg" alt="" />
                   <span>Letters</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -175,6 +186,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/card-directions.svg" alt="" />
                   <span>Directions</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -182,6 +194,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/card-diagonal.svg" alt="" />
                   <span>Diagonal</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -189,6 +202,15 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/card-shapes.svg" alt="" />
                   <span>Shapes</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
+                </span>
+              </label>
+              <label class="icon-choice">
+                <input type="checkbox" value="fruits" />
+                <span class="icon-tile">
+                  <img src="imgs/apple.png" alt="" />
+                  <span>Fruits</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
             </div>
@@ -201,6 +223,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-mathops.svg" alt="" />
                   <span>Math ops</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -208,6 +231,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-misleadcolors.svg" alt="" />
                   <span>Mislead</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -215,6 +239,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-backgroundcolor.svg" alt="" />
                   <span>Background</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -222,6 +247,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-swapcards.svg" alt="" />
                   <span>Swap</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -229,6 +255,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-platformer.svg" alt="" />
                   <span>Platformer</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -239,6 +266,7 @@
                     <text x="32" y="42" text-anchor="middle" font-family="'Arial Black', sans-serif" font-size="28" fill="#111">7</text>
                   </svg>
                   <span>Glitch</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -246,6 +274,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-fog.svg" alt="" />
                   <span>Fog</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -253,6 +282,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-blur.svg" alt="" />
                   <span>Blur</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
               <label class="icon-choice">
@@ -260,6 +290,7 @@
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-ads.svg" alt="" />
                   <span>Ads</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
                 </span>
               </label>
             </div>
@@ -279,6 +310,25 @@
     <div data-include="ui/stats.html"></div>
     <div data-include="ui/stage-intro.html"></div>
     <div data-include="ui/reference.html"></div>
+    <div class="modal" id="flashStageModal" aria-hidden="true">
+      <div class="modal-card modal-card--muted modal-card--flash">
+        <h3>Flash Level</h3>
+        <p class="modal-note">Reveal time is extremely short. Get ready.</p>
+        <label class="checkbox-inline flash-optout">
+          <input id="flashStageSkip" type="checkbox" />
+          Don't show again
+        </label>
+        <div class="modal-actions">
+          <button id="flashStageStart" class="secondary icon-button" type="button" aria-label="Start (Enter)">
+            <img class="action-icon" src="imgs/play_button.png" alt="" />
+            <span class="action-key-hint" aria-hidden="true">(Enter)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="flash-countdown" id="flashCountdown" aria-hidden="true">
+      <div class="flash-countdown__num">3</div>
+    </div>
     <div class="interrupt-modal" id="interruptModal" aria-hidden="true" hidden>
       <div class="interrupt-card">
         <div class="interrupt-header">
@@ -304,10 +354,10 @@
     <script src="version.js?v=20260217"></script>
     <script src="firebase-analytics.js?v=2"></script>
     <script>
-      window.unlockAllStages = true;
-      window.unlockSandbox = true;
+      window.unlockAllStages = false;
+      window.unlockSandbox = false;
+      window.unlockAllModifiers = false;
     </script>
     <script src="ui-loader.js?v=1"></script>
   </body>
 </html>
-

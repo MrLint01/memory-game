@@ -470,6 +470,36 @@
         });
       }
 
+      function recordRoundStats(seconds, cardCount) {
+        if (!Number.isFinite(seconds) || !Number.isFinite(cardCount) || cardCount <= 0) return;
+        if (!window.flashRecallSessionStats || typeof window.flashRecallSessionStats !== "object") {
+          window.flashRecallSessionStats = { totalSeconds: 0, totalCards: 0 };
+        }
+        window.flashRecallSessionStats.totalSeconds += seconds;
+        window.flashRecallSessionStats.totalCards += cardCount;
+        const key = "flashRecallStats";
+        let payload = { totalSeconds: 0, totalCards: 0 };
+        try {
+          const raw = window.localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              payload.totalSeconds = Number(parsed.totalSeconds) || 0;
+              payload.totalCards = Number(parsed.totalCards) || 0;
+            }
+          }
+        } catch (error) {
+          payload = { totalSeconds: 0, totalCards: 0 };
+        }
+        payload.totalSeconds += seconds;
+        payload.totalCards += cardCount;
+        try {
+          window.localStorage.setItem(key, JSON.stringify(payload));
+        } catch (error) {
+          // ignore storage errors
+        }
+      }
+
       async function checkAnswers() {
         if (phase !== "recall") return;
         if (swapTimeoutId) {
@@ -482,6 +512,8 @@
         clearInterval(timerId);
         timerId = null;
         const platformerRequired = platformerState.required;
+        const roundTimeSpent = (performance.now() - roundStartTime) / 1000;
+        recordRoundStats(roundTimeSpent, roundItems.length);
         const entries = roundItems.map((item, index) => {
           const mappedIndex = swapMap ? swapMap[index] : index;
           const expectedItem = roundItems[mappedIndex];
@@ -774,6 +806,13 @@
           window.clearFirstLetterHint();
         }
         document.body.classList.remove("stage-fail");
+        if (gameMode === "stages" && !options.__flashOverride) {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (stage && String(stage.stageType).toLowerCase() === "flash" && typeof window.startFlashRound === "function") {
+            window.startFlashRound();
+            return;
+          }
+        }
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (!stage) {

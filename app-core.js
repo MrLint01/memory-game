@@ -50,8 +50,13 @@ const revealInput = document.getElementById("revealTime");
       const settingsClose = document.getElementById("settingsClose");
       const statsModal = document.getElementById("statsModal");
       const statsClose = document.getElementById("statsClose");
+      const flashCountdownToggle = document.getElementById("flashCountdownToggle");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
+      const flashStageModal = document.getElementById("flashStageModal");
+      const flashStageStart = document.getElementById("flashStageStart");
+      const flashCountdown = document.getElementById("flashCountdown");
+      const flashStageSkip = document.getElementById("flashStageSkip");
       const stageIntroModal = document.getElementById("stageIntroModal");
       const stageIntroTitle = document.getElementById("stageIntroTitle");
       const stageIntroSubtitle = document.getElementById("stageIntroSubtitle");
@@ -147,6 +152,9 @@ const revealInput = document.getElementById("revealTime");
       let swapRemaining = null;
       let swapStartRecall = null;
       let swapCleanup = null;
+      let stageCategoryQueue = null;
+      let stageCategoryQueueIndex = 0;
+      let stageCategoryQueueStageId = null;
       const stageState = {
         active: false,
         index: 0,
@@ -292,38 +300,39 @@ const revealInput = document.getElementById("revealTime");
 
       function updateCategoryControls() {
         const disabled = gameMode !== "practice";
+        const unlocks = window.sandboxUnlocks || {};
+        const cardUnlocks = unlocks.cardTypes || {};
+        const modifierUnlocks = unlocks.modifiers || {};
+        const isStageCompleted = (requiredId) => {
+          if (!Number.isFinite(requiredId)) return false;
+          const key = String(requiredId);
+          return Boolean(window.stageCompleted && window.stageCompleted[key]);
+        };
         document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
-          input.disabled = disabled;
+          if (disabled) {
+            input.disabled = true;
+            return;
+          }
+          const value = input.value;
+          const id = input.id;
+          let requiredStage = null;
+          if (value && dataSets[value]) {
+            requiredStage = cardUnlocks[value];
+          } else if (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id)) {
+            requiredStage = modifierUnlocks[id];
+          }
+          const unlocked =
+            (value && dataSets[value] && window.unlockSandbox) ||
+            (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id) && window.unlockAllModifiers) ||
+            isStageCompleted(requiredStage);
+          input.disabled = !unlocked;
+          if (!unlocked) {
+            input.checked = false;
+          }
         });
         document.querySelectorAll("#practiceModal .stat-field input").forEach((input) => {
           input.disabled = disabled;
         });
-        if (!disabled) {
-          if (practiceMathOps) {
-            practiceMathOps.disabled = false;
-          }
-          if (practiceMisleadColors) {
-            practiceMisleadColors.disabled = false;
-          }
-          if (practiceBackgroundColor) {
-            practiceBackgroundColor.disabled = false;
-          }
-          if (practiceGlitch) {
-            practiceGlitch.disabled = false;
-          }
-          if (practiceFog) {
-            practiceFog.disabled = false;
-          }
-          if (practiceBlur) {
-            practiceBlur.disabled = false;
-          }
-          if (practiceAds) {
-            practiceAds.disabled = false;
-          }
-          if (practiceSwap) {
-            practiceSwap.disabled = false;
-          }
-        }
       }
 
       function setPhase(text, nextState) {
@@ -596,6 +605,14 @@ const revealInput = document.getElementById("revealTime");
         return Math.min(max, Math.max(min, value));
       }
 
+      function shuffleArray(list) {
+        for (let i = list.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [list[i], list[j]] = [list[j], list[i]];
+        }
+        return list;
+      }
+
 
       function resetBoard() {
         cardGrid.innerHTML = "";
@@ -625,6 +642,8 @@ const revealInput = document.getElementById("revealTime");
             return "Diagonal";
           case "shapes":
             return "Shape";
+          case "fruits":
+            return "Fruit";
           default:
             return category ? category[0].toUpperCase() + category.slice(1) : "Card";
         }
@@ -713,6 +732,10 @@ const revealInput = document.getElementById("revealTime");
         if (item.category === "diagonal") {
           const normalized = expected.replace(/\s+/g, "");
           return actual === expected || actual === normalized;
+        }
+        if (item.category === "fruits") {
+          const initial = expected.charAt(0);
+          return actual === expected || actual === initial;
         }
         if (item.category === "shapes") {
           if (expected === "square") {
@@ -874,12 +897,42 @@ const revealInput = document.getElementById("revealTime");
             ? window.getStageCardCounts(stage)
             : null;
         let categories = getActiveCategories(round);
+        let forcedCategory = null;
+        if (gameMode === "stages" && stage && Number(stage.rounds) > 1) {
+          const perRoundGuarantee = Array.isArray(stage.roundCategoryGuarantee)
+            ? stage.roundCategoryGuarantee.filter((key) => typeof key === "string")
+            : null;
+          const cardCount = window.getStageCardCount ? window.getStageCardCount(stage) : stage.cards || 1;
+          if (perRoundGuarantee && perRoundGuarantee.length && Number(cardCount) === 1) {
+            const stageCategories = window.getStageCategories ? window.getStageCategories(stage) : categories;
+            const required = perRoundGuarantee.filter((key) => stageCategories.includes(key));
+            if (stageCategoryQueueStageId !== stage.id || round === 1) {
+              const queue = shuffleArray([...required]);
+              const totalRounds = Number(stage.rounds) || 1;
+              const remaining = Math.max(0, totalRounds - queue.length);
+              for (let i = 0; i < remaining; i += 1) {
+                const pick = stageCategories[Math.floor(Math.random() * stageCategories.length)];
+                queue.push(pick);
+              }
+              stageCategoryQueue = queue;
+              stageCategoryQueueIndex = 0;
+              stageCategoryQueueStageId = stage.id;
+            }
+            if (Array.isArray(stageCategoryQueue) && stageCategoryQueue.length) {
+              forcedCategory = stageCategoryQueue[stageCategoryQueueIndex] || null;
+              stageCategoryQueueIndex = Math.min(stageCategoryQueueIndex + 1, stageCategoryQueue.length);
+            }
+          }
+        }
         if (cardCounts && typeof cardCounts === "object") {
           const extra = Object.keys(cardCounts).filter((key) => dataSets[key]);
           categories = Array.from(new Set([...categories, ...extra]));
         }
         if (!categories.length) {
           categories = ["numbers"];
+        }
+        if (forcedCategory && categories.includes(forcedCategory)) {
+          categories = [forcedCategory];
         }
         const count =
           gameMode === "practice"
@@ -928,6 +981,10 @@ const revealInput = document.getElementById("revealTime");
           const category = categories[Math.floor(Math.random() * categories.length)];
           pickFromCategory(category);
         }
+        for (let i = chosen.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
+        }
         const plan = planModifierAssignments(chosen, options);
         const built = chosen.map((item, index) => buildChallenge(item, options, plan[index]));
         return applyNumberChallenges(built, options);
@@ -966,6 +1023,11 @@ const revealInput = document.getElementById("revealTime");
               `;
             } else if (item.category === "shapes") {
               card.innerHTML = `${renderShapeSVG(item.shape)}`;
+            } else if (item.category === "fruits") {
+              const src = item.image || "";
+              card.innerHTML = `
+                <img class="fruit-image" src="${src}" alt="${item.label}" />
+              `;
             } else {
               const cardLabel = item.textLabel ?? item.label;
               const symbol = item.symbol ? `${item.symbol} ` : "";

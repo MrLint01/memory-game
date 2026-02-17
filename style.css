@@ -435,9 +435,16 @@ h1 {
         transform: none;
         box-shadow: none;
       }
-      button:hover:not(:disabled) {
-        transform: translateY(-2px);
-      }
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.modal-card--flash .icon-button:hover:not(:disabled) {
+  transform: translateX(-50%) translateY(-2px);
+}
+.stages-page-prev:hover:not(:disabled),
+.stages-page-next:hover:not(:disabled) {
+  transform: translateY(-50%) scale(1.08);
+}
 button.icon-button {
   width: 52px;
   height: 52px;
@@ -453,7 +460,7 @@ button.icon-button {
   padding: 0;
   position: absolute;
   transform: translateY(-1%);
-  bottom: -1.8rem;
+  bottom: -1.4rem;
 }
       .action-icon {
         width: 28px;
@@ -1485,6 +1492,49 @@ body[data-state="paused"] .hud-pause {
   padding: 1.6rem 1.8rem;
   font-size: 1rem;
 }
+.stages-page-next {
+  position: fixed;
+  right: -3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  z-index: 6;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.stages-page-prev {
+  position: fixed;
+  left: -3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  z-index: 6;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.stages-page-next::before,
+.stages-page-prev::before {
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+  border-top: 22px solid transparent;
+  border-bottom: 22px solid transparent;
+}
+.stages-page-next::before {
+  border-left: 24px solid var(--ink);
+  margin-left: 6px;
+}
+.stages-page-prev::before {
+  border-right: 24px solid var(--ink);
+  margin-left: 6px;
+}
 .stage-list.stage-list--hidden {
   opacity: 0;
   pointer-events: none;
@@ -1713,6 +1763,9 @@ body[data-state="paused"] .hud-pause {
 .stage-stars--shine .stage-star.is-filled {
   animation: stageStarShine 900ms ease-out both;
 }
+.stage-stars--shine .stage-star.is-secret {
+  animation: stageStarShineBlue 900ms ease-out both;
+}
 @keyframes stageStarShine {
   0% {
     filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0)) brightness(1);
@@ -1724,6 +1777,20 @@ body[data-state="paused"] .hud-pause {
   }
   100% {
     filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0)) brightness(1);
+    transform: scale(1);
+  }
+}
+@keyframes stageStarShineBlue {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(147, 197, 253, 0)) brightness(1);
+    transform: scale(1);
+  }
+  40% {
+    filter: drop-shadow(0 0 10px rgba(147, 197, 253, 0.9)) brightness(1.2);
+    transform: scale(1.12);
+  }
+  100% {
+    filter: drop-shadow(0 0 0 rgba(147, 197, 253, 0)) brightness(1);
     transform: scale(1);
   }
 }
@@ -1863,6 +1930,74 @@ body.pause-active .interrupt-close {
 .modal-card--muted {
   background: var(--panel-muted);
 }
+.modal-card--flash {
+  width: min(520px, 92vw);
+  text-align: center;
+  position: relative;
+  padding-bottom: 5rem;
+}
+.modal-card--flash .modal-note {
+  margin-top: 0.4rem;
+}
+.modal-card--flash .flash-optout {
+  justify-content: center;
+  margin: 0.6rem 0 0;
+}
+.modal-card--flash .modal-actions {
+  position: relative;
+  height: 0;
+  margin-top: 0;
+}
+.modal-card--flash .action-key-hint {
+  position: absolute;
+  left: 50%;
+  top: -1.3rem;
+  bottom: auto;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
+}
+.modal-card--flash .icon-button {
+  width: 140px;
+  height: 52px;
+  position: absolute;
+  left: 50%;
+  bottom: -5.6rem;
+  transform: translateX(-50%);
+}
+.modal-card--flash .icon-button:hover .action-key-hint,
+.modal-card--flash .icon-button:focus-visible .action-key-hint {
+  opacity: 1;
+  transform: translateX(-50%) translateY(2px);
+}
+.flash-countdown {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 14;
+  pointer-events: none;
+}
+.flash-countdown-active main {
+  opacity: 0;
+  pointer-events: none;
+}
+.flash-countdown.show {
+  display: flex;
+}
+.flash-countdown__num {
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+}
 .modal-card.reference-card {
   width: min(980px, 96vw);
   max-height: 80vh;
@@ -1873,7 +2008,7 @@ body.pause-active .interrupt-close {
   background: #ffffff;
   border: 2px solid var(--border);
   box-shadow: none;
-  padding: 1.1rem 1.2rem;
+  padding: 0.7rem 1rem;
   position: relative;
   will-change: transform, opacity;
 }
@@ -1908,10 +2043,32 @@ body.pause-active .interrupt-close {
 .stage-intro-start {
   border-width: 2px;
 }
+.stage-intro-start {
+  position: relative;
+}
+.stage-intro-start .action-key-hint {
+  position: absolute;
+  left: 50%;
+  top: -1.3rem;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
+}
+.stage-intro-start:hover .action-key-hint,
+.stage-intro-start:focus-visible .action-key-hint {
+  opacity: 1;
+  transform: translateX(-50%) translateY(2px);
+}
 .stage-intro-shell {
   display: grid;
-  gap: 0.9rem;
-  padding-bottom: 1.0rem;
+  gap: 0.5rem;
+  padding-bottom: 0.2rem;
 }
 .stage-intro-header {
   display: grid;
@@ -2365,6 +2522,18 @@ body.pause-active .interrupt-close {
   object-fit: contain;
   display: block;
 }
+.fruit-image {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  display: block;
+}
+.ref-fruit img {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  display: block;
+}
 .ref-arrow img,
 .ref-diagonal img {
   width: 26px;
@@ -2415,6 +2584,21 @@ body.pause-active .interrupt-close {
   position: relative;
   display: grid;
   width: 100%;
+}
+.icon-choice .lock-icon {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  pointer-events: none;
+}
+.icon-choice input:disabled + .icon-tile {
+  opacity: 0.45;
+}
+.icon-choice input:disabled + .icon-tile .lock-icon {
+  opacity: 1;
 }
 .icon-choice input {
   position: absolute;
@@ -2505,6 +2689,10 @@ body.pause-active .interrupt-close {
 .modal-card .controls span {
   user-select: none;
 }
+.modal-card--muted #settingsModal .checkboxes label,
+.modal-card--muted .checkboxes label {
+  font-weight: 400;
+}
 .modal-card--sandbox .controls {
   overflow-y: auto;
   min-height: 0;
@@ -2528,6 +2716,13 @@ body.pause-active .interrupt-close {
   margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--ink);
 }
 .modal-actions {
   display: flex;

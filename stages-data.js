@@ -31,7 +31,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2, gold: 5, silver: 8, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
       instructions: window.stageInstructions[1] || []
     },
     {
@@ -53,7 +53,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 3, gold: 10, silver: 16, bronze: 30 },
+      starTimes: { platinum: 3, gold: 4, silver: 16, bronze: 30 },
       instructions: window.stageInstructions[2] || [],
     },
     {
@@ -66,7 +66,7 @@
       recallSeconds: 15,
       categories: ["letters"],
       modifiers: {
-        mathOps: true,
+        mathOps: false,
         misleadColors: false,
         backgroundColor: false,
         swapCards: false,
@@ -75,7 +75,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 3, gold: 8, silver: 12, bronze: 20 },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 },
       instructions: window.stageInstructions[3] || []
     },
     {
@@ -97,7 +97,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 3, gold: 6.5, silver: 12, bronze: 20 },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 },
     },
     {
       id: 5,
@@ -174,6 +174,7 @@
       revealSeconds: 15,
       recallSeconds: 15,
       categories: ["numbers", "directions", "shapes"],
+      roundCategoryGuarantee: ["numbers", "directions", "shapes"],
       modifiers: {
         mathOps: false,
         misleadColors: false,
@@ -184,7 +185,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 3, gold: 5, silver: 10, bronze: 20 },
+      starTimes: { platinum: 5, gold: 6, silver: 10, bronze: 20 },
     },
     {
       id: 9,
@@ -195,6 +196,7 @@
       revealSeconds: 15,
       recallSeconds: 15,
       categories: ["numbers", "colors", "letters"],
+      roundCategoryGuarantee: ["numbers", "colors", "letters"],
       modifiers: {
         mathOps: false,
         misleadColors: false,
@@ -205,7 +207,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 3, gold: 5, silver: 10, bronze: 20 },
+      starTimes: { platinum: 3, gold: 4, silver: 10, bronze: 20 },
     },
     {
       id: 10,
@@ -218,11 +220,24 @@
       categories: ["numbers", "colors", "letters", "shapes", "directions"],
       modifiers: {
       },
-      starTimes: { platinum: 3.5, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 3.5, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 11,
       name: "Stage 11",
+      stageType: "flash",
+      rounds: 3,
+      cards: 1,
+      revealSeconds: 0.1,
+      recallSeconds: 15,
+      categories: ["numbers"],
+      modifiers: {
+      },
+      starTimes: { platinum: 1.8, gold: 3, silver: 12, bronze: 20 }
+    },
+    {
+      id: 12,
+      name: "Stage 12",
       stageType: "tutorial",
       rounds: 3,
       cards: 1,
@@ -233,12 +248,12 @@
         mathOps: true,
         mathChance: 1.0,
       },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 },
-      instructions: window.stageInstructions[11] || []
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 },
+      instructions: window.stageInstructions[12] || []
     },
     {
-      id: 12,
-      name: "Stage 12",
+      id: 13,
+      name: "Stage 13",
       stageType: "memory",
       rounds: 3,
       cards: 2,
@@ -247,41 +262,45 @@
       categories: ["numbers"],
       modifiers: {
         mathOps: true,
-        mathChance: 0.7, //default
+        mathChance: 0.7,
       },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
-    },
-    {
-      id: 13,
-      name: "Stage 13",
-      stageType: "memory",
-      rounds: 3,
-      cards: 3,
-      revealSeconds: 15,
-      recallSeconds: 15,
-      categories: ["numbers", "colors", "letters", "directions", "shapes"],
-      modifiers: {
-        mathOps: true
-      },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 5, gold: 6, silver: 12, bronze: 20 }
     },
     {
       id: 14,
       name: "Stage 14",
       stageType: "memory",
-      rounds: 1,
-      cards: 4,
+      rounds: 3,
+      cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
       categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      cardCounts: { numbers: 1},
       modifiers: {
         mathOps: true,
+        mathChance: 1.0,
+        mathMinCount: 1,
+        mathMaxCount: 1
       },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 5, gold: 6, silver: 12, bronze: 20 }
     },
     {
       id: 15,
       name: "Stage 15",
+      stageType: "flash",
+      rounds: 3,
+      cards: 1,
+      revealSeconds: 0.1,
+      recallSeconds: 15,
+      categories: ["letters", "shapes"],
+      roundCategoryGuarantee: ["letters", "shapes"],
+      modifiers: {
+      },
+      starTimes: { platinum: 2, gold: 3, silver: 12, bronze: 20 }
+    },
+    {
+      id: 16,
+      name: "Stage 16",
       stageType: "tutorial",
       rounds: 3,
       cards: 2,
@@ -293,44 +312,58 @@
         backgroundColorChance: 1.0,
         backgroundPromptChance: 1.0,
       },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 },
-      instructions: window.stageInstructions[15] || []
-    },
-    {
-      id: 16,
-      name: "Stage 16",
-      stageType: "memory",
-      rounds: 4,
-      cards: 1,
-      revealSeconds: 15,
-      recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
-      modifiers: {
-        backgroundColor: true,
-        backgroundColorChance: 1.0,
-        backgroundPromptChance: 0.5
-      },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 },
+      instructions: window.stageInstructions[16] || []
     },
     {
       id: 17,
       name: "Stage 17",
       stageType: "memory",
-      rounds: 2,
-      cards: 2,
+      rounds: 3,
+      cards: 1,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      categories: ["numbers", "letters", "shapes"],
+      roundCategoryGuarantee: ["numbers", "letters", "shapes"],
       modifiers: {
         backgroundColor: true,
         backgroundColorChance: 1.0,
         backgroundPromptChance: 0.5
       },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 18,
       name: "Stage 18",
+      stageType: "memory",
+      rounds: 2,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "directions", "shapes"],
+      modifiers: {
+        backgroundColor: true,
+        backgroundColorChance: 1.0,
+        backgroundPromptChance: 0.5
+      },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
+    },
+    {
+      id: 19,
+      name: "Stage 19",
+      stageType: "flash",
+      rounds: 3,
+      cards: 1,
+      revealSeconds: 0.1,
+      recallSeconds: 30,
+      categories: ["colors", "directions"],
+      modifiers: {
+      },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
+    },
+    {
+      id: 20,
+      name: "Stage 20",
       stageType: "memory",
       rounds: 1,
       cards: 3,
@@ -339,31 +372,30 @@
       categories: ["numbers", "colors", "letters", "directions", "shapes"],
       modifiers: {
         backgroundColor: true,
-        backgroundColorChance: 1.0,
-        backgroundPromptChance: 0.5
-      },
-      starTimes: { platinum: 5, gold: 8, silver: 12, bronze: 20 }
-    },
-    {
-      id: 19,
-      name: "Stage 19",
-      stageType: "memory",
-      rounds: 2,
-      cards: 3,
-      revealSeconds: 30,
-      recallSeconds: 30,
-      categories: ["numbers", "colors", "letters", "directions", "shapes"],
-      modifiers: {
-        backgroundColor: true,
         backgroundColorChance: 0.7,
         backgroundPromptChance: 0.5,
-        mathOps: true
+        mathOps: true,
+        mathChance: 1.0
       },
-      starTimes: { platinum: 10, gold: 16, silver: 20, bronze: 30 }
+      starTimes: { platinum: 4, gold: 5, silver: 20, bronze: 30 }
     },
     {
-      id: 20,
-      name: "Stage 20",
+      id: 21,
+      name: "Stage 21",
+      stageType: "flash",
+      rounds: 3,
+      cards: 1,
+      revealSeconds: 0.1,
+      recallSeconds: 30,
+      categories: ["colors"],
+      modifiers: {
+      },
+      starTimes: { platinum: 2, gold: 3, silver: 15, bronze: 20 },
+      instructions: window.stageInstructions[21] || []
+    },
+    {
+      id: 22,
+      name: "Stage 22",
       stageType: "tutorial",
       rounds: 3,
       cards: 2,
@@ -374,12 +406,226 @@
         misleadColors: true,
         misleadChance: 1.0
       },
-      starTimes: { platinum: 3, gold: 10, silver: 15, bronze: 20 },
-      instructions: window.stageInstructions[20] || []
+      starTimes: { platinum: 2.8, gold: 3.5, silver: 15, bronze: 20 },
+    },
+    {
+      id: 23,
+      name: "Stage 23",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 24,
+      name: "Stage 24",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 25,
+      name: "Stage 25",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 26,
+      name: "Stage 26",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 27,
+      name: "Stage 27",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 28,
+      name: "Stage 28",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 29,
+      name: "Stage 29",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 30,
+      name: "Stage 30",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 31,
+      name: "Stage 31",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 32,
+      name: "Stage 32",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 33,
+      name: "Stage 33",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 34,
+      name: "Stage 34",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 35,
+      name: "Stage 35",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 36,
+      name: "Stage 36",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 37,
+      name: "Stage 37",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 38,
+      name: "Stage 38",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 39,
+      name: "Stage 39",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+    },
+    {
+      id: 40,
+      name: "Stage 40",
+      stageType: "memory",
+      rounds: 3,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers", "letters", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
     },
   ];
 })();
-
 
   // mathOps: true,
   // mathChance: 0.9,
