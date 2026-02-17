@@ -52,6 +52,23 @@ Thumbs.db
 *.njsproj
 *.sln
 
+# Firebase / GCP keys
+serviceAccountKey.json
+serviceAccount*.json
+*service-account*.json
+*.key.json
+
+# Generated analysis data
+prepared_data/
+analysis_output/
+data_combined.json
+data_combined_sample.json
+*.normalized.csv
+
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Optional: keep this tracked for shared project targeting.
 # Uncomment if each developer should use their own Firebase project mapping.
 # .firebaserc

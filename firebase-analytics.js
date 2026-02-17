@@ -1,7 +1,6 @@
 // Firebase Analytics for Flash Recall
-// Handles all Firestore tracking for level attempts, rounds, and card failures
+// Firestore-backed event/session logging with player/session/version metadata.
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyC9Wqa3tvKDcM1yPuCgjRkwtM_xbsMmLQg",
   authDomain: "flash-recall-df7d9.firebaseapp.com",
@@ -11,152 +10,565 @@ const firebaseConfig = {
   appId: "1:84239074574:web:265f87be6b4b9df8ccc35f"
 };
 
+const PLAYER_ID_STORAGE_KEY = "flash_recall_player_id_v1";
+const INACTIVITY_QUIT_MS = 3 * 60 * 1000;
+const HEARTBEAT_INTERVAL_MS = 30 * 1000;
+const FLUSH_INTERVAL_MS = 4 * 1000;
+const MAX_EVENT_BUFFER = 10;
+
 let firebaseApp = null;
 let firebaseDb = null;
 let currentUserId = null;
-let currentSessionId = null;
-let roundsForCurrentLevel = [];
+let currentSessionDocId = null;
 
-// Initialize Firebase and Firestore
+let roundsForCurrentLevel = [];
+let pendingEvents = [];
+let flushTimerId = null;
+let heartbeatTimerId = null;
+let inactivityTimerId = null;
+let isFlushingEvents = false;
+let lifecycleListenersBound = false;
+let hasEndedSession = false;
+let inactivityQuitLogged = false;
+let hiddenStartedAtMs = null;
+
+const sessionStartedAtMs = Date.now();
+let lastActivityAtMs = sessionStartedAtMs;
+
+const playerId = getOrCreatePlayerId();
+const sessionId = generateId();
+const gameVersion = window.FLASH_RECALL_VERSION || "dev";
+const releaseChannel = window.FLASH_RECALL_RELEASE_CHANNEL || deriveReleaseChannel();
+
+function deriveReleaseChannel() {
+  const host = String(window.location.hostname || "").toLowerCase();
+  if (host.includes("github.io")) return "github-pages";
+  if (host.includes("web.app") || host.includes("firebaseapp.com")) return "firebase-hosting";
+  if (host === "localhost" || host === "127.0.0.1") return "local";
+  return "custom";
+}
+
+function generateId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+
+function getOrCreatePlayerId() {
+  try {
+    const existing = window.localStorage.getItem(PLAYER_ID_STORAGE_KEY);
+    if (existing) return existing;
+    const created = generateId();
+    window.localStorage.setItem(PLAYER_ID_STORAGE_KEY, created);
+    return created;
+  } catch (error) {
+    console.warn("Unable to access localStorage for player id:", error);
+    return generateId();
+  }
+}
+
+function getSessionRef() {
+  if (!firebaseDb || !currentSessionDocId) return null;
+  return firebaseDb.collection("game_sessions").doc(currentSessionDocId);
+}
+
+function isReadyForWrites() {
+  return Boolean(firebaseDb && currentSessionDocId && currentUserId);
+}
+
+function mapEntriesToFailedCards(entries) {
+  return entries
+    .filter((entry) => !entry.correct)
+    .map((entry) => {
+      const expectedValue =
+        typeof entry.expected === "object"
+          ? entry.expected.answer || entry.expected.label || "unknown"
+          : entry.expected || entry.answer || "unknown";
+
+      return {
+        card_type: entry.category || "unknown",
+        expected: expectedValue,
+        actual: entry.userAnswer || entry.actual || entry.raw || "blank",
+        position: entry.displayIndex || 0
+      };
+    });
+}
+
+function normalizeLevelNumber(levelNumber) {
+  return Number(levelNumber) + 1;
+}
+
+function scheduleFlush() {
+  if (flushTimerId) return;
+  flushTimerId = window.setTimeout(() => {
+    flushTimerId = null;
+    flushEvents();
+  }, FLUSH_INTERVAL_MS);
+}
+
+function enqueueEvent(eventType, payload = {}, options = {}) {
+  const eventDoc = {
+    event_type: eventType,
+    user_id: currentUserId || null,
+    player_id: playerId,
+    session_id: sessionId,
+    game_version: gameVersion,
+    release_channel: releaseChannel,
+    client_timestamp_ms: Date.now(),
+    client_iso: new Date().toISOString(),
+    ...payload
+  };
+
+  pendingEvents.push(eventDoc);
+
+  if (options.immediate || pendingEvents.length >= MAX_EVENT_BUFFER) {
+    flushEvents();
+  } else {
+    scheduleFlush();
+  }
+}
+
+async function flushEvents() {
+  if (isFlushingEvents || !pendingEvents.length || !isReadyForWrites()) {
+    return;
+  }
+
+  const eventsToWrite = pendingEvents.splice(0, pendingEvents.length);
+  isFlushingEvents = true;
+
+  try {
+    const sessionRef = getSessionRef();
+    if (!sessionRef) {
+      pendingEvents = eventsToWrite.concat(pendingEvents);
+      return;
+    }
+
+    const batch = firebaseDb.batch();
+
+    eventsToWrite.forEach((eventDoc) => {
+      const eventRef = sessionRef.collection("events").doc();
+      batch.set(eventRef, {
+        ...eventDoc,
+        user_id: currentUserId,
+        event_timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    batch.update(sessionRef, {
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_activity_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_event_type: eventsToWrite[eventsToWrite.length - 1].event_type
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.error("Failed to flush analytics events:", error);
+    pendingEvents = eventsToWrite.concat(pendingEvents).slice(-200);
+  } finally {
+    isFlushingEvents = false;
+  }
+}
+
+function startHeartbeat() {
+  if (heartbeatTimerId) {
+    window.clearInterval(heartbeatTimerId);
+  }
+
+  heartbeatTimerId = window.setInterval(async () => {
+    const sessionRef = getSessionRef();
+    if (!sessionRef) return;
+
+    try {
+      await sessionRef.update({
+        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+        last_activity_at: firebase.firestore.FieldValue.serverTimestamp(),
+        total_playtime_seconds: Math.max(0, (Date.now() - sessionStartedAtMs) / 1000)
+      });
+    } catch (error) {
+      console.error("Failed heartbeat update:", error);
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimerId) {
+    window.clearInterval(heartbeatTimerId);
+    heartbeatTimerId = null;
+  }
+}
+
+function resetInactivityTimer() {
+  if (inactivityTimerId) {
+    window.clearTimeout(inactivityTimerId);
+  }
+
+  inactivityTimerId = window.setTimeout(async () => {
+    if (!isReadyForWrites() || hasEndedSession || inactivityQuitLogged) return;
+
+    inactivityQuitLogged = true;
+    enqueueEvent("quit_inferred_inactivity", {
+      inactivity_ms: INACTIVITY_QUIT_MS
+    }, { immediate: true });
+
+    const sessionRef = getSessionRef();
+    if (sessionRef) {
+      try {
+        await sessionRef.update({
+          quit_inferred: true,
+          quit_reason: "inactivity_timeout",
+          updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (error) {
+        console.error("Failed to mark inactivity quit:", error);
+      }
+    }
+  }, INACTIVITY_QUIT_MS);
+}
+
+function noteActivity(source) {
+  lastActivityAtMs = Date.now();
+
+  if (inactivityQuitLogged && isReadyForWrites()) {
+    inactivityQuitLogged = false;
+    enqueueEvent("session_resumed_after_inactivity", {
+      source
+    }, { immediate: true });
+
+    const sessionRef = getSessionRef();
+    if (sessionRef) {
+      sessionRef.update({
+        quit_inferred: false,
+        quit_reason: null,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch((error) => {
+        console.error("Failed to clear quit_inferred flag:", error);
+      });
+    }
+  }
+
+  resetInactivityTimer();
+}
+
+function bindLifecycleListeners() {
+  if (lifecycleListenersBound) return;
+  lifecycleListenersBound = true;
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      hiddenStartedAtMs = Date.now();
+      enqueueEvent("tab_hidden", {});
+    } else {
+      const hiddenDurationMs = hiddenStartedAtMs ? Date.now() - hiddenStartedAtMs : null;
+      hiddenStartedAtMs = null;
+      enqueueEvent("tab_visible", {
+        hidden_duration_ms: hiddenDurationMs
+      });
+      noteActivity("tab_visible");
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    enqueueEvent("window_focus", {});
+    noteActivity("window_focus");
+  });
+
+  window.addEventListener("blur", () => {
+    enqueueEvent("window_blur", {});
+  });
+
+  window.addEventListener("pagehide", () => {
+    enqueueEvent("page_hide", {}, { immediate: true });
+    flushEvents();
+  });
+
+  window.addEventListener("beforeunload", () => {
+    enqueueEvent("before_unload", {
+      session_duration_seconds: Math.max(0, (Date.now() - sessionStartedAtMs) / 1000)
+    }, { immediate: true });
+    flushEvents();
+  });
+
+  const activityEvents = ["pointerdown", "keydown", "touchstart", "mousedown"];
+  activityEvents.forEach((eventName) => {
+    window.addEventListener(eventName, () => {
+      noteActivity(eventName);
+    }, { passive: true });
+  });
+}
+
+async function fetchIpAddressBestEffort() {
+  const timeoutMs = 1500;
+
+  try {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch("https://api.ipify.org?format=json", {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    window.clearTimeout(timeout);
+
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return payload && payload.ip ? String(payload.ip) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
 async function initializeFirebase() {
   try {
-    // Initialize Firebase app
     firebaseApp = firebase.initializeApp(firebaseConfig);
     firebaseDb = firebase.firestore();
-    
-    // Set up anonymous authentication
+
+    bindLifecycleListeners();
+
     firebase.auth().onAuthStateChanged(async (user) => {
       if (user) {
         currentUserId = user.uid;
-        console.log('Firebase anonymous user authenticated:', currentUserId);
+        console.log("Firebase anonymous user authenticated:", currentUserId);
         await createNewSession();
       } else {
-        // Sign in anonymously if not already
         try {
           await firebase.auth().signInAnonymously();
         } catch (error) {
-          console.error('Failed to sign in anonymously:', error);
+          console.error("Failed to sign in anonymously:", error);
         }
       }
     });
   } catch (error) {
-    console.error('Firebase initialization failed:', error);
+    console.error("Firebase initialization failed:", error);
   }
 }
 
-// Create a new gaming session on app start
 async function createNewSession() {
+  if (!firebaseDb || !currentUserId) return;
+
   try {
-    const sessionRef = await firebaseDb.collection('game_sessions').add({
+    const ipAddress = await fetchIpAddressBestEffort();
+
+    const sessionPayload = {
       user_id: currentUserId,
+      player_id: playerId,
+      session_id: sessionId,
+      game_version: gameVersion,
+      release_channel: releaseChannel,
+      site_host: window.location.host,
+      page_path: window.location.pathname,
+      user_agent: navigator.userAgent || "unknown",
+      language: navigator.language || null,
+      timezone: (Intl.DateTimeFormat().resolvedOptions() || {}).timeZone || null,
+      ip_address: ipAddress,
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      started_at: firebase.firestore.FieldValue.serverTimestamp(),
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-      total_playtime_seconds: 0
-    });
-    currentSessionId = sessionRef.id;
-    console.log('New session created:', currentSessionId);
+      last_activity_at: firebase.firestore.FieldValue.serverTimestamp(),
+      total_playtime_seconds: 0,
+      last_level_completed: 0,
+      quit_inferred: false,
+      session_state: "active"
+    };
+
+    const sessionRef = await firebaseDb.collection("game_sessions").add(sessionPayload);
+    currentSessionDocId = sessionRef.id;
+
+    enqueueEvent("session_start", {
+      ip_collected: Boolean(ipAddress),
+      referrer: document.referrer || null,
+      game_build: window.FLASH_RECALL_BUILD_ID || null
+    }, { immediate: true });
+
+    startHeartbeat();
+    resetInactivityTimer();
+
+    console.log("New session created:", currentSessionDocId);
   } catch (error) {
-    console.error('Failed to create session:', error);
+    console.error("Failed to create session:", error);
   }
 }
 
-// Track round completion
 function trackRoundCompletion(roundNumber, passed, timeSpent) {
   roundsForCurrentLevel.push({
     round_number: roundNumber,
-    passed: passed,
-    time_spent: parseFloat(timeSpent.toFixed(2))
+    passed: Boolean(passed),
+    time_spent: Number.isFinite(timeSpent) ? parseFloat(timeSpent.toFixed(2)) : null
+  });
+
+  enqueueEvent("round_complete", {
+    round_number: roundNumber,
+    passed: Boolean(passed),
+    time_spent_seconds: Number.isFinite(timeSpent) ? parseFloat(timeSpent.toFixed(2)) : null
   });
 }
 
-// Main level tracking - sent when level completes/fails/quits
-async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, entries) {
-  if (!entries || entries.length === 0) {
-    console.warn('trackLevelSession called with empty entries');
+async function trackLevelStart(levelNumber, metadata = {}) {
+  if (!isReadyForWrites()) {
+    enqueueEvent("level_start_buffered", {
+      level_number: normalizeLevelNumber(levelNumber),
+      ...metadata
+    });
     return;
   }
-  
-  if (!currentSessionId || !currentUserId) {
-    console.warn('Firebase not initialized yet');
-    return;
-  }
+
+  const sessionRef = getSessionRef();
+  if (!sessionRef) return;
+
+  const normalizedLevel = normalizeLevelNumber(levelNumber);
+
+  enqueueEvent("level_start", {
+    level_number: normalizedLevel,
+    ...metadata
+  }, { immediate: true });
 
   try {
-    const failedCards = entries
-      .filter(e => !e.correct)
-      .map(card => ({
-        card_type: card.category || 'unknown',
-        expected: card.answer || card.expected || 'unknown',
-        actual: card.userAnswer || card.actual || 'blank',
-        position: card.displayIndex || 0
-      }));
+    await sessionRef.update({
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      current_level_number: normalizedLevel,
+      current_level_started_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (error) {
+    console.error("Failed to update session on level start:", error);
+  }
+}
 
-    // Create the level attempt document
+async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, entries, endReason = "level_end") {
+  if (!isReadyForWrites()) {
+    console.warn("Firebase not initialized yet");
+    return;
+  }
+
+  const safeEntries = Array.isArray(entries) ? entries : [];
+
+  const sessionRef = getSessionRef();
+  if (!sessionRef) return;
+
+  try {
+    const normalizedLevel = normalizeLevelNumber(levelNumber);
+    const failedCards = mapEntriesToFailedCards(safeEntries);
+
     const attemptData = {
       user_id: currentUserId,
-      level_number: levelNumber,
-      passed: passed,
+      player_id: playerId,
+      session_id: sessionId,
+      game_version: gameVersion,
+      release_channel: releaseChannel,
+      level_number: normalizedLevel,
+      passed: Boolean(passed),
       stars: stars || 0,
-      time_seconds: parseFloat(elapsedSeconds.toFixed(2)),
+      time_seconds: Number.isFinite(elapsedSeconds) ? parseFloat(elapsedSeconds.toFixed(2)) : null,
       rounds: roundsForCurrentLevel,
       cards_failed: failedCards,
-      total_cards: entries.length,
+      total_cards: safeEntries.length,
       cards_failed_count: failedCards.length,
+      end_reason: endReason,
       created_at: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    // Store in Firestore under the current session
-    await firebaseDb
-      .collection('game_sessions')
-      .doc(currentSessionId)
-      .collection('attempts')
-      .add(attemptData);
+    await sessionRef.collection("attempts").add(attemptData);
 
-    console.log('Level attempt tracked:', {
-      level: levelNumber,
-      passed: passed,
-      rounds: roundsForCurrentLevel.length,
-      failedCards: failedCards.length
-    });
+    enqueueEvent("level_end", {
+      level_number: normalizedLevel,
+      passed: Boolean(passed),
+      stars: stars || 0,
+      time_seconds: Number.isFinite(elapsedSeconds) ? parseFloat(elapsedSeconds.toFixed(2)) : null,
+      rounds_count: roundsForCurrentLevel.length,
+      total_cards: safeEntries.length,
+      cards_failed_count: failedCards.length,
+      end_reason: endReason
+    }, { immediate: true });
 
-    // Reset rounds for next level
+    const sessionUpdate = {
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      current_level_number: null
+    };
+
+    if (Boolean(passed)) {
+      sessionUpdate.last_level_completed = normalizedLevel;
+    }
+
+    await sessionRef.update(sessionUpdate);
+
     roundsForCurrentLevel = [];
   } catch (error) {
-    console.error('Failed to track level session:', error);
+    console.error("Failed to track level session:", error);
   }
 }
 
-// Track session end with total time
-async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted) {
-  if (!currentSessionId) {
-    console.warn('No active session to end');
+async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted, endReason = "session_end") {
+  if (hasEndedSession) return;
+  hasEndedSession = true;
+
+  if (!isReadyForWrites()) {
+    console.warn("No active Firebase session to end");
     return;
   }
 
-  try {
-    await firebaseDb
-      .collection('game_sessions')
-      .doc(currentSessionId)
-      .update({
-        total_playtime_seconds: parseFloat(totalSessionSeconds.toFixed(2)),
-        last_level_completed: lastLevelCompleted || 0,
-        ended_at: firebase.firestore.FieldValue.serverTimestamp()
-      });
+  const sessionRef = getSessionRef();
+  if (!sessionRef) return;
 
-    console.log('Session ended:', {
-      sessionId: currentSessionId,
-      totalTime: totalSessionSeconds,
-      lastLevel: lastLevelCompleted
+  if (inactivityTimerId) {
+    window.clearTimeout(inactivityTimerId);
+    inactivityTimerId = null;
+  }
+
+  stopHeartbeat();
+
+  enqueueEvent("session_end", {
+    total_playtime_seconds: Number.isFinite(totalSessionSeconds)
+      ? parseFloat(totalSessionSeconds.toFixed(2))
+      : parseFloat(((Date.now() - sessionStartedAtMs) / 1000).toFixed(2)),
+    last_level_completed: Number.isFinite(lastLevelCompleted) ? lastLevelCompleted : 0,
+    end_reason: endReason,
+    inactive_ms_before_end: Date.now() - lastActivityAtMs
+  }, { immediate: true });
+
+  await flushEvents();
+
+  try {
+    await sessionRef.update({
+      total_playtime_seconds: Number.isFinite(totalSessionSeconds)
+        ? parseFloat(totalSessionSeconds.toFixed(2))
+        : parseFloat(((Date.now() - sessionStartedAtMs) / 1000).toFixed(2)),
+      last_level_completed: Number.isFinite(lastLevelCompleted) ? lastLevelCompleted : 0,
+      ended_at: firebase.firestore.FieldValue.serverTimestamp(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      session_state: "ended",
+      end_reason: endReason,
+      current_level_number: null,
+      quit_inferred: endReason === "inactivity_timeout"
     });
   } catch (error) {
-    console.error('Failed to track session end:', error);
+    console.error("Failed to track session end:", error);
   }
 }
 
-// Initialize Firebase when script loads
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeFirebase);
+function getLoggingDebugSnapshot() {
+  return {
+    ready: isReadyForWrites(),
+    userId: currentUserId,
+    sessionDocId: currentSessionDocId,
+    playerId,
+    sessionId,
+    gameVersion,
+    releaseChannel,
+    pendingEvents: pendingEvents.length
+  };
+}
+
+window.trackRoundCompletion = trackRoundCompletion;
+window.trackLevelStart = trackLevelStart;
+window.trackLevelSession = trackLevelSession;
+window.trackSessionEnd = trackSessionEnd;
+window.getLoggingDebugSnapshot = getLoggingDebugSnapshot;
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeFirebase);
 } else {
   initializeFirebase();
 }
+
 

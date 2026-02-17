@@ -1143,7 +1143,7 @@
               : (performance.now() - (stageState.startTime || performance.now())) / 1000;
             const backEntries = window.__lastEntries || [];
             if (typeof trackLevelSession === 'function') {
-              trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries);
+              trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries, "menu_quit");
             }
           }
           resetStageProgress();
@@ -1446,7 +1446,7 @@
       window.addEventListener("beforeunload", () => {
         const totalSessionSeconds = (performance.now() - sessionStartTime) / 1000;
         if (typeof trackSessionEnd === 'function') {
-          trackSessionEnd(totalSessionSeconds, lastCompletedLevel);
+          trackSessionEnd(totalSessionSeconds, lastCompletedLevel, "beforeunload");
         }
       });
       function clearTabKeyHint() {
@@ -1460,3 +1460,4 @@
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
+

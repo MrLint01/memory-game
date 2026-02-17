@@ -3,8 +3,35 @@
     "public": ".",
     "ignore": [
       "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
+      "firestore.rules",
+      ".firebaserc",
+      "README.md",
+      "DOCS.md",
+      "feedback.txt",
+      "package.json",
+      "package-lock.json",
+      ".git/**",
+      ".github/**",
+      ".firebase/**",
+      ".venv/**",
+      "scripts/**",
+      "dataconnect/**",
+      "src/**",
+      "node_modules/**",
+      "**/__pycache__/**",
+      "**/*.py",
+      "**/*.pyc",
+      "**/*.exe",
+      "**/*.dll",
+      "**/*.so",
+      "**/*.dylib",
+      "**/*.bat",
+      "**/*.ps1",
+      "**/*.sh",
+      "**/.*"
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   }
 }

@@ -5,7 +5,13 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if request.auth.uid == resource.data.user_id;
     }
+
     match /game_sessions/{sessionId}/attempts/{attemptId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth.uid == resource.data.user_id;
+    }
+
+    match /game_sessions/{sessionId}/events/{eventId} {
       allow create: if true;
       allow read, update, delete: if request.auth.uid == resource.data.user_id;
     }

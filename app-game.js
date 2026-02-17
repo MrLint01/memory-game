@@ -787,6 +787,13 @@
             stageState.failed = false;
             startStageStopwatch();
             stageState.attempts = (stageState.attempts || 1) + 1;
+            if (typeof trackLevelStart === "function") {
+              trackLevelStart(stageState.index, {
+                mode: gameMode,
+                attempt_number: stageState.attempts,
+                stage_name: stage && stage.name ? stage.name : null
+              });
+            }
           }
           const stageRounds = stage.rounds || 1;
           if (advanceRound && round >= stageRounds) {
@@ -854,3 +861,4 @@
           beginRecallPhase();
         });
       }
+
