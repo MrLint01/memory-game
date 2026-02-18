@@ -36,6 +36,7 @@
     'app-core.js',
     'modifiers/background-color.js',
     'modifiers/text-color.js',
+    'modifiers/previous-card.js',
     'modifiers/misleading-colors.js',
     'modifiers/math-ops.js',
     'modifiers/glitch.js',

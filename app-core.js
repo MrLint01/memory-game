@@ -45,6 +45,7 @@ const revealInput = document.getElementById("revealTime");
       const practiceMisleadColors = document.getElementById("practiceMisleadColors");
       const practiceBackgroundColor = document.getElementById("practiceBackgroundColor");
       const practiceTextColor = document.getElementById("practiceTextColor");
+      const practicePreviousCard = document.getElementById("practicePreviousCard");
       const settingsOpen = document.getElementById("settingsOpen");
       const statsOpen = document.getElementById("statsOpen");
       const settingsModal = document.getElementById("settingsModal");
@@ -170,6 +171,20 @@ const revealInput = document.getElementById("revealTime");
       let lastCompletedLevel = 0;
       let dragSelecting = false;
       let dragTargetState = null;
+      window.applyPreviousCardSwap = function applyPreviousCardSwap(map) {
+        const previousRoundItems =
+          typeof window.getPreviousRoundItems === "function" ? window.getPreviousRoundItems() : null;
+        if (!Array.isArray(map) || !Array.isArray(previousRoundItems) || !previousRoundItems.length) {
+          return;
+        }
+        map.forEach((mappedIndex) => {
+          const item = roundItems[mappedIndex];
+          if (!item || item.recallHint !== "Previous card") return;
+          const prevItem = previousRoundItems[mappedIndex];
+          if (!prevItem) return;
+          item.answer = prevItem.textLabel || prevItem.label || prevItem.answer || "";
+        });
+      };
       function getSelectedCategories() {
         return Array.from(document.querySelectorAll(".checkboxes input:checked"))
           .map((checkbox) => checkbox.value)
@@ -204,12 +219,16 @@ const revealInput = document.getElementById("revealTime");
             enableTextColor: false,
             textColorChance: 0.6,
             textPromptChance: 0.5,
+            enablePreviousCard: false,
+            previousCardChance: 0.5,
             misleadMinCount: null,
             misleadMaxCount: null,
             backgroundPromptMinCount: null,
             backgroundPromptMaxCount: null,
             textPromptMinCount: null,
             textPromptMaxCount: null,
+            previousPromptMinCount: null,
+            previousPromptMaxCount: null,
             enableGlitch: false
           };
         }
@@ -224,6 +243,8 @@ const revealInput = document.getElementById("revealTime");
           enableTextColor: practiceTextColor.checked,
           textColorChance: 0.6,
           textPromptChance: 0.5,
+          enablePreviousCard: practicePreviousCard.checked,
+          previousCardChance: 0.5,
           enableGlitch: practiceGlitch.checked
         };
       }
@@ -785,6 +806,24 @@ const revealInput = document.getElementById("revealTime");
           textColorLabel: null,
           textColorHex: null
         };
+        const previousRoundItems =
+          typeof window.getPreviousRoundItems === "function" ? window.getPreviousRoundItems() : null;
+        if (
+          options &&
+          options.enablePreviousCard &&
+          Array.isArray(previousRoundItems) &&
+          previousRoundItems.length > 0
+        ) {
+          const usePlan = Boolean(options._usePreviousPromptPlan);
+          const usePrevious = usePlan
+            ? plan.forcePreviousPrompt
+            : plan.forcePreviousPrompt || Math.random() < (Number(options.previousCardChance) || 0);
+          const previousItem = previousRoundItems[plan.positionIndex];
+          if (usePrevious && previousItem) {
+            challenge.answer = previousItem.textLabel || previousItem.label || previousItem.answer || "";
+            challenge.recallHint = "Previous card";
+          }
+        }
         const canUseTextColor = ["numbers", "letters", "colors"].includes(item.category);
         const applyTextColor =
           Boolean(options && options.enableTextColor) &&
@@ -832,7 +871,7 @@ const revealInput = document.getElementById("revealTime");
           } else {
             challenge.colorTarget = "text";
           }
-          if (challenge.recallHint !== "Text color") {
+          if (challenge.recallHint !== "Text color" && challenge.recallHint !== "Previous card") {
             if (challenge.colorTarget === "background") {
               challenge.answer = challenge.label;
               challenge.recallHint = "Background color";
@@ -854,7 +893,11 @@ const revealInput = document.getElementById("revealTime");
             const shouldPrompt = usePromptPlan
               ? plan.forceBackgroundPrompt
               : plan.forceBackgroundPrompt || Math.random() < promptChance;
-            if (shouldPrompt && challenge.recallHint !== "Text color") {
+            if (
+              shouldPrompt &&
+              challenge.recallHint !== "Text color" &&
+              challenge.recallHint !== "Previous card"
+            ) {
               challenge.answer = backgroundColor.label;
               challenge.recallHint = "Background color";
             }
@@ -905,8 +948,13 @@ const revealInput = document.getElementById("revealTime");
         const plan = items.map(() => ({
           forceMislead: false,
           forceBackgroundPrompt: false,
-          forceTextPrompt: false
+          forceTextPrompt: false,
+          forcePreviousPrompt: false,
+          positionIndex: 0
         }));
+        plan.forEach((entry, index) => {
+          entry.positionIndex = index;
+        });
         if (options && options.misleadColors) {
           const min = clampCount(options.misleadMinCount);
           const max = clampCount(options.misleadMaxCount);
@@ -944,6 +992,20 @@ const revealInput = document.getElementById("revealTime");
             const selected = selectModifierIndices(eligible, options.textPromptChance, min, max);
             selected.forEach((index) => {
               plan[index].forceTextPrompt = true;
+            });
+          }
+        }
+        const previousRoundItems =
+          typeof window.getPreviousRoundItems === "function" ? window.getPreviousRoundItems() : null;
+        if (options && options.enablePreviousCard && Array.isArray(previousRoundItems) && previousRoundItems.length) {
+          const min = clampCount(options.previousPromptMinCount);
+          const max = clampCount(options.previousPromptMaxCount);
+          if (min !== null || max !== null) {
+            options._usePreviousPromptPlan = true;
+            const eligible = items.map((_, index) => index);
+            const selected = selectModifierIndices(eligible, options.previousCardChance, min, max);
+            selected.forEach((index) => {
+              plan[index].forcePreviousPrompt = true;
             });
           }
         }

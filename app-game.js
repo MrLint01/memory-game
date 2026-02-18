@@ -580,11 +580,19 @@
             if (typeof trackRoundCompletion === 'function') {
               trackRoundCompletion(round, true, roundTimeSpent);
             }
+            if (typeof window.setPreviousRoundItems === "function") {
+              const ordered = swapMap ? swapMap.map((idx) => roundItems[idx]) : roundItems;
+              window.setPreviousRoundItems(ordered);
+            }
             startRound();
             return;
           }
           streak += 1;
           updateScore();
+          if (typeof window.setPreviousRoundItems === "function") {
+            const ordered = swapMap ? swapMap.map((idx) => roundItems[idx]) : roundItems;
+            window.setPreviousRoundItems(ordered);
+          }
           startRound();
           return;
         }
@@ -754,6 +762,9 @@
             swapActive = true;
           }
         }
+        if (swapActive && typeof window.applyPreviousCardSwap === "function") {
+          window.applyPreviousCardSwap(swapMap);
+        }
         if (timerFill) {
           timerFill.style.width = "100%";
         }
@@ -900,4 +911,3 @@
           beginRecallPhase();
         });
       }
-

@@ -61,6 +61,7 @@
       misleadColors: false,
       backgroundColor: false,
       textColor: false,
+      previousCard: false,
       swapCards: false,
       platformer: false,
       glitch: false,
@@ -123,6 +124,12 @@
         typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
       textPromptMaxCount:
         typeof modifiers.textPromptMaxCount === "number" ? modifiers.textPromptMaxCount : null,
+      enablePreviousCard: Boolean(modifiers.previousCard),
+      previousCardChance: typeof modifiers.previousCardChance === "number" ? modifiers.previousCardChance : 0.5,
+      previousPromptMinCount:
+        typeof modifiers.previousPromptMinCount === "number" ? modifiers.previousPromptMinCount : null,
+      previousPromptMaxCount:
+        typeof modifiers.previousPromptMaxCount === "number" ? modifiers.previousPromptMaxCount : null,
       enableGlitch: Boolean(modifiers.glitch)
     };
   };

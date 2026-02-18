@@ -13,6 +13,7 @@ window.sandboxUnlocks = {
     practiceMisleadColors: 22,
     practiceBackgroundColor: 16,
     practiceTextColor: null,
+    practicePreviousCard: null,
     practiceSwap: null,
     practicePlatformer: null,
     practiceGlitch: null,
