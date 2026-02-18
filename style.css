@@ -1226,14 +1226,22 @@ body[data-state="paused"] .hud-pause {
         display: grid;
         place-items: center;
         text-align: center;
-        font-size: 1.9rem;
-        font-weight: 800;
+        font-size: 2.2rem;
+        font-weight: 400;
+        font-family: "Anton", sans-serif;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: var(--ink);
         box-shadow: none;
         animation: none;
       }
+.card.card--text-color {
+  text-shadow:
+    -1px -1px 0 #000000,
+    1px -1px 0 #000000,
+    -1px 1px 0 #000000,
+    1px 1px 0 #000000;
+}
 .card--rise {
   animation: rise 0.4s ease;
 }
@@ -1260,11 +1268,14 @@ body[data-state="paused"] .hud-pause {
         font-size: 1rem;
         letter-spacing: 0.06em;
       }
-      .hidden-card {
+.hidden-card {
         background: #111827;
         color: #ffffff;
         font-size: 1.1rem;
         border-color: #111827;
+        font-family: "Courier New", "Lucida Console", monospace;
+        font-weight: 600;
+        text-shadow: none;
       }
       .hidden-card span {
         font-size: 1rem;

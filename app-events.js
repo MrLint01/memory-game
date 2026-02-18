@@ -141,6 +141,7 @@
           { key: "mathOps", label: "Math ops" },
           { key: "misleadColors", label: "Misleading colors" },
           { key: "backgroundColor", label: "Background color" },
+          { key: "textColor", label: "Text color" },
           { key: "swapCards", label: "Card swap" },
           { key: "platformer", label: "Platformer" },
           { key: "glitch", label: "Glitch" },
@@ -375,6 +376,7 @@
           mathOps: { label: "Math ops", src: "imgs/icons/mod-mathops.svg" },
           misleadColors: { label: "Mislead", src: "imgs/icons/mod-misleadcolors.svg" },
           backgroundColor: { label: "Background", src: "imgs/icons/mod-backgroundcolor.svg" },
+          textColor: { label: "Text color", src: "imgs/icons/mod-misleadcolors.svg" },
           swapCards: { label: "Swap", src: "imgs/icons/mod-swapcards.svg" },
           platformer: { label: "Platformer", src: "imgs/icons/mod-platformer.svg" },
           glitch: { label: "Glitch", inlineSvg: glitchSvg },
@@ -1741,4 +1743,3 @@
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-

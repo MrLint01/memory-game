@@ -12,6 +12,7 @@ window.sandboxUnlocks = {
     practiceMathOps: 12,
     practiceMisleadColors: 22,
     practiceBackgroundColor: 16,
+    practiceTextColor: null,
     practiceSwap: null,
     practicePlatformer: null,
     practiceGlitch: null,

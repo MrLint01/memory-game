@@ -44,6 +44,7 @@ const revealInput = document.getElementById("revealTime");
       const practiceMathOps = document.getElementById("practiceMathOps");
       const practiceMisleadColors = document.getElementById("practiceMisleadColors");
       const practiceBackgroundColor = document.getElementById("practiceBackgroundColor");
+      const practiceTextColor = document.getElementById("practiceTextColor");
       const settingsOpen = document.getElementById("settingsOpen");
       const statsOpen = document.getElementById("statsOpen");
       const settingsModal = document.getElementById("settingsModal");
@@ -200,10 +201,15 @@ const revealInput = document.getElementById("revealTime");
             enableBackgroundColor: false,
             backgroundColorChance: 0.35,
             backgroundPromptChance: 0.5,
+            enableTextColor: false,
+            textColorChance: 0.6,
+            textPromptChance: 0.5,
             misleadMinCount: null,
             misleadMaxCount: null,
             backgroundPromptMinCount: null,
             backgroundPromptMaxCount: null,
+            textPromptMinCount: null,
+            textPromptMaxCount: null,
             enableGlitch: false
           };
         }
@@ -215,6 +221,9 @@ const revealInput = document.getElementById("revealTime");
           enableBackgroundColor: practiceBackgroundColor.checked,
           backgroundColorChance: clamp(Number(practiceBackgroundChance && practiceBackgroundChance.value) || 0.35, 0, 1),
           backgroundPromptChance: 0.5,
+          enableTextColor: practiceTextColor.checked,
+          textColorChance: 0.6,
+          textPromptChance: 0.5,
           enableGlitch: practiceGlitch.checked
         };
       }
@@ -757,6 +766,10 @@ const revealInput = document.getElementById("revealTime");
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
+        if (item.recallHint === "Text color") {
+          const initial = expected.charAt(0);
+          return actual === expected || actual === initial;
+        }
         return actual === expected;
       }
 
@@ -768,8 +781,29 @@ const revealInput = document.getElementById("revealTime");
           textLabel: null,
           colorTarget: null,
           backgroundColorLabel: null,
-          backgroundColorHex: null
+          backgroundColorHex: null,
+          textColorLabel: null,
+          textColorHex: null
         };
+        const canUseTextColor = ["numbers", "letters", "colors"].includes(item.category);
+        const applyTextColor =
+          Boolean(options && options.enableTextColor) &&
+          canUseTextColor &&
+          (plan.forceTextPrompt || Math.random() < (Number(options.textColorChance) || 0));
+        if (applyTextColor) {
+          const textColor = pickTextColor();
+          challenge.textColorLabel = textColor.label;
+          challenge.textColorHex = textColor.color;
+          const promptChance =
+            typeof options.textPromptChance === "number" ? options.textPromptChance : 0.5;
+          const shouldPrompt = options._useTextPromptPlan
+            ? plan.forceTextPrompt
+            : plan.forceTextPrompt || Math.random() < promptChance;
+          if (shouldPrompt) {
+            challenge.answer = textColor.label;
+            challenge.recallHint = "Text color";
+          }
+        }
         if (item.category === "colors") {
           if (options.misleadColors) {
             const usePlan = Boolean(options._useMisleadPlan);
@@ -798,12 +832,14 @@ const revealInput = document.getElementById("revealTime");
           } else {
             challenge.colorTarget = "text";
           }
-          if (challenge.colorTarget === "background") {
-            challenge.answer = challenge.label;
-            challenge.recallHint = "Background color";
-          } else {
-            challenge.answer = challenge.textLabel;
-            challenge.recallHint = "Color text";
+          if (challenge.recallHint !== "Text color") {
+            if (challenge.colorTarget === "background") {
+              challenge.answer = challenge.label;
+              challenge.recallHint = "Background color";
+            } else {
+              challenge.answer = challenge.textLabel;
+              challenge.recallHint = "Text";
+            }
           }
         } else if (options.enableBackgroundColor) {
           const bgChance =
@@ -818,7 +854,7 @@ const revealInput = document.getElementById("revealTime");
             const shouldPrompt = usePromptPlan
               ? plan.forceBackgroundPrompt
               : plan.forceBackgroundPrompt || Math.random() < promptChance;
-            if (shouldPrompt) {
+            if (shouldPrompt && challenge.recallHint !== "Text color") {
               challenge.answer = backgroundColor.label;
               challenge.recallHint = "Background color";
             }
@@ -866,7 +902,11 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function planModifierAssignments(items, options) {
-        const plan = items.map(() => ({ forceMislead: false, forceBackgroundPrompt: false }));
+        const plan = items.map(() => ({
+          forceMislead: false,
+          forceBackgroundPrompt: false,
+          forceTextPrompt: false
+        }));
         if (options && options.misleadColors) {
           const min = clampCount(options.misleadMinCount);
           const max = clampCount(options.misleadMaxCount);
@@ -890,6 +930,20 @@ const revealInput = document.getElementById("revealTime");
             const selected = selectModifierIndices(eligible, options.backgroundPromptChance, min, max);
             selected.forEach((index) => {
               plan[index].forceBackgroundPrompt = true;
+            });
+          }
+        }
+        if (options && options.enableTextColor) {
+          const min = clampCount(options.textPromptMinCount);
+          const max = clampCount(options.textPromptMaxCount);
+          if (min !== null || max !== null) {
+            options._useTextPromptPlan = true;
+            const eligible = items
+              .map((item, index) => (["numbers", "letters", "colors"].includes(item.category) ? index : null))
+              .filter((index) => index !== null);
+            const selected = selectModifierIndices(eligible, options.textPromptChance, min, max);
+            selected.forEach((index) => {
+              plan[index].forceTextPrompt = true;
             });
           }
         }
@@ -1044,11 +1098,19 @@ const revealInput = document.getElementById("revealTime");
             }
             if (item.color) {
               card.style.background = item.color;
-              card.style.color = "#0f172a";
+              if (!item.textColorHex) {
+                card.style.color = "#0f172a";
+              }
             } else if (item.backgroundColorHex) {
               card.style.background = item.backgroundColorHex;
-              card.style.color = "#0f172a";
+              if (!item.textColorHex) {
+                card.style.color = "#0f172a";
+              }
               card.classList.add("background-color");
+            }
+            if (item.textColorHex) {
+              card.style.color = item.textColorHex;
+              card.classList.add("card--text-color");
             }
           } else {
             const cardLabel = `Card ${index + 1}`;

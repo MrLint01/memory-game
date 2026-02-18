@@ -60,6 +60,7 @@
       mathOps: false,
       misleadColors: false,
       backgroundColor: false,
+      textColor: false,
       swapCards: false,
       platformer: false,
       glitch: false,
@@ -115,6 +116,13 @@
         typeof modifiers.backgroundPromptMinCount === "number" ? modifiers.backgroundPromptMinCount : null,
       backgroundPromptMaxCount:
         typeof modifiers.backgroundPromptMaxCount === "number" ? modifiers.backgroundPromptMaxCount : null,
+      enableTextColor: Boolean(modifiers.textColor),
+      textColorChance: typeof modifiers.textColorChance === "number" ? modifiers.textColorChance : 0.6,
+      textPromptChance: typeof modifiers.textPromptChance === "number" ? modifiers.textPromptChance : 0.5,
+      textPromptMinCount:
+        typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
+      textPromptMaxCount:
+        typeof modifiers.textPromptMaxCount === "number" ? modifiers.textPromptMaxCount : null,
       enableGlitch: Boolean(modifiers.glitch)
     };
   };
