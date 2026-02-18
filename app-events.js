@@ -1298,23 +1298,59 @@
         switch(event.key) {
           case "ArrowUp":
             event.preventDefault();
-            activeInput.value = "↑";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "↑";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           case "ArrowDown":
             event.preventDefault();
-            activeInput.value = "↓";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "↓";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           case "ArrowLeft":
             event.preventDefault();
-            activeInput.value = "←";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "←";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           case "ArrowRight":
             event.preventDefault();
-            activeInput.value = "→";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "→";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
         }
       });

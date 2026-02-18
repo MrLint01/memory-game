@@ -359,7 +359,7 @@
       categories: ["colors", "directions"],
       modifiers: {
       },
-      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
+      starTimes: { platinum: 2.5, gold: 3, silver: 12, bronze: 20 }
     },
     {
       id: 20,
@@ -377,7 +377,7 @@
         mathOps: true,
         mathChance: 1.0
       },
-      starTimes: { platinum: 4, gold: 5, silver: 20, bronze: 30 }
+      starTimes: { platinum: 3.5, gold: 4, silver: 20, bronze: 30 }
     },
     {
       id: 21,
@@ -398,7 +398,7 @@
       name: "Stage 22",
       stageType: "tutorial",
       rounds: 3,
-      cards: 2,
+      cards: 1,
       revealSeconds: 30,
       recallSeconds: 30,
       categories: ["colors"],

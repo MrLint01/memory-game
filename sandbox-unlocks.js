@@ -9,9 +9,9 @@ window.sandboxUnlocks = {
     fruits: null
   },
   modifiers: {
-    practiceMathOps: null,
-    practiceMisleadColors: null,
-    practiceBackgroundColor: null,
+    practiceMathOps: 12,
+    practiceMisleadColors: 22,
+    practiceBackgroundColor: 16,
     practiceSwap: null,
     practicePlatformer: null,
     practiceGlitch: null,

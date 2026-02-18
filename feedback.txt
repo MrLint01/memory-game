@@ -30,3 +30,8 @@ you get data in batches
 Fill out the form is outlier.
     - 
     
+
+Color Text 
+Delete some levels in between, since 2 palytesters felt a little slow in difficulty progression. 
+Rotation Modifiers for directions. 
+For diagonal Modifier press double "arrows", like press one arrow + another. 

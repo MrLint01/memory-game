@@ -731,7 +731,16 @@ const revealInput = document.getElementById("revealTime");
         }
         if (item.category === "diagonal") {
           const normalized = expected.replace(/\s+/g, "");
-          return actual === expected || actual === normalized;
+          const compact = actual.replace(/\s+/g, "");
+          if (compact === expected || compact === normalized) return true;
+          const arrowPairs = {
+            ne: ["↑→", "→↑"],
+            nw: ["↑←", "←↑"],
+            se: ["↓→", "→↓"],
+            sw: ["↓←", "←↓"]
+          };
+          const allowed = arrowPairs[normalized];
+          return Array.isArray(allowed) && allowed.includes(compact);
         }
         if (item.category === "fruits") {
           const initial = expected.charAt(0);
