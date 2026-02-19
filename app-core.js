@@ -335,15 +335,12 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function updateCategoryControls() {
-        const disabled = gameMode !== "practice";
-        const unlocks = window.sandboxUnlocks || {};
-        const cardUnlocks = unlocks.cardTypes || {};
-        const modifierUnlocks = unlocks.modifiers || {};
-        const isStageCompleted = (requiredId) => {
-          if (!Number.isFinite(requiredId)) return false;
-          const key = String(requiredId);
-          return Boolean(window.stageCompleted && window.stageCompleted[key]);
-        };
+        const disabled =
+          gameMode !== "practice" &&
+          !(practiceModal && practiceModal.classList.contains("show"));
+        const costs = window.sandboxUnlockCosts || { cardTypes: {}, modifiers: {} };
+        const availableStars =
+          typeof window.getSandboxStarsAvailable === "function" ? window.getSandboxStarsAvailable() : 0;
         document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
           if (disabled) {
             input.disabled = true;
@@ -351,19 +348,44 @@ const revealInput = document.getElementById("revealTime");
           }
           const value = input.value;
           const id = input.id;
-          let requiredStage = null;
+          let type = null;
+          let cost = 0;
+          let unlocked = false;
           if (value && dataSets[value]) {
-            requiredStage = cardUnlocks[value];
-          } else if (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id)) {
-            requiredStage = modifierUnlocks[id];
+            type = "cardTypes";
+            cost = Number(costs.cardTypes && costs.cardTypes[value]) || 0;
+            unlocked =
+              Boolean(window.unlockSandbox) ||
+              (typeof window.isSandboxItemUnlocked === "function" && window.isSandboxItemUnlocked(type, value));
+          } else if (id && Object.prototype.hasOwnProperty.call(costs.modifiers || {}, id)) {
+            type = "modifiers";
+            cost = Number(costs.modifiers && costs.modifiers[id]) || 0;
+            unlocked =
+              Boolean(window.unlockAllModifiers) ||
+              (typeof window.isSandboxItemUnlocked === "function" && window.isSandboxItemUnlocked(type, id));
           }
-          const unlocked =
-            (value && dataSets[value] && window.unlockSandbox) ||
-            (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id) && window.unlockAllModifiers) ||
-            isStageCompleted(requiredStage);
-          input.disabled = !unlocked;
+          input.dataset.cost = Number.isFinite(cost) ? String(cost) : "0";
+          input.dataset.unlockType = type || "";
+          input.disabled = false;
+          const tile = input.nextElementSibling;
+          if (tile && tile.classList.contains("icon-tile")) {
+            let costEl = tile.querySelector(".icon-cost");
+            if (!unlocked && cost > 0) {
+              if (!costEl) {
+                costEl = document.createElement("span");
+                costEl.className = "icon-cost";
+                tile.appendChild(costEl);
+              }
+              costEl.innerHTML = `${cost}<span class="stage-star is-filled icon-cost__star">✦</span>`;
+            } else if (costEl) {
+              costEl.remove();
+            }
+          }
           if (!unlocked) {
             input.checked = false;
+            input.dataset.locked = "true";
+          } else {
+            input.dataset.locked = "";
           }
         });
         document.querySelectorAll("#practiceModal .stat-field input").forEach((input) => {

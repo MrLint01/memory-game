@@ -1,26 +1,116 @@
-window.sandboxUnlocks = {
+window.sandboxUnlockCosts = {
   cardTypes: {
-    numbers: 1,
+    numbers: 3,
     letters: 3,
-    shapes: 5,
-    directions: 6,
-    colors: 7,
-    diagonal: null,
-    fruits: null
+    shapes: 3,
+    directions: 3,
+    colors: 3,
+    diagonal: 3,
+    fruits: 3
   },
   modifiers: {
-    practiceMathOps: 12,
-    practiceMisleadColors: 22,
-    practiceBackgroundColor: 16,
-    practiceTextColor: null,
-    practicePreviousCard: null,
-    practiceSwap: null,
-    practicePlatformer: null,
-    practiceGlitch: null,
-    practiceRotate: null,
-    practiceRotatePlus: null,
-    practiceFog: null,
-    practiceBlur: null,
-    practiceAds: null
+    practiceMathOps: 3,
+    practiceMisleadColors: 3,
+    practiceBackgroundColor: 3,
+    practiceTextColor: 3,
+    practicePreviousCard: 3,
+    practiceSwap: 3,
+    practicePlatformer: 3,
+    practiceGlitch: 3,
+    practiceRotate: 3,
+    practiceRotatePlus: 3,
+    practiceFog: 3,
+    practiceBlur: 3,
+    practiceAds: 3
   }
 };
+
+(() => {
+  const unlockKey = "flashRecallSandboxUnlocks";
+
+  const emptyState = () => ({
+    cardTypes: {},
+    modifiers: {}
+  });
+
+  window.getSandboxUnlockState = function getSandboxUnlockState() {
+    try {
+      const raw = window.localStorage.getItem(unlockKey);
+      if (!raw) return emptyState();
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return emptyState();
+      return {
+        cardTypes: parsed.cardTypes || {},
+        modifiers: parsed.modifiers || {}
+      };
+    } catch {
+      return emptyState();
+    }
+  };
+
+  window.saveSandboxUnlockState = function saveSandboxUnlockState(state) {
+    try {
+      window.localStorage.setItem(unlockKey, JSON.stringify(state));
+    } catch {
+      // ignore
+    }
+  };
+
+  window.getSandboxStarsEarned = function getSandboxStarsEarned() {
+    const stars = window.stageStars || {};
+    return Object.values(stars).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  };
+
+  window.getSandboxStarsSpent = function getSandboxStarsSpent() {
+    const costs = window.sandboxUnlockCosts || { cardTypes: {}, modifiers: {} };
+    const state = window.getSandboxUnlockState ? window.getSandboxUnlockState() : emptyState();
+    let spent = 0;
+    Object.entries(state.cardTypes || {}).forEach(([key, unlocked]) => {
+      if (unlocked) {
+        spent += Number(costs.cardTypes && costs.cardTypes[key]) || 0;
+      }
+    });
+    Object.entries(state.modifiers || {}).forEach(([key, unlocked]) => {
+      if (unlocked) {
+        spent += Number(costs.modifiers && costs.modifiers[key]) || 0;
+      }
+    });
+    return spent;
+  };
+
+  window.getSandboxStarsAvailable = function getSandboxStarsAvailable() {
+    return Math.max(0, window.getSandboxStarsEarned() - window.getSandboxStarsSpent());
+  };
+
+  window.isSandboxItemUnlocked = function isSandboxItemUnlocked(type, key) {
+    const state = window.getSandboxUnlockState ? window.getSandboxUnlockState() : emptyState();
+    if (type === "cardTypes") {
+      return Boolean(state.cardTypes && state.cardTypes[key]);
+    }
+    if (type === "modifiers") {
+      return Boolean(state.modifiers && state.modifiers[key]);
+    }
+    return false;
+  };
+
+  window.unlockSandboxItem = function unlockSandboxItem(type, key) {
+    const costs = window.sandboxUnlockCosts || { cardTypes: {}, modifiers: {} };
+    const state = window.getSandboxUnlockState ? window.getSandboxUnlockState() : emptyState();
+    const cost = Number((costs[type] && costs[type][key]) || 0);
+    if (type === "cardTypes") {
+      if (state.cardTypes[key]) return true;
+      if (window.getSandboxStarsAvailable() < cost) return false;
+      state.cardTypes[key] = true;
+      window.saveSandboxUnlockState(state);
+      return true;
+    }
+    if (type === "modifiers") {
+      if (state.modifiers[key]) return true;
+      if (window.getSandboxStarsAvailable() < cost) return false;
+      state.modifiers[key] = true;
+      window.saveSandboxUnlockState(state);
+      return true;
+    }
+    return false;
+  };
+})();

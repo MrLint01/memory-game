@@ -118,7 +118,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2, gold: 6, silver: 10, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 10, bronze: 20 },
       instructions: window.stageInstructions[5] || []
     },
     {
@@ -140,7 +140,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2.5, gold: 6.5, silver: 12, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 12, bronze: 20 },
       instructions: window.stageInstructions[6] || []
     },
     {
@@ -162,7 +162,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2, gold: 6, silver: 10, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 10, bronze: 20 },
       instructions: window.stageInstructions[7] || []
     },
     {

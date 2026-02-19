@@ -146,7 +146,15 @@
     </main>
     <div class="modal" id="practiceModal" aria-hidden="true">
       <div class="modal-card modal-card--sandbox">
-        <h3>Sandbox Settings</h3>
+        <div class="sandbox-header">
+          <h3>Sandbox Settings</h3>
+          <div class="sandbox-stars" id="sandboxStars">
+            <span class="stage-star is-filled">✦</span>
+            <span class="sandbox-stars__count">
+              <span class="sandbox-stars__available">0</span>/<span class="sandbox-stars__total">0</span>
+            </span>
+          </div>
+        </div>
         <div class="controls">
           <div class="control-row settings-row">
             <div class="stat-field">
@@ -403,9 +411,9 @@
     <script src="version.js?v=20260217"></script>
     <script src="firebase-analytics.js?v=2"></script>
     <script>
-      window.unlockAllStages = true;
-      window.unlockSandbox = true;
-      window.unlockAllModifiers = true;
+      window.unlockAllStages = false;
+      window.unlockSandbox = false;
+      window.unlockAllModifiers = false;
     </script>
     <script src="ui-loader.js?v=1"></script>
   </body>
