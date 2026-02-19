@@ -56,17 +56,19 @@
   };
 
   window.getStageModifiers = function getStageModifiers(stage) {
-    const defaults = {
-      mathOps: false,
-      misleadColors: false,
-      backgroundColor: false,
-      textColor: false,
-      previousCard: false,
-      swapCards: false,
-      platformer: false,
-      glitch: false,
-      fog: false,
-      ads: false
+      const defaults = {
+        mathOps: false,
+        misleadColors: false,
+        backgroundColor: false,
+        textColor: false,
+        previousCard: false,
+        rotate: false,
+        rotatePlus: false,
+        swapCards: false,
+        platformer: false,
+        glitch: false,
+        fog: false,
+        ads: false
     };
     if (!stage || typeof stage.modifiers !== "object" || stage.modifiers === null) {
       return { ...defaults };
@@ -99,40 +101,42 @@
 
   window.getStageChallengeOptions = function getStageChallengeOptions(stage) {
     const modifiers = window.getStageModifiers(stage);
-    return {
-      enableMathOps: Boolean(modifiers.mathOps),
-      mathChance: typeof modifiers.mathChance === "number" ? modifiers.mathChance : 0.7,
-      mathMinCount: typeof modifiers.mathMinCount === "number" ? modifiers.mathMinCount : null,
-      mathMaxCount: typeof modifiers.mathMaxCount === "number" ? modifiers.mathMaxCount : null,
-      misleadColors: Boolean(modifiers.misleadColors),
-      misleadChance: typeof modifiers.misleadChance === "number" ? modifiers.misleadChance : 0.6,
-      misleadMinCount: typeof modifiers.misleadMinCount === "number" ? modifiers.misleadMinCount : null,
-      misleadMaxCount: typeof modifiers.misleadMaxCount === "number" ? modifiers.misleadMaxCount : null,
-      enableBackgroundColor: Boolean(modifiers.backgroundColor),
-      backgroundColorChance:
-        typeof modifiers.backgroundColorChance === "number" ? modifiers.backgroundColorChance : 0.35,
-      backgroundPromptChance:
-        typeof modifiers.backgroundPromptChance === "number" ? modifiers.backgroundPromptChance : 0.5,
-      backgroundPromptMinCount:
-        typeof modifiers.backgroundPromptMinCount === "number" ? modifiers.backgroundPromptMinCount : null,
-      backgroundPromptMaxCount:
-        typeof modifiers.backgroundPromptMaxCount === "number" ? modifiers.backgroundPromptMaxCount : null,
-      enableTextColor: Boolean(modifiers.textColor),
-      textColorChance: typeof modifiers.textColorChance === "number" ? modifiers.textColorChance : 0.6,
-      textPromptChance: typeof modifiers.textPromptChance === "number" ? modifiers.textPromptChance : 0.5,
-      textPromptMinCount:
-        typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
-      textPromptMaxCount:
-        typeof modifiers.textPromptMaxCount === "number" ? modifiers.textPromptMaxCount : null,
-      enablePreviousCard: Boolean(modifiers.previousCard),
-      previousCardChance: typeof modifiers.previousCardChance === "number" ? modifiers.previousCardChance : 0.5,
-      previousPromptMinCount:
-        typeof modifiers.previousPromptMinCount === "number" ? modifiers.previousPromptMinCount : null,
-      previousPromptMaxCount:
-        typeof modifiers.previousPromptMaxCount === "number" ? modifiers.previousPromptMaxCount : null,
-      enableGlitch: Boolean(modifiers.glitch)
+      return {
+        enableMathOps: Boolean(modifiers.mathOps),
+        mathChance: typeof modifiers.mathChance === "number" ? modifiers.mathChance : 0.7,
+        mathMinCount: typeof modifiers.mathMinCount === "number" ? modifiers.mathMinCount : null,
+        mathMaxCount: typeof modifiers.mathMaxCount === "number" ? modifiers.mathMaxCount : null,
+        misleadColors: Boolean(modifiers.misleadColors),
+        misleadChance: typeof modifiers.misleadChance === "number" ? modifiers.misleadChance : 0.6,
+        misleadMinCount: typeof modifiers.misleadMinCount === "number" ? modifiers.misleadMinCount : null,
+        misleadMaxCount: typeof modifiers.misleadMaxCount === "number" ? modifiers.misleadMaxCount : null,
+        enableBackgroundColor: Boolean(modifiers.backgroundColor),
+        backgroundColorChance:
+          typeof modifiers.backgroundColorChance === "number" ? modifiers.backgroundColorChance : 0.35,
+        backgroundPromptChance:
+          typeof modifiers.backgroundPromptChance === "number" ? modifiers.backgroundPromptChance : 0.5,
+        backgroundPromptMinCount:
+          typeof modifiers.backgroundPromptMinCount === "number" ? modifiers.backgroundPromptMinCount : null,
+        backgroundPromptMaxCount:
+          typeof modifiers.backgroundPromptMaxCount === "number" ? modifiers.backgroundPromptMaxCount : null,
+        enableTextColor: Boolean(modifiers.textColor),
+        textColorChance: typeof modifiers.textColorChance === "number" ? modifiers.textColorChance : 0.6,
+        textPromptChance: typeof modifiers.textPromptChance === "number" ? modifiers.textPromptChance : 0.5,
+        textPromptMinCount:
+          typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
+        textPromptMaxCount:
+          typeof modifiers.textPromptMaxCount === "number" ? modifiers.textPromptMaxCount : null,
+        enablePreviousCard: Boolean(modifiers.previousCard),
+        previousCardChance: typeof modifiers.previousCardChance === "number" ? modifiers.previousCardChance : 0.5,
+        previousPromptMinCount:
+          typeof modifiers.previousPromptMinCount === "number" ? modifiers.previousPromptMinCount : null,
+        previousPromptMaxCount:
+          typeof modifiers.previousPromptMaxCount === "number" ? modifiers.previousPromptMaxCount : null,
+        enableRotate: Boolean(modifiers.rotate),
+        enableRotatePlus: Boolean(modifiers.rotatePlus),
+        enableGlitch: Boolean(modifiers.glitch)
+      };
     };
-  };
 
   window.getStageInstructionSlides = function getStageInstructionSlides(stage) {
     if (!stage || !Array.isArray(stage.instructions)) return { slides: [], result: [] };

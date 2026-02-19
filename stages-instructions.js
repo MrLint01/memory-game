@@ -238,7 +238,7 @@
     ],
     [
       {
-        "text": "Type the shapes you saw. **SHORTCUT:** Just **first letters** counts (e.g., **C**ircle -> **C**).",
+        "text": "Type the shapes you saw. **SHORTCUT:** **First letters** counts (e.g., **C**ircle -> **C**).",
         "x": 0,
         "y": 130,
         "w": 100,
@@ -312,7 +312,7 @@
     ],
     [
       {
-        "text": "Type the directions you saw. **SHORTCUT:** Just **first letters** counts (e.g., **R**ight -> **R**).",
+        "text": "Type the directions you saw. \n**SHORTCUT:** **First letters** counts (e.g., **R**ight -> **R**). \nArrow keys (↑,↓,←,→). Cardinal directions (N,E,S,W)",
         "x": 0,
         "y": 130,
         "w": 100,
@@ -320,7 +320,7 @@
         "size": "2rem",
         "color": "#111827",
         "at": 0,
-        "duration": 6000
+        "duration": 10000
       },
       {
         "text": "Press **RETURN/ENTER** when ready.",
@@ -330,13 +330,13 @@
         "h": 0.7,
         "size": "2rem",
         "color": "#111827",
-        "at": 6500
+        "at": 10500
       }
     ],
     [],
     [
       {
-        "text": "**R**ight -> **R**, **L**eft -> **L**, **U**p -> **U**, **D**own -> **D**",
+        "text": "**R**ight -> **R**, **L**eft -> **L**, **U**p -> **U**, **D**own -> **D**. \nArrow keys (↑,↓,←,→). Cardinal directions (N,E,S,W)",
         "x": 0,
         "y": 130,
         "w": 100,
@@ -349,7 +349,7 @@
     [],
     [
       {
-        "text": "**R**ight -> **R**, **L**eft -> **L**, **U**p -> **U**, **D**own -> **D**",
+        "text": "**R**ight -> **R**, **L**eft -> **L**, **U**p -> **U**, **D**own -> **D**. \nArrow keys (↑,↓,←,→). Cardinal directions (N,E,S,W)",
         "x": 0,
         "y": 130,
         "w": 100,
@@ -386,7 +386,7 @@
     ],
     [
       {
-        "text": "Type the colors you saw. **SHORTCUT:** Just **first letter** counts (e.g., **R**ed -> **R**).",
+        "text": "Type the colors you saw. **SHORTCUT:** **First letter** counts (e.g., **R**ed -> **R**).",
         "x": 0,
         "y": 130,
         "w": 100,
@@ -515,7 +515,7 @@
     ],
     [
       {
-        "text": "Type the background colors you saw. **SHORTCUT:** Just **first letter** counts (e.g., **R**ed -> **R**).",
+        "text": "Type the background colors you saw. **SHORTCUT:** **First letter** counts (e.g., **R**ed -> **R**).",
         "x": 0,
         "y": 130,
         "w": 100,
@@ -568,7 +568,7 @@
     ],
     [
       {
-        "text": "Type the **Color Text* you saw. **SHORTCUT:** Just **first letter** counts (e.g., **R**ed -> **R**).",
+        "text": "Type the **Color Text* you saw. **SHORTCUT:** **First letter** counts (e.g., **R**ed -> **R**).",
         "x": 0,
         "y": 130,
         "w": 100,
@@ -589,6 +589,54 @@
         "at": 6500
       }
     ]
-  ]
+  ],
+  "27": [
+    [
+      {
+        "text": "**Memorize** the diagonal directions.",
+        "x": 0.1,
+        "y": 140,
+        "w": 80,
+        "h": 0.82,
+        "size": "2rem",
+        "color": "#111827",
+        "at": 0,
+        "duration": 2000
+      },
+      {
+        "text": "Press **RETURN/ENTER** when ready.",
+        "x": 0.1,
+        "y": 140,
+        "w": 80,
+        "h": 0.82,
+        "size": "2rem",
+        "color": "#111827",
+        "at": 2500
+      }
+    ],
+    [
+      {
+        "text": "Type the directions you saw **(NE, NW, SE, SW)**. Try inputting two arrow keys (e.g., ↑ + → = NE)",
+        "x": 0,
+        "y": 130,
+        "w": 100,
+        "h": 0.7,
+        "size": "2rem",
+        "color": "#111827",
+        "at": 0,
+        "duration": 6000
+      },
+      {
+        "text": "Press **RETURN/ENTER** when ready.",
+        "x": 0.1,
+        "y": 130,
+        "w": 80,
+        "h": 0.7,
+        "size": "2rem",
+        "color": "#111827",
+        "at": 6500
+      }
+    ]
+  ],
 };
 })();

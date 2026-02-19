@@ -23,6 +23,8 @@ const revealInput = document.getElementById("revealTime");
       const cardCountInput = document.getElementById("cardCount");
       const practicePlatformer = document.getElementById("practicePlatformer");
       const practiceGlitch = document.getElementById("practiceGlitch");
+      const practiceRotate = document.getElementById("practiceRotate");
+      const practiceRotatePlus = document.getElementById("practiceRotatePlus");
       const practiceFog = document.getElementById("practiceFog");
       const practiceBlur = document.getElementById("practiceBlur");
       const practiceAds = document.getElementById("practiceAds");
@@ -221,6 +223,8 @@ const revealInput = document.getElementById("revealTime");
             textPromptChance: 0.5,
             enablePreviousCard: false,
             previousCardChance: 0.5,
+            enableRotate: false,
+            enableRotatePlus: false,
             misleadMinCount: null,
             misleadMaxCount: null,
             backgroundPromptMinCount: null,
@@ -245,6 +249,8 @@ const revealInput = document.getElementById("revealTime");
           textPromptChance: 0.5,
           enablePreviousCard: practicePreviousCard.checked,
           previousCardChance: 0.5,
+          enableRotate: Boolean(practiceRotate && practiceRotate.checked),
+          enableRotatePlus: Boolean(practiceRotatePlus && practiceRotatePlus.checked),
           enableGlitch: practiceGlitch.checked
         };
       }
@@ -733,17 +739,93 @@ const revealInput = document.getElementById("revealTime");
         }
       }
 
+      function normalizeCompassKey(label) {
+        const value = String(label || "").trim().toLowerCase();
+        if (["up", "right", "down", "left"].includes(value)) return value;
+        if (["ne", "nw", "se", "sw"].includes(value)) return value;
+        return null;
+      }
+
+      function getRotatedCompassKey(baseKey, degrees, direction) {
+        const compass = ["up", "ne", "right", "se", "down", "sw", "left", "nw"];
+        const start = compass.indexOf(baseKey);
+        if (start === -1) return baseKey;
+        const steps = Math.round(degrees / 45);
+        const delta = direction === "ccw" ? -steps : steps;
+        const next = (start + delta + compass.length * 10) % compass.length;
+        return compass[next];
+      }
+
+      function formatCompassLabel(key) {
+        switch (key) {
+          case "up":
+            return "Up";
+          case "right":
+            return "Right";
+          case "down":
+            return "Down";
+          case "left":
+            return "Left";
+          case "ne":
+            return "NE";
+          case "nw":
+            return "NW";
+          case "se":
+            return "SE";
+          case "sw":
+            return "SW";
+          default:
+            return key;
+        }
+      }
+
+      function applyRotationChallenges(items, options) {
+        const enableRotate = Boolean(options && options.enableRotate);
+        const enableRotatePlus = Boolean(options && options.enableRotatePlus);
+        if (!enableRotate && !enableRotatePlus) return items;
+        const degrees = [];
+        if (enableRotate) {
+          degrees.push(45, 90, 180);
+        }
+        if (enableRotatePlus) {
+          degrees.push(135, 225, 270, 315, 360);
+        }
+        if (!degrees.length) return items;
+        return items.map((item) => {
+          if (!item || item.recallHint) return item;
+          if (item.category !== "directions" && item.category !== "diagonal") {
+            return item;
+          }
+          const baseKey = normalizeCompassKey(item.label);
+          if (!baseKey) return item;
+          const degree = degrees[Math.floor(Math.random() * degrees.length)];
+          const direction = Math.random() < 0.5 ? "cw" : "ccw";
+          const rotatedKey = getRotatedCompassKey(baseKey, degree, direction);
+          const answerLabel = formatCompassLabel(rotatedKey);
+          const answerCategory =
+            ["up", "right", "down", "left"].includes(rotatedKey) ? "directions" : "diagonal";
+          const symbol = direction === "ccw" ? "↺" : "↻";
+          return {
+            ...item,
+            answer: answerLabel,
+            answerCategory,
+            recallHint: `${degree}° ${symbol}`
+          };
+        });
+      }
+
       function isCorrectAnswer(item, actualValue) {
         if (!actualValue || !String(actualValue).trim()) {
           return false;
         }
         const actual = normalize(actualValue);
         const expected = normalize(item.answer ?? item.label);
-        if (item.category === "colors") {
+        const category = item.answerCategory || item.category;
+        if (category === "colors") {
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
-        if (item.category === "directions") {
+        if (category === "directions") {
           const initial = expected.charAt(0);
           const arrowMap = {
             up: "↑",
@@ -759,7 +841,7 @@ const revealInput = document.getElementById("revealTime");
             actual === cardinalMap[expected]
           );
         }
-        if (item.category === "diagonal") {
+        if (category === "diagonal") {
           const normalized = expected.replace(/\s+/g, "");
           const compact = actual.replace(/\s+/g, "");
           if (compact === expected || compact === normalized) return true;
@@ -770,13 +852,13 @@ const revealInput = document.getElementById("revealTime");
             sw: ["↓←", "←↓"]
           };
           const allowed = arrowPairs[normalized];
-          return Array.isArray(allowed) && allowed.includes(compact);
+            return Array.isArray(allowed) && allowed.includes(compact);
         }
-        if (item.category === "fruits") {
+        if (category === "fruits") {
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
-        if (item.category === "shapes") {
+        if (category === "shapes") {
           if (expected === "square") {
             return actual === "square" || actual === "s" || actual === "rectangle" || actual === "r";
           }
@@ -1112,7 +1194,8 @@ const revealInput = document.getElementById("revealTime");
         }
         const plan = planModifierAssignments(chosen, options);
         const built = chosen.map((item, index) => buildChallenge(item, options, plan[index]));
-        return applyNumberChallenges(built, options);
+        const rotated = applyRotationChallenges(built, options);
+        return applyNumberChallenges(rotated, options);
       }
 
 
@@ -1178,9 +1261,12 @@ const revealInput = document.getElementById("revealTime");
             const cardLabel = `Card ${index + 1}`;
             const categoryLabel = formatCategoryLabel(item.category);
             if (item.recallHint) {
+              const hintHtml = String(item.recallHint)
+                .replace(/↻/g, '<span class="rotation-icon">↻</span>')
+                .replace(/↺/g, '<span class="rotation-icon">↺</span>');
               card.innerHTML = `
                 <small>${cardLabel}</small>
-                <span>${item.recallHint}</span>
+                <span>${hintHtml}</span>
               `;
             } else {
               card.innerHTML = `

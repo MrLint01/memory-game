@@ -17,6 +17,8 @@ window.sandboxUnlocks = {
     practiceSwap: null,
     practicePlatformer: null,
     practiceGlitch: null,
+    practiceRotate: null,
+    practiceRotatePlus: null,
     practiceFog: null,
     practiceBlur: null,
     practiceAds: null

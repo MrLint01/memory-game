@@ -1276,10 +1276,19 @@ body[data-state="paused"] .hud-pause {
         font-family: "Courier New", "Lucida Console", monospace;
         font-weight: 600;
         text-shadow: none;
+        grid-template-rows: minmax(1.1rem, auto) minmax(1.6rem, auto);
+        align-content: center;
+        justify-items: center;
+        row-gap: 0.35rem;
+        place-items: initial;
       }
       .hidden-card span {
         font-size: 1rem;
         letter-spacing: 0.06em;
+        min-height: 1.6rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
       .glitch {
         position: relative;
@@ -2526,6 +2535,24 @@ body.pause-active .interrupt-close {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.rotation-icon {
+  font-size: 1em;
+  line-height: 1;
+  display: inline-block;
+  transform: scale(1.8);
+  transform-origin: center;
+  vertical-align: -0.05em;
+  margin-left: 0.3em;
+}
+.hidden-card .rotation-icon {
+  font-size: 1em;
+  line-height: 1;
+  transform: scale(2.2);
+  margin-left: 0.34em;
+}
+body.stage-fail .rotation-icon {
+  transform: scale(2.2);
 }
 .direction-arrow {
   width: 64px;

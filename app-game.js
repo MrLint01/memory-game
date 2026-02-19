@@ -268,9 +268,12 @@
           entries.forEach((entry) => {
             const prompt = document.createElement("div");
             prompt.className = "card hidden-card hint";
+            const hintHtml = String(entry.expected.label || "")
+              .replace(/↻/g, '<span class="rotation-icon">↻</span>')
+              .replace(/↺/g, '<span class="rotation-icon">↺</span>');
             prompt.innerHTML = `
               <small>Card ${entry.displayIndex}</small>
-              <span>${entry.expected.label}</span>
+              <span>${hintHtml}</span>
             `;
             promptGrid.appendChild(prompt);
           });
