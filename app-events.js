@@ -1249,9 +1249,10 @@
           const cost = Number(target.dataset.cost || 0);
           const isLocked = target.dataset.locked === "true";
           if (target.checked && isLocked && unlockType) {
+            const unlockKey = unlockType === "modifiers" ? target.id : target.value;
             const unlocked =
               typeof window.unlockSandboxItem === "function"
-                ? window.unlockSandboxItem(unlockType, target.value || target.id)
+                ? window.unlockSandboxItem(unlockType, unlockKey)
                 : false;
             if (!unlocked) {
               target.checked = false;
