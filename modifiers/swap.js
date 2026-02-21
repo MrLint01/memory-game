@@ -10,10 +10,7 @@
             pairs.push([i, j]);
           }
         }
-        const pick = Math.floor(Math.random() * (pairs.length + 1));
-        if (pick >= pairs.length) {
-          return null;
-        }
+        const pick = Math.floor(Math.random() * pairs.length);
         return pairs[pick];
       }
 
