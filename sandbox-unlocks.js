@@ -1,27 +1,27 @@
 window.sandboxUnlockCosts = {
   cardTypes: {
-    numbers: 3,
-    letters: 3,
-    shapes: 3,
-    directions: 3,
-    colors: 3,
-    diagonal: 3,
-    fruits: 3
+    numbers: 9,
+    letters: 9,
+    shapes: 9,
+    directions: 9,
+    colors: 15,
+    diagonal: 15,
+    fruits: 100
   },
   modifiers: {
-    practiceMathOps: 3,
-    practiceMisleadColors: 3,
-    practiceBackgroundColor: 3,
-    practiceTextColor: 3,
-    practicePreviousCard: 3,
-    practiceSwap: 3,
-    practicePlatformer: 3,
-    practiceGlitch: 3,
-    practiceRotate: 3,
-    practiceRotatePlus: 3,
-    practiceFog: 3,
-    practiceBlur: 3,
-    practiceAds: 3
+    practiceMathOps: 15,
+    practiceMisleadColors: 15,
+    practiceBackgroundColor: 15,
+    practiceTextColor: 15,
+    practicePreviousCard: 60,
+    practiceSwap: 45,
+    practicePlatformer: 100,
+    practiceGlitch: 15,
+    practiceRotate: 30,
+    practiceRotatePlus: 60,
+    practiceFog: 30,
+    practiceBlur: 60,
+    practiceAds: 45
   }
 };
 

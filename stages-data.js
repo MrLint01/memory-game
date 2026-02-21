@@ -525,9 +525,13 @@
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
-      modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["diagonal", "directions"],
+      modifiers: {
+        backgroundColor: true,
+        backgroundColorChance: 0.7,
+        backgroundPromptChance: 0.5,
+      },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 31,

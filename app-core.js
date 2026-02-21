@@ -863,6 +863,10 @@ const revealInput = document.getElementById("revealTime");
         const actual = normalize(actualValue);
         const expected = normalize(item.answer ?? item.label);
         const category = item.answerCategory || item.category;
+        if (item.recallHint === "Background color" || item.recallHint === "Text color") {
+          const initial = expected.charAt(0);
+          return actual === expected || actual === initial;
+        }
         if (category === "colors") {
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
@@ -904,14 +908,6 @@ const revealInput = document.getElementById("revealTime");
           if (expected === "square") {
             return actual === "square" || actual === "s" || actual === "rectangle" || actual === "r";
           }
-          const initial = expected.charAt(0);
-          return actual === expected || actual === initial;
-        }
-        if (item.recallHint === "Background color") {
-          const initial = expected.charAt(0);
-          return actual === expected || actual === initial;
-        }
-        if (item.recallHint === "Text color") {
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
