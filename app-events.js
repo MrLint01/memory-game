@@ -26,6 +26,9 @@
           cancelSuccessAnimation();
         }
         clearFlashCountdown();
+        if (typeof window.clearPreviousRoundItems === "function") {
+          window.clearPreviousRoundItems();
+        }
         clearInterval(timerId);
         timerId = null;
         if (stageTimerId) {
@@ -76,6 +79,9 @@
           cancelSuccessAnimation();
         }
         clearFlashCountdown();
+        if (typeof window.clearPreviousRoundItems === "function") {
+          window.clearPreviousRoundItems();
+        }
         clearInterval(timerId);
         timerId = null;
         document.body.classList.remove("stage-fail");
@@ -108,6 +114,23 @@
 
       function openPracticeModal() {
         setModalState(practiceModal, true);
+        const starsEl = document.getElementById("sandboxStars");
+        if (
+          starsEl &&
+          typeof window.getSandboxStarsAvailable === "function" &&
+          typeof window.getSandboxStarsEarned === "function"
+        ) {
+          const availableEl = starsEl.querySelector(".sandbox-stars__available");
+          const totalEl = starsEl.querySelector(".sandbox-stars__total");
+          const available = window.getSandboxStarsAvailable();
+          const total = window.getSandboxStarsEarned();
+          if (availableEl && totalEl) {
+            availableEl.textContent = String(available);
+            totalEl.textContent = String(total);
+          } else {
+            starsEl.textContent = `✦ ${available}/${total}`;
+          }
+        }
         updateCategoryControls();
       }
 
@@ -141,6 +164,10 @@
           { key: "mathOps", label: "Math ops" },
           { key: "misleadColors", label: "Misleading colors" },
           { key: "backgroundColor", label: "Background color" },
+          { key: "textColor", label: "Text color" },
+          { key: "previousCard", label: "Previous card" },
+          { key: "rotate", label: "Rotate" },
+          { key: "rotatePlus", label: "Rotate+" },
           { key: "swapCards", label: "Card swap" },
           { key: "platformer", label: "Platformer" },
           { key: "glitch", label: "Glitch" },
@@ -375,6 +402,10 @@
           mathOps: { label: "Math ops", src: "imgs/icons/mod-mathops.svg" },
           misleadColors: { label: "Mislead", src: "imgs/icons/mod-misleadcolors.svg" },
           backgroundColor: { label: "Background", src: "imgs/icons/mod-backgroundcolor.svg" },
+          textColor: { label: "Text color", src: "imgs/icons/mod-textcolor.svg" },
+          previousCard: { label: "Previous", src: "imgs/icons/mod-previouscard.svg" },
+          rotate: { label: "Rotate", src: "imgs/icons/mod-rotate.svg" },
+          rotatePlus: { label: "Rotate+", src: "imgs/icons/mod-rotateplus.svg" },
           swapCards: { label: "Swap", src: "imgs/icons/mod-swapcards.svg" },
           platformer: { label: "Platformer", src: "imgs/icons/mod-platformer.svg" },
           glitch: { label: "Glitch", inlineSvg: glitchSvg },
@@ -441,20 +472,41 @@
         if (window.lockAllStagesExceptFirst) return stageIndex === 0;
         // Stage 1 (first stage) is always unlocked
         if (stageIndex === 0) return true;
-        
-        // Check if previous stage has been completed
+
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
-        const prevStage = stages[stageIndex - 1];
-        if (!prevStage) return false;
-        
-        const prevStageKey = prevStage && prevStage.id ? String(prevStage.id) : String(stageIndex);
-        
-        // Initialize stageCompleted object if it doesn't exist
+        if (!stages.length) return false;
         if (!window.stageCompleted) {
           window.stageCompleted = {};
         }
-        
-        return window.stageCompleted[prevStageKey] === true;
+
+        // If the previous stage is completed, keep it unlocked (default progression).
+        const prevStage = stages[stageIndex - 1];
+        if (prevStage) {
+          const prevStageKey = prevStage && prevStage.id ? String(prevStage.id) : String(stageIndex);
+          if (window.stageCompleted[prevStageKey] === true) {
+            return true;
+          }
+        }
+
+        // Tutorial unlock rule:
+        // completing a tutorial stage unlocks all stages up to and including the next tutorial stage.
+        const tutorialIndices = stages
+          .map((stage, index) => (String(stage.stageType).toLowerCase() === "tutorial" ? index : null))
+          .filter((index) => Number.isFinite(index));
+        if (!tutorialIndices.length) return false;
+
+        for (let i = 0; i < tutorialIndices.length; i += 1) {
+          const tIndex = tutorialIndices[i];
+          const tutorialStage = stages[tIndex];
+          const tutorialKey = tutorialStage && tutorialStage.id ? String(tutorialStage.id) : String(tIndex + 1);
+          if (!window.stageCompleted[tutorialKey]) continue;
+          const nextTutorialIndex = tutorialIndices[i + 1] ?? stages.length - 1;
+          if (stageIndex > tIndex && stageIndex <= nextTutorialIndex) {
+            return true;
+          }
+        }
+
+        return false;
       }
 
       function renderStageList(animate = false) {
@@ -1020,6 +1072,7 @@
           document
             .querySelectorAll("#practiceModal .control-group .checkboxes input[type=\"checkbox\"]")
             .forEach((input) => {
+              if (input.dataset.locked === "true") return;
               input.checked = true;
             });
         });
@@ -1190,8 +1243,57 @@
       if (practiceModal) {
         practiceModal.addEventListener("change", (event) => {
           const target = event.target;
-          if (!(target && target.matches("input[type=\"checkbox\"][value]"))) return;
+          if (!(target && target.matches("input[type=\"checkbox\"]"))) return;
           const error = document.getElementById("practiceTypeError");
+          const unlockType = target.dataset.unlockType;
+          const cost = Number(target.dataset.cost || 0);
+          const isLocked = target.dataset.locked === "true";
+          if (target.checked && isLocked && unlockType) {
+            const unlockKey = unlockType === "modifiers" ? target.id : target.value;
+            const unlocked =
+              typeof window.unlockSandboxItem === "function"
+                ? window.unlockSandboxItem(unlockType, unlockKey)
+                : false;
+            if (!unlocked) {
+              target.checked = false;
+              if (error) {
+                error.textContent = `Need ${cost} stars to unlock.`;
+                error.hidden = false;
+                error.classList.remove("show");
+                void error.offsetWidth;
+                error.classList.add("show");
+                if (error.dataset.hideTimer) {
+                  clearTimeout(Number(error.dataset.hideTimer));
+                }
+                const timerId = window.setTimeout(() => {
+                  error.hidden = true;
+                  error.classList.remove("show");
+                  error.dataset.hideTimer = "";
+                  error.textContent = "Select at least one card type to start Sandbox.";
+                }, 2000);
+                error.dataset.hideTimer = String(timerId);
+              }
+              return;
+            }
+            updateCategoryControls();
+            const starsEl = document.getElementById("sandboxStars");
+            if (
+              starsEl &&
+              typeof window.getSandboxStarsAvailable === "function" &&
+              typeof window.getSandboxStarsEarned === "function"
+            ) {
+              const availableEl = starsEl.querySelector(".sandbox-stars__available");
+              const totalEl = starsEl.querySelector(".sandbox-stars__total");
+              const available = window.getSandboxStarsAvailable();
+              const total = window.getSandboxStarsEarned();
+              if (availableEl && totalEl) {
+                availableEl.textContent = String(available);
+                totalEl.textContent = String(total);
+              } else {
+                starsEl.textContent = `✦ ${available}/${total}`;
+              }
+            }
+          }
           if (!error) return;
           const anyChecked = Array.from(
             practiceModal.querySelectorAll(".control-group .checkboxes input[type=\"checkbox\"][value]")
@@ -1298,23 +1400,59 @@
         switch(event.key) {
           case "ArrowUp":
             event.preventDefault();
-            activeInput.value = "↑";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "↑";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           case "ArrowDown":
             event.preventDefault();
-            activeInput.value = "↓";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "↓";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           case "ArrowLeft":
             event.preventDefault();
-            activeInput.value = "←";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "←";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           case "ArrowRight":
             event.preventDefault();
-            activeInput.value = "→";
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            if (activeInput) {
+              const nextArrow = "→";
+              const current = String(activeInput.value || "").trim();
+              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              if (isArrowSeq && current.length === 1) {
+                activeInput.value = current + nextArrow;
+              } else {
+                activeInput.value = nextArrow;
+              }
+              activeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
         }
       });
@@ -1717,4 +1855,3 @@
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-

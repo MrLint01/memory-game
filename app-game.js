@@ -268,9 +268,12 @@
           entries.forEach((entry) => {
             const prompt = document.createElement("div");
             prompt.className = "card hidden-card hint";
+            const hintHtml = String(entry.expected.label || "")
+              .replace(/↻/g, '<span class="rotation-icon">↻</span>')
+              .replace(/↺/g, '<span class="rotation-icon">↺</span>');
             prompt.innerHTML = `
               <small>Card ${entry.displayIndex}</small>
-              <span>${entry.expected.label}</span>
+              <span>${hintHtml}</span>
             `;
             promptGrid.appendChild(prompt);
           });
@@ -586,11 +589,19 @@
                 level_number: stageState.index + 1
               });
             }
+            if (typeof window.setPreviousRoundItems === "function") {
+              const ordered = swapMap ? swapMap.map((idx) => roundItems[idx]) : roundItems;
+              window.setPreviousRoundItems(ordered);
+            }
             startRound();
             return;
           }
           streak += 1;
           updateScore();
+          if (typeof window.setPreviousRoundItems === "function") {
+            const ordered = swapMap ? swapMap.map((idx) => roundItems[idx]) : roundItems;
+            window.setPreviousRoundItems(ordered);
+          }
           startRound();
           return;
         }
@@ -769,6 +780,9 @@
             swapActive = true;
           }
         }
+        if (swapActive && typeof window.applyPreviousCardSwap === "function") {
+          window.applyPreviousCardSwap(swapMap);
+        }
         if (timerFill) {
           timerFill.style.width = "100%";
         }
@@ -915,4 +929,3 @@
           beginRecallPhase();
         });
       }
-

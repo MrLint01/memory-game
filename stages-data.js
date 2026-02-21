@@ -118,7 +118,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2, gold: 6, silver: 10, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 10, bronze: 20 },
       instructions: window.stageInstructions[5] || []
     },
     {
@@ -140,7 +140,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2.5, gold: 6.5, silver: 12, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 12, bronze: 20 },
       instructions: window.stageInstructions[6] || []
     },
     {
@@ -162,7 +162,7 @@
         fog: false,
         ads: false
       },
-      starTimes: { platinum: 2, gold: 6, silver: 10, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 10, bronze: 20 },
       instructions: window.stageInstructions[7] || []
     },
     {
@@ -356,10 +356,10 @@
       cards: 1,
       revealSeconds: 0.1,
       recallSeconds: 30,
-      categories: ["colors", "directions"],
+      categories: ["shapes", "directions"],
       modifiers: {
       },
-      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
+      starTimes: { platinum: 2.5, gold: 3, silver: 12, bronze: 20 }
     },
     {
       id: 20,
@@ -377,7 +377,7 @@
         mathOps: true,
         mathChance: 1.0
       },
-      starTimes: { platinum: 4, gold: 5, silver: 20, bronze: 30 }
+      starTimes: { platinum: 3.5, gold: 4, silver: 20, bronze: 30 }
     },
     {
       id: 21,
@@ -387,7 +387,7 @@
       cards: 1,
       revealSeconds: 0.1,
       recallSeconds: 30,
-      categories: ["colors"],
+      categories: ["colors", "directions", "colors"],
       modifiers: {
       },
       starTimes: { platinum: 2, gold: 3, silver: 15, bronze: 20 },
@@ -398,7 +398,7 @@
       name: "Stage 22",
       stageType: "tutorial",
       rounds: 3,
-      cards: 2,
+      cards: 1,
       revealSeconds: 30,
       recallSeconds: 30,
       categories: ["colors"],
@@ -406,67 +406,89 @@
         misleadColors: true,
         misleadChance: 1.0
       },
-      starTimes: { platinum: 2.8, gold: 3.5, silver: 15, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 15, bronze: 20 },
     },
     {
       id: 23,
       name: "Stage 23",
       stageType: "memory",
       rounds: 3,
-      cards: 2,
+      cards: 1,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
-      modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: {
+        misleadColors: true,
+        misleadChance: 1.0,
+        backgroundColor: true,
+        backgroundColorChance: 0.7,
+        backgroundPromptChance: 0.5,
+      },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 24,
       name: "Stage 24",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
-      modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: {
+        misleadColors: true,
+        misleadChance: 1.0,
+        backgroundColor: true,
+        backgroundColorChance: 0.7,
+        backgroundPromptChance: 0.5,
+      },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 25,
       name: "Stage 25",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.1,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
-      modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: {
+        misleadColors: true,
+        misleadChance: 1.0,
+        backgroundColor: true,
+        backgroundColorChance: 0.7,
+        backgroundPromptChance: 0.5,
+      },
+      starTimes: { platinum: 2.5, gold: 3, silver: 12, bronze: 20 }
     },
     {
       id: 26,
       name: "Stage 26",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
-      modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      modifiers: {
+        mathOps: true,
+        mathChance: 1.0
+      },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 27,
       name: "Stage 27",
-      stageType: "memory",
+      stageType: "tutorial",
       rounds: 3,
-      cards: 2,
+      cards: 1,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
+      categories: ["diagonal"],
       modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 },
+      instructions: window.stageInstructions[27] || []
     },
     {
       id: 28,
@@ -476,21 +498,24 @@
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
+      categories: ["directions", "diagonal"],
       modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 29,
       name: "Stage 29",
       stageType: "memory",
       rounds: 3,
-      cards: 2,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes"],
-      modifiers: {},
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes", "diagonal"],
+      modifiers: {
+        mathOps: true,
+        mathChance: 0.5
+      },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 30,

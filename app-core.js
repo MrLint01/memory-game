@@ -23,6 +23,8 @@ const revealInput = document.getElementById("revealTime");
       const cardCountInput = document.getElementById("cardCount");
       const practicePlatformer = document.getElementById("practicePlatformer");
       const practiceGlitch = document.getElementById("practiceGlitch");
+      const practiceRotate = document.getElementById("practiceRotate");
+      const practiceRotatePlus = document.getElementById("practiceRotatePlus");
       const practiceFog = document.getElementById("practiceFog");
       const practiceBlur = document.getElementById("practiceBlur");
       const practiceAds = document.getElementById("practiceAds");
@@ -44,6 +46,8 @@ const revealInput = document.getElementById("revealTime");
       const practiceMathOps = document.getElementById("practiceMathOps");
       const practiceMisleadColors = document.getElementById("practiceMisleadColors");
       const practiceBackgroundColor = document.getElementById("practiceBackgroundColor");
+      const practiceTextColor = document.getElementById("practiceTextColor");
+      const practicePreviousCard = document.getElementById("practicePreviousCard");
       const settingsOpen = document.getElementById("settingsOpen");
       const statsOpen = document.getElementById("statsOpen");
       const settingsModal = document.getElementById("settingsModal");
@@ -189,6 +193,20 @@ const revealInput = document.getElementById("revealTime");
       window.getCurrentGameMode = function getCurrentGameMode() {
         return gameMode;
       };
+      window.applyPreviousCardSwap = function applyPreviousCardSwap(map) {
+        const previousRoundItems =
+          typeof window.getPreviousRoundItems === "function" ? window.getPreviousRoundItems() : null;
+        if (!Array.isArray(map) || !Array.isArray(previousRoundItems) || !previousRoundItems.length) {
+          return;
+        }
+        map.forEach((mappedIndex) => {
+          const item = roundItems[mappedIndex];
+          if (!item || item.recallHint !== "Previous card") return;
+          const prevItem = previousRoundItems[mappedIndex];
+          if (!prevItem) return;
+          item.answer = prevItem.textLabel || prevItem.label || prevItem.answer || "";
+        });
+      };
       function getSelectedCategories() {
         return Array.from(document.querySelectorAll(".checkboxes input:checked"))
           .map((checkbox) => checkbox.value)
@@ -220,10 +238,21 @@ const revealInput = document.getElementById("revealTime");
             enableBackgroundColor: false,
             backgroundColorChance: 0.35,
             backgroundPromptChance: 0.5,
+            enableTextColor: false,
+            textColorChance: 0.6,
+            textPromptChance: 0.5,
+            enablePreviousCard: false,
+            previousCardChance: 0.5,
+            enableRotate: false,
+            enableRotatePlus: false,
             misleadMinCount: null,
             misleadMaxCount: null,
             backgroundPromptMinCount: null,
             backgroundPromptMaxCount: null,
+            textPromptMinCount: null,
+            textPromptMaxCount: null,
+            previousPromptMinCount: null,
+            previousPromptMaxCount: null,
             enableGlitch: false
           };
         }
@@ -235,6 +264,13 @@ const revealInput = document.getElementById("revealTime");
           enableBackgroundColor: practiceBackgroundColor.checked,
           backgroundColorChance: clamp(Number(practiceBackgroundChance && practiceBackgroundChance.value) || 0.35, 0, 1),
           backgroundPromptChance: 0.5,
+          enableTextColor: practiceTextColor.checked,
+          textColorChance: 0.6,
+          textPromptChance: 0.5,
+          enablePreviousCard: practicePreviousCard.checked,
+          previousCardChance: 0.5,
+          enableRotate: Boolean(practiceRotate && practiceRotate.checked),
+          enableRotatePlus: Boolean(practiceRotatePlus && practiceRotatePlus.checked),
           enableGlitch: practiceGlitch.checked
         };
       }
@@ -319,15 +355,12 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function updateCategoryControls() {
-        const disabled = gameMode !== "practice";
-        const unlocks = window.sandboxUnlocks || {};
-        const cardUnlocks = unlocks.cardTypes || {};
-        const modifierUnlocks = unlocks.modifiers || {};
-        const isStageCompleted = (requiredId) => {
-          if (!Number.isFinite(requiredId)) return false;
-          const key = String(requiredId);
-          return Boolean(window.stageCompleted && window.stageCompleted[key]);
-        };
+        const disabled =
+          gameMode !== "practice" &&
+          !(practiceModal && practiceModal.classList.contains("show"));
+        const costs = window.sandboxUnlockCosts || { cardTypes: {}, modifiers: {} };
+        const availableStars =
+          typeof window.getSandboxStarsAvailable === "function" ? window.getSandboxStarsAvailable() : 0;
         document.querySelectorAll("#practiceModal .checkboxes input").forEach((input) => {
           if (disabled) {
             input.disabled = true;
@@ -335,19 +368,44 @@ const revealInput = document.getElementById("revealTime");
           }
           const value = input.value;
           const id = input.id;
-          let requiredStage = null;
+          let type = null;
+          let cost = 0;
+          let unlocked = false;
           if (value && dataSets[value]) {
-            requiredStage = cardUnlocks[value];
-          } else if (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id)) {
-            requiredStage = modifierUnlocks[id];
+            type = "cardTypes";
+            cost = Number(costs.cardTypes && costs.cardTypes[value]) || 0;
+            unlocked =
+              Boolean(window.unlockSandbox) ||
+              (typeof window.isSandboxItemUnlocked === "function" && window.isSandboxItemUnlocked(type, value));
+          } else if (id && Object.prototype.hasOwnProperty.call(costs.modifiers || {}, id)) {
+            type = "modifiers";
+            cost = Number(costs.modifiers && costs.modifiers[id]) || 0;
+            unlocked =
+              Boolean(window.unlockAllModifiers) ||
+              (typeof window.isSandboxItemUnlocked === "function" && window.isSandboxItemUnlocked(type, id));
           }
-          const unlocked =
-            (value && dataSets[value] && window.unlockSandbox) ||
-            (id && Object.prototype.hasOwnProperty.call(modifierUnlocks, id) && window.unlockAllModifiers) ||
-            isStageCompleted(requiredStage);
-          input.disabled = !unlocked;
+          input.dataset.cost = Number.isFinite(cost) ? String(cost) : "0";
+          input.dataset.unlockType = type || "";
+          input.disabled = false;
+          const tile = input.nextElementSibling;
+          if (tile && tile.classList.contains("icon-tile")) {
+            let costEl = tile.querySelector(".icon-cost");
+            if (!unlocked && cost > 0) {
+              if (!costEl) {
+                costEl = document.createElement("span");
+                costEl.className = "icon-cost";
+                tile.appendChild(costEl);
+              }
+              costEl.innerHTML = `${cost}<span class="stage-star is-filled icon-cost__star">✦</span>`;
+            } else if (costEl) {
+              costEl.remove();
+            }
+          }
           if (!unlocked) {
             input.checked = false;
+            input.dataset.locked = "true";
+          } else {
+            input.dataset.locked = "";
           }
         });
         document.querySelectorAll("#practiceModal .stat-field input").forEach((input) => {
@@ -723,17 +781,93 @@ const revealInput = document.getElementById("revealTime");
         }
       }
 
+      function normalizeCompassKey(label) {
+        const value = String(label || "").trim().toLowerCase();
+        if (["up", "right", "down", "left"].includes(value)) return value;
+        if (["ne", "nw", "se", "sw"].includes(value)) return value;
+        return null;
+      }
+
+      function getRotatedCompassKey(baseKey, degrees, direction) {
+        const compass = ["up", "ne", "right", "se", "down", "sw", "left", "nw"];
+        const start = compass.indexOf(baseKey);
+        if (start === -1) return baseKey;
+        const steps = Math.round(degrees / 45);
+        const delta = direction === "ccw" ? -steps : steps;
+        const next = (start + delta + compass.length * 10) % compass.length;
+        return compass[next];
+      }
+
+      function formatCompassLabel(key) {
+        switch (key) {
+          case "up":
+            return "Up";
+          case "right":
+            return "Right";
+          case "down":
+            return "Down";
+          case "left":
+            return "Left";
+          case "ne":
+            return "NE";
+          case "nw":
+            return "NW";
+          case "se":
+            return "SE";
+          case "sw":
+            return "SW";
+          default:
+            return key;
+        }
+      }
+
+      function applyRotationChallenges(items, options) {
+        const enableRotate = Boolean(options && options.enableRotate);
+        const enableRotatePlus = Boolean(options && options.enableRotatePlus);
+        if (!enableRotate && !enableRotatePlus) return items;
+        const degrees = [];
+        if (enableRotate) {
+          degrees.push(45, 90, 180);
+        }
+        if (enableRotatePlus) {
+          degrees.push(135, 225, 270, 315, 360);
+        }
+        if (!degrees.length) return items;
+        return items.map((item) => {
+          if (!item || item.recallHint) return item;
+          if (item.category !== "directions" && item.category !== "diagonal") {
+            return item;
+          }
+          const baseKey = normalizeCompassKey(item.label);
+          if (!baseKey) return item;
+          const degree = degrees[Math.floor(Math.random() * degrees.length)];
+          const direction = Math.random() < 0.5 ? "cw" : "ccw";
+          const rotatedKey = getRotatedCompassKey(baseKey, degree, direction);
+          const answerLabel = formatCompassLabel(rotatedKey);
+          const answerCategory =
+            ["up", "right", "down", "left"].includes(rotatedKey) ? "directions" : "diagonal";
+          const symbol = direction === "ccw" ? "↺" : "↻";
+          return {
+            ...item,
+            answer: answerLabel,
+            answerCategory,
+            recallHint: `${degree}° ${symbol}`
+          };
+        });
+      }
+
       function isCorrectAnswer(item, actualValue) {
         if (!actualValue || !String(actualValue).trim()) {
           return false;
         }
         const actual = normalize(actualValue);
         const expected = normalize(item.answer ?? item.label);
-        if (item.category === "colors") {
+        const category = item.answerCategory || item.category;
+        if (category === "colors") {
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
-        if (item.category === "directions") {
+        if (category === "directions") {
           const initial = expected.charAt(0);
           const arrowMap = {
             up: "↑",
@@ -749,15 +883,24 @@ const revealInput = document.getElementById("revealTime");
             actual === cardinalMap[expected]
           );
         }
-        if (item.category === "diagonal") {
+        if (category === "diagonal") {
           const normalized = expected.replace(/\s+/g, "");
-          return actual === expected || actual === normalized;
+          const compact = actual.replace(/\s+/g, "");
+          if (compact === expected || compact === normalized) return true;
+          const arrowPairs = {
+            ne: ["↑→", "→↑"],
+            nw: ["↑←", "←↑"],
+            se: ["↓→", "→↓"],
+            sw: ["↓←", "←↓"]
+          };
+          const allowed = arrowPairs[normalized];
+            return Array.isArray(allowed) && allowed.includes(compact);
         }
-        if (item.category === "fruits") {
+        if (category === "fruits") {
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
-        if (item.category === "shapes") {
+        if (category === "shapes") {
           if (expected === "square") {
             return actual === "square" || actual === "s" || actual === "rectangle" || actual === "r";
           }
@@ -765,6 +908,10 @@ const revealInput = document.getElementById("revealTime");
           return actual === expected || actual === initial;
         }
         if (item.recallHint === "Background color") {
+          const initial = expected.charAt(0);
+          return actual === expected || actual === initial;
+        }
+        if (item.recallHint === "Text color") {
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
@@ -779,8 +926,47 @@ const revealInput = document.getElementById("revealTime");
           textLabel: null,
           colorTarget: null,
           backgroundColorLabel: null,
-          backgroundColorHex: null
+          backgroundColorHex: null,
+          textColorLabel: null,
+          textColorHex: null
         };
+        const previousRoundItems =
+          typeof window.getPreviousRoundItems === "function" ? window.getPreviousRoundItems() : null;
+        if (
+          options &&
+          options.enablePreviousCard &&
+          Array.isArray(previousRoundItems) &&
+          previousRoundItems.length > 0
+        ) {
+          const usePlan = Boolean(options._usePreviousPromptPlan);
+          const usePrevious = usePlan
+            ? plan.forcePreviousPrompt
+            : plan.forcePreviousPrompt || Math.random() < (Number(options.previousCardChance) || 0);
+          const previousItem = previousRoundItems[plan.positionIndex];
+          if (usePrevious && previousItem) {
+            challenge.answer = previousItem.textLabel || previousItem.label || previousItem.answer || "";
+            challenge.recallHint = "Previous card";
+          }
+        }
+        const canUseTextColor = ["numbers", "letters", "colors"].includes(item.category);
+        const applyTextColor =
+          Boolean(options && options.enableTextColor) &&
+          canUseTextColor &&
+          (plan.forceTextPrompt || Math.random() < (Number(options.textColorChance) || 0));
+        if (applyTextColor) {
+          const textColor = pickTextColor();
+          challenge.textColorLabel = textColor.label;
+          challenge.textColorHex = textColor.color;
+          const promptChance =
+            typeof options.textPromptChance === "number" ? options.textPromptChance : 0.5;
+          const shouldPrompt = options._useTextPromptPlan
+            ? plan.forceTextPrompt
+            : plan.forceTextPrompt || Math.random() < promptChance;
+          if (shouldPrompt) {
+            challenge.answer = textColor.label;
+            challenge.recallHint = "Text color";
+          }
+        }
         if (item.category === "colors") {
           if (options.misleadColors) {
             const usePlan = Boolean(options._useMisleadPlan);
@@ -809,12 +995,14 @@ const revealInput = document.getElementById("revealTime");
           } else {
             challenge.colorTarget = "text";
           }
-          if (challenge.colorTarget === "background") {
-            challenge.answer = challenge.label;
-            challenge.recallHint = "Background color";
-          } else {
-            challenge.answer = challenge.textLabel;
-            challenge.recallHint = "Color text";
+          if (challenge.recallHint !== "Text color" && challenge.recallHint !== "Previous card") {
+            if (challenge.colorTarget === "background") {
+              challenge.answer = challenge.label;
+              challenge.recallHint = "Background color";
+            } else {
+              challenge.answer = challenge.textLabel;
+              challenge.recallHint = "Text";
+            }
           }
         } else if (options.enableBackgroundColor) {
           const bgChance =
@@ -829,7 +1017,11 @@ const revealInput = document.getElementById("revealTime");
             const shouldPrompt = usePromptPlan
               ? plan.forceBackgroundPrompt
               : plan.forceBackgroundPrompt || Math.random() < promptChance;
-            if (shouldPrompt) {
+            if (
+              shouldPrompt &&
+              challenge.recallHint !== "Text color" &&
+              challenge.recallHint !== "Previous card"
+            ) {
               challenge.answer = backgroundColor.label;
               challenge.recallHint = "Background color";
             }
@@ -877,7 +1069,16 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function planModifierAssignments(items, options) {
-        const plan = items.map(() => ({ forceMislead: false, forceBackgroundPrompt: false }));
+        const plan = items.map(() => ({
+          forceMislead: false,
+          forceBackgroundPrompt: false,
+          forceTextPrompt: false,
+          forcePreviousPrompt: false,
+          positionIndex: 0
+        }));
+        plan.forEach((entry, index) => {
+          entry.positionIndex = index;
+        });
         if (options && options.misleadColors) {
           const min = clampCount(options.misleadMinCount);
           const max = clampCount(options.misleadMaxCount);
@@ -901,6 +1102,34 @@ const revealInput = document.getElementById("revealTime");
             const selected = selectModifierIndices(eligible, options.backgroundPromptChance, min, max);
             selected.forEach((index) => {
               plan[index].forceBackgroundPrompt = true;
+            });
+          }
+        }
+        if (options && options.enableTextColor) {
+          const min = clampCount(options.textPromptMinCount);
+          const max = clampCount(options.textPromptMaxCount);
+          if (min !== null || max !== null) {
+            options._useTextPromptPlan = true;
+            const eligible = items
+              .map((item, index) => (["numbers", "letters", "colors"].includes(item.category) ? index : null))
+              .filter((index) => index !== null);
+            const selected = selectModifierIndices(eligible, options.textPromptChance, min, max);
+            selected.forEach((index) => {
+              plan[index].forceTextPrompt = true;
+            });
+          }
+        }
+        const previousRoundItems =
+          typeof window.getPreviousRoundItems === "function" ? window.getPreviousRoundItems() : null;
+        if (options && options.enablePreviousCard && Array.isArray(previousRoundItems) && previousRoundItems.length) {
+          const min = clampCount(options.previousPromptMinCount);
+          const max = clampCount(options.previousPromptMaxCount);
+          if (min !== null || max !== null) {
+            options._usePreviousPromptPlan = true;
+            const eligible = items.map((_, index) => index);
+            const selected = selectModifierIndices(eligible, options.previousCardChance, min, max);
+            selected.forEach((index) => {
+              plan[index].forcePreviousPrompt = true;
             });
           }
         }
@@ -1007,7 +1236,8 @@ const revealInput = document.getElementById("revealTime");
         }
         const plan = planModifierAssignments(chosen, options);
         const built = chosen.map((item, index) => buildChallenge(item, options, plan[index]));
-        return applyNumberChallenges(built, options);
+        const rotated = applyRotationChallenges(built, options);
+        return applyNumberChallenges(rotated, options);
       }
 
 
@@ -1055,19 +1285,30 @@ const revealInput = document.getElementById("revealTime");
             }
             if (item.color) {
               card.style.background = item.color;
-              card.style.color = "#0f172a";
+              if (!item.textColorHex) {
+                card.style.color = "#0f172a";
+              }
             } else if (item.backgroundColorHex) {
               card.style.background = item.backgroundColorHex;
-              card.style.color = "#0f172a";
+              if (!item.textColorHex) {
+                card.style.color = "#0f172a";
+              }
               card.classList.add("background-color");
+            }
+            if (item.textColorHex) {
+              card.style.color = item.textColorHex;
+              card.classList.add("card--text-color");
             }
           } else {
             const cardLabel = `Card ${index + 1}`;
             const categoryLabel = formatCategoryLabel(item.category);
             if (item.recallHint) {
+              const hintHtml = String(item.recallHint)
+                .replace(/↻/g, '<span class="rotation-icon">↻</span>')
+                .replace(/↺/g, '<span class="rotation-icon">↺</span>');
               card.innerHTML = `
                 <small>${cardLabel}</small>
-                <span>${item.recallHint}</span>
+                <span>${hintHtml}</span>
               `;
             } else {
               card.innerHTML = `
