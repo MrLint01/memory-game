@@ -169,6 +169,26 @@ const revealInput = document.getElementById("revealTime");
       let lastCompletedLevel = 0;
       let dragSelecting = false;
       let dragTargetState = null;
+      function getActiveLevelContext() {
+        if (gameMode !== "stages" || !stageState.active) return null;
+        const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        const modifiers = window.getStageModifiers
+          ? window.getStageModifiers(stage)
+          : (stage && stage.modifiers ? stage.modifiers : {});
+        const activeModifiers = Object.keys(modifiers || {}).filter((key) => Boolean(modifiers[key]));
+        return {
+          mode: gameMode,
+          stage_index: stageState.index,
+          level_number: stageState.index + 1,
+          stage_name: stage && stage.name ? stage.name : null,
+          attempt_number: Number.isFinite(stageState.attempts) ? stageState.attempts : null,
+          active_modifiers: activeModifiers
+        };
+      }
+      window.getActiveLevelContext = getActiveLevelContext;
+      window.getCurrentGameMode = function getCurrentGameMode() {
+        return gameMode;
+      };
       function getSelectedCategories() {
         return Array.from(document.querySelectorAll(".checkboxes input:checked"))
           .map((checkbox) => checkbox.value)

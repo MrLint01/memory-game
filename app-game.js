@@ -558,7 +558,10 @@
           saveStageStars(stage, stars, elapsedSeconds);
               // Analytics: Track level session
               if (typeof trackLevelSession === 'function') {
-                trackLevelSession(stageState.index, true, stars, elapsedSeconds, entries);
+                const activeContext = typeof window.getActiveLevelContext === "function"
+                  ? window.getActiveLevelContext()
+                  : null;
+                trackLevelSession(stageState.index, true, stars, elapsedSeconds, entries, "level_end", activeContext || {});
               }
               lastCompletedLevel = stageState.index + 1;
               lockInputs(true);
@@ -578,7 +581,10 @@
             // Track the current successful round before moving to next
             const roundTimeSpent = (performance.now() - roundStartTime) / 1000;
             if (typeof trackRoundCompletion === 'function') {
-              trackRoundCompletion(round, true, roundTimeSpent);
+              trackRoundCompletion(round, true, roundTimeSpent, {
+                mode: gameMode,
+                level_number: stageState.index + 1
+              });
             }
             startRound();
             return;
@@ -606,28 +612,37 @@
             nextBtn.disabled = false;
             nextBtn.textContent = "Retry stage";
           }
+          if (typeof trackRoundCompletion === "function") {
+            trackRoundCompletion(round, false, roundTimeSpent, {
+              mode: gameMode,
+              level_number: stageState.index + 1
+            });
+          }
           stageState.failed = true;
           stageState.completed = false;
           stageState.active = false;
           stopStageStopwatch();
           streak = 0;
           // Analytics: Track level failure
-          const failedEntries = roundItems.map((item) => ({
-            expected: buildExpectedLabel(item),
-            actual: "",
-            correct: false
-          }));
           const failedElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
             ? stageState.elapsedSeconds
             : (performance.now() - (stageState.startTime || performance.now())) / 1000;
           if (typeof trackLevelSession === 'function') {
-            trackLevelSession(stageState.index, false, 0, failedElapsedSeconds, failedEntries);
+            const activeContext = typeof window.getActiveLevelContext === "function"
+              ? window.getActiveLevelContext()
+              : null;
+            trackLevelSession(stageState.index, false, 0, failedElapsedSeconds, entries, "level_end", activeContext || {});
           }
           setPhase("Round complete", "result");
           updateScore();
           return;
         }
         if (gameMode === "practice") {
+          if (typeof trackRoundCompletion === "function") {
+            trackRoundCompletion(round, false, roundTimeSpent, {
+              mode: gameMode
+            });
+          }
           lockInputs(true);
           const swapOrder = swapMap ? swapMap.slice() : null;
           swapActive = false;

@@ -11,6 +11,7 @@ const firebaseConfig = {
 };
 
 const PLAYER_ID_STORAGE_KEY = "flash_recall_player_id_v1";
+const INACTIVITY_ACTIVE_PAUSE_MS = 1 * 60 * 1000;
 const INACTIVITY_QUIT_MS = 3 * 60 * 1000;
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 const FLUSH_INTERVAL_MS = 4 * 1000;
@@ -26,6 +27,7 @@ let pendingEvents = [];
 let flushTimerId = null;
 let heartbeatTimerId = null;
 let inactivityTimerId = null;
+let inactivityActiveTimerId = null;
 let isFlushingEvents = false;
 let lifecycleListenersBound = false;
 let hasEndedSession = false;
@@ -34,6 +36,9 @@ let hiddenStartedAtMs = null;
 
 const sessionStartedAtMs = Date.now();
 let lastActivityAtMs = sessionStartedAtMs;
+let activePlaytimeAccumulatedSeconds = 0;
+let activeSegmentStartedAtMs = sessionStartedAtMs;
+let isSessionActiveForPlaytime = true;
 
 const playerId = getOrCreatePlayerId();
 const sessionId = generateId();
@@ -81,22 +86,66 @@ function mapEntriesToFailedCards(entries) {
   return entries
     .filter((entry) => !entry.correct)
     .map((entry) => {
+      const expectedLabel =
+        typeof entry.expected === "object"
+          ? entry.expected.label || null
+          : null;
       const expectedValue =
         typeof entry.expected === "object"
           ? entry.expected.answer || entry.expected.label || "unknown"
           : entry.expected || entry.answer || "unknown";
+      const promptTarget = expectedLabel || null;
+      const hintType = promptTarget
+        ? String(promptTarget).toLowerCase().replace(/\s+/g, "_")
+        : null;
 
       return {
         card_type: entry.category || "unknown",
         expected: expectedValue,
         actual: entry.userAnswer || entry.actual || entry.raw || "blank",
-        position: entry.displayIndex || 0
+        position: entry.displayIndex || 0,
+        prompt_target: promptTarget,
+        hint_type: hintType
       };
     });
 }
 
 function normalizeLevelNumber(levelNumber) {
   return Number(levelNumber) + 1;
+}
+
+function getActivePlaytimeSeconds(nowMs = Date.now()) {
+  const liveSeconds = activeSegmentStartedAtMs
+    ? Math.max(0, (nowMs - activeSegmentStartedAtMs) / 1000)
+    : 0;
+  return Math.max(0, activePlaytimeAccumulatedSeconds + liveSeconds);
+}
+
+function finalizeActiveSegment(nowMs = Date.now()) {
+  if (!activeSegmentStartedAtMs) return;
+  const delta = Math.max(0, (nowMs - activeSegmentStartedAtMs) / 1000);
+  activePlaytimeAccumulatedSeconds += delta;
+  activeSegmentStartedAtMs = null;
+}
+
+function pausePlaytimeTracking(reason, nowMs = Date.now()) {
+  if (!isSessionActiveForPlaytime) return;
+  finalizeActiveSegment(nowMs);
+  isSessionActiveForPlaytime = false;
+  enqueueEvent("playtime_tracking_paused", {
+    reason,
+    active_playtime_seconds: parseFloat(getActivePlaytimeSeconds(nowMs).toFixed(2))
+  });
+}
+
+function resumePlaytimeTracking(source, nowMs = Date.now()) {
+  if (isSessionActiveForPlaytime) return;
+  activeSegmentStartedAtMs = nowMs;
+  isSessionActiveForPlaytime = true;
+  enqueueEvent("playtime_tracking_resumed", {
+    source,
+    active_playtime_seconds: parseFloat(getActivePlaytimeSeconds(nowMs).toFixed(2))
+  });
 }
 
 function scheduleFlush() {
@@ -182,8 +231,7 @@ function startHeartbeat() {
     try {
       await sessionRef.update({
         updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-        last_activity_at: firebase.firestore.FieldValue.serverTimestamp(),
-        total_playtime_seconds: Math.max(0, (Date.now() - sessionStartedAtMs) / 1000)
+        total_playtime_seconds: parseFloat(getActivePlaytimeSeconds().toFixed(2))
       });
     } catch (error) {
       console.error("Failed heartbeat update:", error);
@@ -207,6 +255,9 @@ function resetInactivityTimer() {
     if (!isReadyForWrites() || hasEndedSession || inactivityQuitLogged) return;
 
     inactivityQuitLogged = true;
+    enqueueEvent("quit_reason", {
+      reason: "inactivity_timeout"
+    }, { immediate: true });
     enqueueEvent("quit_inferred_inactivity", {
       inactivity_ms: INACTIVITY_QUIT_MS
     }, { immediate: true });
@@ -226,8 +277,20 @@ function resetInactivityTimer() {
   }, INACTIVITY_QUIT_MS);
 }
 
+function resetActiveInactivityTimer() {
+  if (inactivityActiveTimerId) {
+    window.clearTimeout(inactivityActiveTimerId);
+  }
+  inactivityActiveTimerId = window.setTimeout(() => {
+    if (hasEndedSession) return;
+    pausePlaytimeTracking("no_input_timeout");
+  }, INACTIVITY_ACTIVE_PAUSE_MS);
+}
+
 function noteActivity(source) {
-  lastActivityAtMs = Date.now();
+  const nowMs = Date.now();
+  lastActivityAtMs = nowMs;
+  resumePlaytimeTracking(source, nowMs);
 
   if (inactivityQuitLogged && isReadyForWrites()) {
     inactivityQuitLogged = false;
@@ -247,6 +310,7 @@ function noteActivity(source) {
     }
   }
 
+  resetActiveInactivityTimer();
   resetInactivityTimer();
 }
 
@@ -264,13 +328,11 @@ function bindLifecycleListeners() {
       enqueueEvent("tab_visible", {
         hidden_duration_ms: hiddenDurationMs
       });
-      noteActivity("tab_visible");
     }
   });
 
   window.addEventListener("focus", () => {
     enqueueEvent("window_focus", {});
-    noteActivity("window_focus");
   });
 
   window.addEventListener("blur", () => {
@@ -283,8 +345,18 @@ function bindLifecycleListeners() {
   });
 
   window.addEventListener("beforeunload", () => {
+    const activeContext = typeof window.getActiveLevelContext === "function"
+      ? window.getActiveLevelContext()
+      : null;
+    if (activeContext) {
+      enqueueEvent("quit_reason", {
+        reason: "close_tab_mid_level",
+        ...activeContext
+      }, { immediate: true });
+    }
     enqueueEvent("before_unload", {
-      session_duration_seconds: Math.max(0, (Date.now() - sessionStartedAtMs) / 1000)
+      session_duration_seconds: Math.max(0, (Date.now() - sessionStartedAtMs) / 1000),
+      active_playtime_seconds: parseFloat(getActivePlaytimeSeconds().toFixed(2))
     }, { immediate: true });
     flushEvents();
   });
@@ -383,6 +455,7 @@ async function createNewSession() {
     }, { immediate: true });
 
     startHeartbeat();
+    resetActiveInactivityTimer();
     resetInactivityTimer();
 
     console.log("New session created:", currentSessionDocId);
@@ -391,17 +464,19 @@ async function createNewSession() {
   }
 }
 
-function trackRoundCompletion(roundNumber, passed, timeSpent) {
+function trackRoundCompletion(roundNumber, passed, timeSpent, metadata = {}) {
   roundsForCurrentLevel.push({
     round_number: roundNumber,
     passed: Boolean(passed),
-    time_spent: Number.isFinite(timeSpent) ? parseFloat(timeSpent.toFixed(2)) : null
+    time_spent: Number.isFinite(timeSpent) ? parseFloat(timeSpent.toFixed(2)) : null,
+    ...metadata
   });
 
   enqueueEvent("round_complete", {
     round_number: roundNumber,
     passed: Boolean(passed),
-    time_spent_seconds: Number.isFinite(timeSpent) ? parseFloat(timeSpent.toFixed(2)) : null
+    time_spent_seconds: Number.isFinite(timeSpent) ? parseFloat(timeSpent.toFixed(2)) : null,
+    ...metadata
   });
 }
 
@@ -435,7 +510,7 @@ async function trackLevelStart(levelNumber, metadata = {}) {
   }
 }
 
-async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, entries, endReason = "level_end") {
+async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, entries, endReason = "level_end", metadata = {}) {
   if (!isReadyForWrites()) {
     console.warn("Firebase not initialized yet");
     return;
@@ -449,6 +524,9 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
   try {
     const normalizedLevel = normalizeLevelNumber(levelNumber);
     const failedCards = mapEntriesToFailedCards(safeEntries);
+    const mode = metadata.mode || (typeof window.getCurrentGameMode === "function" ? window.getCurrentGameMode() : null);
+    const stageName = metadata.stage_name || null;
+    const activeModifiers = Array.isArray(metadata.active_modifiers) ? metadata.active_modifiers : [];
 
     const attemptData = {
       user_id: currentUserId,
@@ -457,6 +535,9 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
       game_version: gameVersion,
       release_channel: releaseChannel,
       level_number: normalizedLevel,
+      mode,
+      stage_name: stageName,
+      active_modifiers: activeModifiers,
       passed: Boolean(passed),
       stars: stars || 0,
       time_seconds: Number.isFinite(elapsedSeconds) ? parseFloat(elapsedSeconds.toFixed(2)) : null,
@@ -472,6 +553,9 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
 
     enqueueEvent("level_end", {
       level_number: normalizedLevel,
+      mode,
+      stage_name: stageName,
+      active_modifiers: activeModifiers,
       passed: Boolean(passed),
       stars: stars || 0,
       time_seconds: Number.isFinite(elapsedSeconds) ? parseFloat(elapsedSeconds.toFixed(2)) : null,
@@ -480,6 +564,15 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
       cards_failed_count: failedCards.length,
       end_reason: endReason
     }, { immediate: true });
+
+    if (endReason && endReason !== "level_end") {
+      enqueueEvent("quit_reason", {
+        reason: endReason,
+        level_number: normalizedLevel,
+        mode,
+        stage_name: stageName
+      }, { immediate: true });
+    }
 
     const sessionUpdate = {
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
@@ -514,13 +607,22 @@ async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted, endReaso
     window.clearTimeout(inactivityTimerId);
     inactivityTimerId = null;
   }
+  if (inactivityActiveTimerId) {
+    window.clearTimeout(inactivityActiveTimerId);
+    inactivityActiveTimerId = null;
+  }
+
+  finalizeActiveSegment(Date.now());
 
   stopHeartbeat();
 
+  const activePlaytimeSeconds = parseFloat(getActivePlaytimeSeconds().toFixed(2));
+  const sessionElapsedSeconds = parseFloat(((Date.now() - sessionStartedAtMs) / 1000).toFixed(2));
+
   enqueueEvent("session_end", {
-    total_playtime_seconds: Number.isFinite(totalSessionSeconds)
-      ? parseFloat(totalSessionSeconds.toFixed(2))
-      : parseFloat(((Date.now() - sessionStartedAtMs) / 1000).toFixed(2)),
+    total_playtime_seconds: activePlaytimeSeconds,
+    session_elapsed_seconds: sessionElapsedSeconds,
+    reported_session_seconds: Number.isFinite(totalSessionSeconds) ? parseFloat(totalSessionSeconds.toFixed(2)) : null,
     last_level_completed: Number.isFinite(lastLevelCompleted) ? lastLevelCompleted : 0,
     end_reason: endReason,
     inactive_ms_before_end: Date.now() - lastActivityAtMs
@@ -530,9 +632,8 @@ async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted, endReaso
 
   try {
     await sessionRef.update({
-      total_playtime_seconds: Number.isFinite(totalSessionSeconds)
-        ? parseFloat(totalSessionSeconds.toFixed(2))
-        : parseFloat(((Date.now() - sessionStartedAtMs) / 1000).toFixed(2)),
+      total_playtime_seconds: activePlaytimeSeconds,
+      session_elapsed_seconds: sessionElapsedSeconds,
       last_level_completed: Number.isFinite(lastLevelCompleted) ? lastLevelCompleted : 0,
       ended_at: firebase.firestore.FieldValue.serverTimestamp(),
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
@@ -555,14 +656,24 @@ function getLoggingDebugSnapshot() {
     sessionId,
     gameVersion,
     releaseChannel,
-    pendingEvents: pendingEvents.length
+    pendingEvents: pendingEvents.length,
+    activePlaytimeSeconds: parseFloat(getActivePlaytimeSeconds().toFixed(2)),
+    isSessionActiveForPlaytime
   };
+}
+
+function trackQuitReason(reason, metadata = {}) {
+  enqueueEvent("quit_reason", {
+    reason: reason || "unknown",
+    ...metadata
+  }, { immediate: true });
 }
 
 window.trackRoundCompletion = trackRoundCompletion;
 window.trackLevelStart = trackLevelStart;
 window.trackLevelSession = trackLevelSession;
 window.trackSessionEnd = trackSessionEnd;
+window.trackQuitReason = trackQuitReason;
 window.getLoggingDebugSnapshot = getLoggingDebugSnapshot;
 
 if (document.readyState === "loading") {

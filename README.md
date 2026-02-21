@@ -59,16 +59,21 @@ firebase deploy --only firestore
 Telemetry captures:
 - Stable `player_id` per browser (`localStorage`)
 - New `session_id` for each app return/session
-- Session start/end timestamps and total duration
+- Session start/end timestamps and active gameplay duration
 - `level_start`, `level_end`, `round_complete`
 - Tab/window lifecycle (`tab_hidden`, `tab_visible`, `window_focus`, `window_blur`, `page_hide`, `before_unload`)
-- Inactivity quit inference (`quit_inferred_inactivity`)
+- Inactivity handling:
+  - Playtime tracking pauses after 1 minute without user input on the tab
+  - Playtime tracking resumes on next real user input
+  - Separate 3-minute inactivity quit inference (`quit_inferred_inactivity`)
 - Game version + release channel on events
 
 Data is written under:
 - `game_sessions/{sessionDoc}`
 - `game_sessions/{sessionDoc}/attempts/{attempt}`
 - `game_sessions/{sessionDoc}/events/{event}`
+
+`total_playtime_seconds` now reflects active gameplay time (input-driven), not raw wall-clock tab lifetime.
 
 ## Versioning
 `version.js` controls release metadata:
@@ -123,12 +128,48 @@ python scripts/analyze_logs.py \
   --outdir analysis_output
 ```
 
-Outputs include:
-- `analysis_output/summary.txt`
-- `analysis_output/session_duration_hist.png`
-- `analysis_output/completion_by_level.png`
-- `analysis_output/dropoff_by_level.png`
-- `analysis_output/event_volume_by_type.png`
+Version behavior:
+- By default, analysis runs on the latest `game_version` found and writes to:
+  - `analysis_output/version_<latest_version>/...`
+- To include additional versions in the same run, pass:
+  - `--extra-version <version>`
+  - Each version gets its own subfolder.
+- To force one version only:
+  - `--version-filter <version>`
+
+Example with extra versions:
+```bash
+python scripts/analyze_logs.py \
+  --sessions prepared_data/sessions.csv \
+  --attempts prepared_data/attempts.csv \
+  --events prepared_data/events.csv \
+  --outdir analysis_output \
+  --extra-version 2026.02.17 \
+  --extra-version 2026.02.10
+```
+
+Current outputs (per version folder) include:
+- `summary.txt`
+- `session_duration_hist.png` (gameplay-time based)
+- `completion_by_level.png`
+- `avg_time_per_level.png`
+- `retries_by_level_completed_split.png`
+- `avg_stars_per_level.png`
+- `max_stars_per_level.png`
+- `dropoff_by_level.png`
+- `quit_level_bar.png`
+- `quit_mid_level_bar.png`
+- `failed_cards_type_pie.png`
+- `failed_cards_by_level_type.csv`
+- `highest_level_reached_hist.png`
+- `round_time_per_level/` (one histogram per level)
+- `early_round_correlations/`:
+  - `early_retention_features.csv`
+  - `early_feature_correlations.csv`
+  - `top_early_feature_correlations_bar.png`
+- `sandbox_statistics/`:
+  - `sandbox_participation_unique_players.png`
+  - additional sandbox playtime charts when data is present
 
 ## Service Account Key Safety
 - Do not commit service account keys.

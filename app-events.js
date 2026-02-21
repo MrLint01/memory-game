@@ -1359,8 +1359,14 @@
               ? stageState.elapsedSeconds
               : (performance.now() - (stageState.startTime || performance.now())) / 1000;
             const backEntries = window.__lastEntries || [];
+            const activeContext = typeof window.getActiveLevelContext === "function"
+              ? window.getActiveLevelContext()
+              : null;
+            if (typeof trackQuitReason === "function") {
+              trackQuitReason("menu_quit", activeContext || {});
+            }
             if (typeof trackLevelSession === 'function') {
-              trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries, "menu_quit");
+              trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries, "menu_quit", activeContext || {});
             }
           }
           resetStageProgress();
@@ -1689,6 +1695,12 @@
 
       // Track session end on page unload
       window.addEventListener("beforeunload", () => {
+        const activeContext = typeof window.getActiveLevelContext === "function"
+          ? window.getActiveLevelContext()
+          : null;
+        if (activeContext && typeof trackQuitReason === "function") {
+          trackQuitReason("close_tab_mid_level", activeContext);
+        }
         const totalSessionSeconds = (performance.now() - sessionStartTime) / 1000;
         if (typeof trackSessionEnd === 'function') {
           trackSessionEnd(totalSessionSeconds, lastCompletedLevel, "beforeunload");
