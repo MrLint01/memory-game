@@ -1104,11 +1104,33 @@
           window.flashRecallSessionStats = { totalSeconds: 0, totalCards: 0 };
           window.localStorage.removeItem("flashRecallStats");
           window.localStorage.removeItem("flashRecallFlashWarning");
+          window.localStorage.removeItem("flashRecallSandboxUnlocks");
           if (typeof window.saveStageProgress === "function") {
             window.saveStageProgress();
           }
+          if (typeof window.getSandboxUnlockState === "function") {
+            window.getSandboxUnlockState();
+          }
           if (stagesScreen && document.body.dataset.view === "stages") {
             renderStageList(false);
+          }
+          if (practiceModal && practiceModal.classList.contains("show")) {
+            updateCategoryControls();
+            const starsEl = document.getElementById("sandboxStars");
+            if (
+              starsEl &&
+              typeof window.getSandboxStarsAvailable === "function" &&
+              typeof window.getSandboxStarsEarned === "function"
+            ) {
+              const availableEl = starsEl.querySelector(".sandbox-stars__available");
+              const totalEl = starsEl.querySelector(".sandbox-stars__total");
+              const available = window.getSandboxStarsAvailable();
+              const total = window.getSandboxStarsEarned();
+              if (availableEl && totalEl) {
+                availableEl.textContent = String(available);
+                totalEl.textContent = String(total);
+              }
+            }
           }
         });
       }
