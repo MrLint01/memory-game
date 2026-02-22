@@ -8,10 +8,17 @@
         fogCanvas.height = window.innerHeight;
       }
 
-      function drawFog() {
+      let fogRegenTimer = null;
+
+      function drawFog(options = {}) {
         if (!fogCtx || !fogCanvas) return;
+        const clear = options.clear !== false;
+        const alpha = Number.isFinite(options.alpha) ? options.alpha : 1;
         fogCtx.globalCompositeOperation = "source-over";
-        fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+        if (clear) {
+          fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+        }
+        fogCtx.globalAlpha = alpha;
         const fogCount = Math.round((fogCanvas.width * fogCanvas.height) / 40000);
         for (let i = 0; i < fogCount; i += 1) {
           const x = Math.random() * fogCanvas.width;
@@ -25,19 +32,36 @@
           fogCtx.arc(x, y, radius, 0, Math.PI * 2);
           fogCtx.fill();
         }
+        fogCtx.globalAlpha = 1;
+      }
+
+      function scheduleFogRegen() {
+        if (fogRegenTimer) {
+          window.clearInterval(fogRegenTimer);
+        }
+        fogRegenTimer = window.setInterval(() => {
+          if (!fogActive) return;
+          drawFog({ clear: false, alpha: 0.06 });
+        }, 120);
       }
 
       function startFog() {
         if (!fogCanvas) return;
         fogActive = true;
+        fogCanvas.style.zIndex = "5";
         fogCanvas.style.display = "block";
         resizeFog();
         drawFog();
         fogLastMove = { x: null, y: null, t: 0 };
+        scheduleFogRegen();
       }
 
       function stopFog() {
         fogActive = false;
+        if (fogRegenTimer) {
+          window.clearInterval(fogRegenTimer);
+          fogRegenTimer = null;
+        }
         if (fogCanvas) {
           fogCanvas.style.display = "none";
         }

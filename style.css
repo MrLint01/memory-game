@@ -478,7 +478,7 @@ button.icon-button {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 6;
+  z-index: 50;
 }
 .stage-instruction {
   position: absolute;
@@ -498,6 +498,7 @@ button.icon-button {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 50;
 }
 .stage-instruction__text {
   display: inline-block;
@@ -2887,14 +2888,14 @@ body.stage-fail .rotation-icon {
   position: fixed;
   inset: 0;
   display: none;
-  z-index: 20;
+  z-index: 5;
   pointer-events: none;
 }
 .fog-blur {
   position: fixed;
   inset: 0;
   display: none;
-  z-index: 19;
+  z-index: 4;
   pointer-events: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);

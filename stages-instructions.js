@@ -638,5 +638,30 @@
       }
     ]
   ],
+  "90": [
+    [
+      {
+        "text": "**FOG** blocks the vision of the cards.",
+        "x": 0.1,
+        "y": 140,
+        "w": 80,
+        "h": 0.82,
+        "size": "2rem",
+        "color": "#111827",
+        "at": 0,
+        "duration": 2000
+      },
+      {
+        "text": "**Move** your **mouse cursor** to **clear** the spots. Memorize quickly before the fog covers it again.",
+        "x": 0.1,
+        "y": 140,
+        "w": 80,
+        "h": 0.82,
+        "size": "2rem",
+        "color": "#111827",
+        "at": 2500
+      }
+    ]
+  ],
 };
 })();

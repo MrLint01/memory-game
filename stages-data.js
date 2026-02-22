@@ -545,9 +545,9 @@
       modifiers: { 
         textColor: true,
         textColorChance: 1.0,
-        textPromptChance: 0.5 
+        textPromptChance: 1.0 
       },
-      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 32,
@@ -747,17 +747,17 @@
       modifiers: { rotate: true },
       starTimes: { platinum: 5, gold: 6, silver: 12, bronze: 20 }
     },
-    {
+            {
       id: 46,
       name: "Stage 46",
       stageType: "memory",
-      rounds: 3,
+      rounds: 1,
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "directions", "letters", "colors"],
-      modifiers: { rotate: true, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["directions"],
+      modifiers: { rotate: true },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 47,
@@ -767,21 +767,21 @@
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "shapes", "letters", "numbers"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors", "letters", "directions"],
+      modifiers: { rotate: true },
+      starTimes: { platinum: 8, gold: 9, silver: 12, bronze: 20 }
     },
     {
       id: 48,
       name: "Stage 48",
-      stageType: "flash",
+      stageType: "memory",
       rounds: 3,
-      cards: 1,
-      revealSeconds: 0.2,
+      cards: 2,
+      revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "numbers", "diagonal", "shapes"],
+      categories: ["numbers", "directions"],
       modifiers: { mathOps: true, mathChance: 0.6, rotate: true },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
+      starTimes: { platinum: 8, gold: 9, silver: 12, bronze: 20 }
     },
     {
       id: 49,
@@ -791,237 +791,253 @@
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["shapes", "colors", "directions", "letters"],
-      modifiers: { textColor: true, rotate: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["directions"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, rotate: true },
+      starTimes: { platinum: 8, gold: 9, silver: 12, bronze: 20 }
     },
     {
       id: 50,
       name: "Stage 50",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.1,
       recallSeconds: 15,
-      categories: ["numbers", "directions", "shapes", "colors"],
-      modifiers: { mathOps: true, mathChance: 0.6, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { mathOps: true, mathChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.75 },
+      starTimes: { platinum: 2, gold: 3, silver: 12, bronze: 20 }
     },
     {
       id: 51,
       name: "Stage 51",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["shapes", "directions", "numbers", "colors"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      cardCounts: { directions: 1 },
+      modifiers: { rotate: true },
+      starTimes: { platinum: 2, gold: 3, silver: 12, bronze: 20 }
     },
     {
       id: 52,
       name: "Stage 52",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "colors", "directions", "numbers"],
-      modifiers: { rotate: true, textColor: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      cardCounts: { directions: 1 },
+      modifiers: { rotate: true },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 53,
       name: "Stage 53",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.1,
       recallSeconds: 15,
-      categories: ["directions", "colors", "diagonal", "numbers"],
-      modifiers: { textColor: true, rotate: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, misleadColors: true, misleadChance: 0.6 },
+      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
     },
     {
       id: 54,
       name: "Stage 54",
+      stageType: "memory",
+      rounds: 1,
+      cards: 2,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["directions", "diagonal"],
+      modifiers: { rotate: true },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
+    },
+    {
+      id: 55,
+      name: "Stage 55",
+      stageType: "flash",
+      rounds: 3,
+      cards: 1,
+      revealSeconds: 0.1,
+      recallSeconds: 15,
+      categories: ["directions", "diagonal"],
+      modifiers: { rotate: true },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
+    },
+    {
+      id: 56,
+      name: "Stage 56",
       stageType: "flash",
       rounds: 3,
       cards: 1,
       revealSeconds: 0.2,
       recallSeconds: 15,
-      categories: ["numbers", "shapes", "colors", "letters"],
-      modifiers: { misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
-    },
-    {
-      id: 55,
-      name: "Stage 55",
-      stageType: "memory",
-      rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
-      recallSeconds: 15,
-      categories: ["shapes", "letters", "numbers", "directions"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, rotate: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
-    },
-    {
-      id: 56,
-      name: "Stage 56",
-      stageType: "memory",
-      rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
-      recallSeconds: 15,
-      categories: ["diagonal", "letters", "colors", "directions"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 1.0, backgroundPromptChance: 0.5, misleadColors: true, misleadChance: 0.6, textColor: true, textColorChance: 1.0 },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 57,
       name: "Stage 57",
       stageType: "memory",
       rounds: 3,
-      cards: 2,
+      cards: 1,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["colors", "directions", "shapes", "numbers"],
-      modifiers: { mathOps: true, mathChance: 0.6, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["diagonal"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, rotate: true },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 58,
       name: "Stage 58",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["shapes", "colors", "letters", "numbers"],
-      modifiers: { textColor: true, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      modifiers: { misleadColors: true, misleadChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 59,
       name: "Stage 59",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["diagonal", "letters", "numbers", "directions"],
+      categories: ["numbers", "diagonal"],
       modifiers: { mathOps: true, mathChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 60,
       name: "Stage 60",
-      stageType: "flash",
-      rounds: 3,
-      cards: 1,
-      revealSeconds: 0.2,
+      stageType: "memory",
+      rounds: 2,
+      cards: 3,
+      revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "diagonal", "numbers", "colors"],
-      modifiers: { mathOps: true, mathChance: 0.6, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
+      categories: ["letters", "directions", "shapes"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 61,
       name: "Stage 61",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 2,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "directions", "numbers", "diagonal"],
-      modifiers: { mathOps: true, mathChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { 
+        mathOps: true, 
+        mathChance: 1.0,
+        mathMinCount: 3,
+        mathMaxCount: 3 
+      },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 62,
       name: "Stage 62",
       stageType: "memory",
-      rounds: 3,
-      cards: 3,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["colors", "numbers", "diagonal", "shapes"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { 
+        mathOps: true, 
+        mathChance: 1.0,
+        mathMinCount: 4,
+        mathMaxCount: 4 
+      },
+      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
     },
     {
       id: 63,
       name: "Stage 63",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "colors", "diagonal", "numbers"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, rotate: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { mathOps: true, mathChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, mathMinCount: 1, mathMaxCount: 2 },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 64,
       name: "Stage 64",
+      stageType: "tutorial",
+      rounds: 1,
+      cards: 3,
+      revealSeconds: 15,
+      recallSeconds: 15,
+      categories: ["numbers"],
+      modifiers: { glitch: true },
+      starTimes: { platinum: 2, gold: 3, silver: 12, bronze: 20 }
+    },
+    {
+      id: 65,
+      name: "Stage 65",
       stageType: "memory",
       rounds: 3,
       cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "letters", "numbers", "diagonal"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
-    },
-    {
-      id: 65,
-      name: "Stage 65",
-      stageType: "tutorial",
-      rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
-      recallSeconds: 15,
-      categories: ["numbers", "letters", "shapes", "colors"],
+      categories: ["numbers", "colors", "letters"],
       modifiers: { glitch: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 66,
       name: "Stage 66",
-      stageType: "flash",
+      stageType: "memory",
       rounds: 3,
-      cards: 1,
-      revealSeconds: 0.2,
+      cards: 3,
+      revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "diagonal", "shapes", "letters"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, glitch: true },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
+      categories: ["colors", "directions", "shapes"],
+      modifiers: { glitch: true },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 67,
       name: "Stage 67",
       stageType: "memory",
-      rounds: 3,
+      rounds: 1,
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["colors", "diagonal", "directions", "letters"],
-      modifiers: { glitch: true, textColor: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      fixedCards: [
+        { category: "numbers", label: "6" },
+        { category: "numbers", label: "7" }
+      ],
+      modifiers: {},
+      starTimes: { platinum: 1, gold: 2, silver: 12, bronze: 20 }
     },
     {
       id: 68,
       name: "Stage 68",
       stageType: "memory",
-      rounds: 3,
-      cards: 3,
+      rounds: 2,
+      cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["diagonal", "shapes", "colors", "directions"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, glitch: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, misleadColors: true, misleadChance: 0.6, textColor: true, glitch: true, textColorChance: 1.0 },
+      starTimes: { platinum: 8, gold: 10, silver: 12, bronze: 20 }
     },
     {
       id: 69,
@@ -1031,189 +1047,230 @@
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "directions", "numbers", "shapes"],
-      modifiers: { rotate: true, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { mathOps: true, mathChance: 0.6, glitch: true, mathMinCount: 1, mathMaxCount: 2, backgroundColor: true, backgroundColorChance: 1, backgroundPromptChance: 0.5 },
+      starTimes: { platinum: 7, gold: 8, silver: 12, bronze: 20 }
     },
     {
       id: 70,
       name: "Stage 70",
       stageType: "memory",
       rounds: 3,
-      cards: 3,
+      cards: 1,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "shapes", "diagonal", "directions"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["directions", "diagonal"],
+      modifiers: { rotate: true, glitch: true },
+      starTimes: { platinum: 5, gold: 6, silver: 12, bronze: 20 }
     },
     {
       id: 71,
       name: "Stage 71",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "letters", "diagonal", "colors"],
-      modifiers: { mathOps: true, mathChance: 0.6, textColor: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, misleadColors: true, misleadChance: 0.6, glitch: true },
+      starTimes: { platinum: 8, gold: 10, silver: 12, bronze: 20 }
     },
     {
       id: 72,
       name: "Stage 72",
       stageType: "flash",
       rounds: 3,
-      cards: 2,
+      cards: 1,
       revealSeconds: 0.2,
       recallSeconds: 15,
-      categories: ["directions", "diagonal", "shapes", "colors"],
-      modifiers: { rotate: true, textColor: true },
+      categories: ["letters"],
+      modifiers: { textColor: true, textColorChance: 1.0 },
       starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
     },
     {
       id: 73,
       name: "Stage 73",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "directions", "shapes", "diagonal"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, textColor: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "shapes"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, glitch: true },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 74,
       name: "Stage 74",
       stageType: "memory",
-      rounds: 3,
+      rounds: 1,
       cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "colors", "diagonal"],
-      modifiers: { rotate: true, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["colors", "letters", "directions"],
+      cardCounts: { directions: 1 },
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, glitch: true, rotate: true },
+      starTimes: { platinum: 5, gold: 6, silver: 12, bronze: 20 }
     },
     {
       id: 75,
       name: "Stage 75",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.2,
       recallSeconds: 15,
-      categories: ["colors", "shapes", "numbers", "directions"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, glitch: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: { mathOps: true, mathChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, textColor: true, textColorChance: 1.0 },
+      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
     },
     {
       id: 76,
       name: "Stage 76",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 3,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.1,
       recallSeconds: 15,
-      categories: ["colors", "shapes", "numbers", "directions"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["diagonal"],
+      modifiers: { rotate: true},
+      starTimes: { platinum: 4.5, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 77,
       name: "Stage 77",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 2,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.15,
       recallSeconds: 15,
-      categories: ["diagonal", "letters", "directions", "numbers"],
-      modifiers: { rotate: true, glitch: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters"],
+      modifiers: {
+        backgroundColor: true,
+        backgroundColorChance: 1.0,
+        backgroundPromptChance: 0.5,
+        misleadColors: true,
+        misleadChance: 0.6,
+        textColor: true,
+        textColorChance: 1.0
+      },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 78,
       name: "Stage 78",
-      stageType: "flash",
-      rounds: 3,
+      stageType: "memory",
+      rounds: 2,
       cards: 2,
-      revealSeconds: 0.2,
+      revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "diagonal", "colors", "shapes"],
-      modifiers: { textColor: true, glitch: true },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
+      categories: ["numbers", "letters"],
+      modifiers: { textColor: true, glitch: true, textColorChance: 1.0, textPromptChance: 0.5 },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 79,
       name: "Stage 79",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["diagonal", "numbers", "letters", "colors"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, textColor: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: {
+        backgroundColor: true,
+        backgroundColorChance: 0.6,
+        backgroundPromptChance: 0.5,
+        misleadColors: true,
+        misleadChance: 0.6,
+        textColor: true,
+        glitch: true
+      },
+      starTimes: { platinum: 8, gold: 9, silver: 12, bronze: 20 }
     },
     {
       id: 80,
       name: "Stage 80",
       stageType: "memory",
-      rounds: 3,
-      cards: 3,
+      rounds: 2,
+      cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["shapes", "directions", "letters", "diagonal"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, rotate: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["directions", "diagonal"],
+      modifiers: { rotate: true, glitch: true },
+      starTimes: { platinum: 7, gold: 8, silver: 12, bronze: 20 }
     },
     {
       id: 81,
       name: "Stage 81",
-      stageType: "memory",
+      stageType: "tutorial",
       rounds: 3,
-      cards: 2,
+      cards: 1,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["diagonal", "shapes", "colors", "directions"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: {
+        mathOpsPlus: true,
+        mathChance: 1.0,
+        mathMinCount: 1,
+        mathMaxCount: 1
+      },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 82,
       name: "Stage 82",
       stageType: "memory",
       rounds: 3,
-      cards: 3,
+      cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "letters", "numbers", "diagonal"],
-      modifiers: { glitch: true, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: {
+        backgroundColor: true,
+        backgroundColorChance: 1,
+        backgroundPromptChance: 0.5,
+        glitch: true,
+        mathOpsPlus: true,
+        mathChance: 0.6,
+        mathMinCount: 1,
+        mathMaxCount: 1
+      },
+      starTimes: { platinum: 7.5, gold: 8.5, silver: 12, bronze: 20 }
     },
     {
       id: 83,
       name: "Stage 83",
+      stageType: "flash",
+      rounds: 3,
+      cards: 1,
+      revealSeconds: 0.1,
+      recallSeconds: 15,
+      categories: ["numbers"],
+      modifiers: {
+        mathOpsPlus: true,
+        mathChance: 1.0,
+        mathMinCount: 1,
+        mathMaxCount: 1
+      },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
+    },
+    {
+      id: 84,
+      name: "Stage 84",
       stageType: "memory",
       rounds: 3,
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "colors", "numbers", "shapes"],
-      modifiers: { misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
-    },
-    {
-      id: 84,
-      name: "Stage 84",
-      stageType: "flash",
-      rounds: 3,
-      cards: 2,
-      revealSeconds: 0.2,
-      recallSeconds: 15,
-      categories: ["directions", "diagonal", "letters", "numbers"],
-      modifiers: { textColor: true, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { 
+        mathOpsPlus: true, 
+        mathChance: 0.6,
+        mathMinCount: 2,
+        mathMaxCount: 2
+       },
+      starTimes: { platinum: 5, gold: 6, silver: 12, bronze: 20 }
     },
     {
       id: 85,
@@ -1223,165 +1280,205 @@
       cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "numbers", "diagonal", "letters"],
-      modifiers: { mathOps: true, mathChance: 0.6, textColor: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { 
+        textColor: true, 
+        mathOpsPlus: true, 
+        mathChance: 0.6, 
+        mathMinCount: 1,
+        mathMaxCount: 1,
+        textColorChance: 1.0
+      },
+      starTimes: { platinum: 8, gold: 9, silver: 12, bronze: 20 }
     },
     {
       id: 86,
       name: "Stage 86",
       stageType: "memory",
-      rounds: 3,
-      cards: 3,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["colors", "directions", "diagonal", "shapes"],
-      modifiers: { glitch: true, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      modifiers: {},
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 87,
       name: "Stage 87",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["colors", "letters", "diagonal", "numbers"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, rotate: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "letters", "directions", "shapes"],
+      modifiers: { textColor: true },
+      starTimes: { platinum: 3, gold: 4, silver: 12, bronze: 20 }
     },
     {
       id: 88,
       name: "Stage 88",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 3,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.15,
       recallSeconds: 15,
-      categories: ["colors", "numbers", "letters", "shapes"],
-      modifiers: { textColor: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["directions"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, rotate: true },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 89,
       name: "Stage 89",
       stageType: "memory",
-      rounds: 3,
-      cards: 2,
+      rounds: 1,
+      cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "shapes", "diagonal", "colors"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, rotate: true },
-      starTimes: { platinum: 4, gold: 8, silver: 12, bronze: 20 }
+      categories: ["numbers", "directions"],
+      modifiers: { rotate: true, mathOpsPlus: true, mathChance: 0.6 },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 90,
       name: "Stage 90",
-      stageType: "flash",
-      rounds: 3,
+      stageType: "tutorial",
+      rounds: 1,
       cards: 2,
-      revealSeconds: 0.2,
+      revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "diagonal", "letters", "numbers"],
-      modifiers: { mathOps: true, mathChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: { fog: true },
+      instructions: window.stageInstructions[90] || [],
+      starTimes: { platinum: 2, gold: 3, silver: 12, bronze: 20 }
     },
     {
       id: 91,
       name: "Stage 91",
       stageType: "memory",
       rounds: 3,
-      cards: 3,
+      cards: 1,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "shapes", "directions", "numbers"],
-      modifiers: { textColor: true, rotate: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      modifiers: { fog: true },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 92,
       name: "Stage 92",
       stageType: "memory",
-      rounds: 3,
+      rounds: 1,
       cards: 3,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["colors", "numbers", "diagonal", "letters"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["colors"],
+      modifiers: {
+        backgroundColor: true,
+        backgroundColorChance: 0.6,
+        backgroundPromptChance: 0.5,
+        misleadColors: true,
+        misleadChance: 0.6,
+        fog: true
+      },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 93,
       name: "Stage 93",
       stageType: "memory",
-      rounds: 3,
-      cards: 3,
+      rounds: 1,
+      cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "letters", "diagonal", "colors"],
-      modifiers: { rotate: true, misleadColors: true, misleadChance: 0.6 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["directions", "diagonal"],
+      modifiers: { rotate: true, fog: true },
+      starTimes: { platinum: 6, gold: 7, silver: 12, bronze: 20 }
     },
     {
       id: 94,
       name: "Stage 94",
       stageType: "memory",
-      rounds: 3,
-      cards: 3,
+      rounds: 2,
+      cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["letters", "colors", "shapes", "diagonal"],
-      modifiers: { mathOps: true, mathChance: 0.6, glitch: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: {
+        mathOps: true,
+        mathChance: 0.6,
+        backgroundColor: true,
+        backgroundColorChance: 0.6,
+        backgroundPromptChance: 0.5,
+        fog: true,
+        mathMinCount: 1,
+        mathMaxCount: 1
+      },
+      starTimes: { platinum: 5, gold: 6, silver: 12, bronze: 20 }
     },
     {
       id: 95,
       name: "Stage 95",
       stageType: "memory",
-      rounds: 3,
-      cards: 3,
+      rounds: 2,
+      cards: 2,
       revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["numbers", "shapes", "diagonal", "directions"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, rotate: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: {
+        mathOps: true,
+        mathOpsPlus: true,
+        mathChance: 0.6,
+        backgroundColor: true,
+        backgroundColorChance: 0.6,
+        backgroundPromptChance: 0.5,
+        fog: true,
+        mathMinCount: 1,
+        mathMaxCount: 1
+      },
+      starTimes: { platinum: 7, gold: 8, silver: 12, bronze: 20 }
     },
     {
       id: 96,
       name: "Stage 96",
-      stageType: "flash",
+      stageType: "memory",
       rounds: 3,
-      cards: 2,
-      revealSeconds: 0.2,
+      cards: 3,
+      revealSeconds: 15,
       recallSeconds: 15,
-      categories: ["directions", "diagonal", "numbers", "letters"],
-      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5, textColor: true },
-      starTimes: { platinum: 2.5, gold: 3.5, silver: 12, bronze: 20 }
+      categories: ["numbers", "colors", "letters", "directions", "shapes"],
+      modifiers: { glitch: true, fog: true },
+      starTimes: { platinum: 14, gold: 15, silver: 12, bronze: 20 }
     },
     {
       id: 97,
       name: "Stage 97",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 3,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.15,
       recallSeconds: 15,
-      categories: ["numbers", "colors", "diagonal", "letters"],
-      modifiers: { misleadColors: true, misleadChance: 0.6, mathOps: true, mathChance: 0.6 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["letters"],
+      modifiers: { backgroundColor: true, backgroundColorChance: 1, backgroundPromptChance: 0.5, textColor: true, textColorChance: 1.0 },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 98,
       name: "Stage 98",
-      stageType: "memory",
+      stageType: "flash",
       rounds: 3,
-      cards: 3,
-      revealSeconds: 15,
+      cards: 1,
+      revealSeconds: 0.2,
       recallSeconds: 15,
-      categories: ["numbers", "directions", "letters", "diagonal"],
-      modifiers: { glitch: true, rotate: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      categories: ["numbers"],
+      modifiers: {
+        backgroundColor: true,
+        backgroundColorChance: 0.6,
+        backgroundPromptChance: 0.5,
+        mathOpsPlus: true,
+        mathChance: 0.6
+      },
+      starTimes: { platinum: 4, gold: 5, silver: 12, bronze: 20 }
     },
     {
       id: 99,
@@ -1392,20 +1489,20 @@
       revealSeconds: 15,
       recallSeconds: 15,
       categories: ["shapes", "diagonal", "letters", "colors"],
-      modifiers: { mathOps: true, mathChance: 0.6, backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      modifiers: { backgroundColor: true, backgroundColorChance: 0.6, backgroundPromptChance: 0.5 },
+      starTimes: { platinum: 9, gold: 10, silver: 12, bronze: 20 }
     },
     {
       id: 100,
       name: "Stage 100",
-      stageType: "tutorial",
+      stageType: "memory",
       rounds: 3,
-      cards: 3,
+      cards: 4,
       revealSeconds: 15,
       recallSeconds: 15,
       categories: ["numbers", "letters", "shapes", "colors"],
       modifiers: { fog: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      starTimes: { platinum: 11, gold: 12, silver: 12, bronze: 20 }
     },
     {
       id: 101,
@@ -1416,8 +1513,8 @@
       revealSeconds: 15,
       recallSeconds: 15,
       categories: ["numbers", "directions", "letters", "shapes"],
-      modifiers: { rotate: true, glitch: true },
-      starTimes: { platinum: 4.5, gold: 8.5, silver: 12, bronze: 20 }
+      modifiers: { rotate: true, glitch: true, fog: true },
+      starTimes: { platinum: 9, gold: 10, silver: 12, bronze: 20 }
     },
     {
       id: 102,

@@ -300,7 +300,8 @@
             wrapper.appendChild(correct);
           }
         });
-        const title = mode === "stages" ? "Stage failed" : "Round failed";
+        const stageNumber = Number.isFinite(stageState.index) ? stageState.index + 1 : 1;
+        const title = mode === "stages" ? `Stage ${stageNumber} Failed` : "Round Failed";
         const subtitle = mode === "stages" ? "" : `Streak ${streak}`;
         const buttons =
           mode === "stages"

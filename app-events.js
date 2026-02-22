@@ -162,6 +162,7 @@
       function formatStageModifiers(modifiers) {
         const entries = [
           { key: "mathOps", label: "Math ops" },
+          { key: "mathOpsPlus", label: "Math ops+" },
           { key: "misleadColors", label: "Misleading colors" },
           { key: "backgroundColor", label: "Background color" },
           { key: "textColor", label: "Text color" },
@@ -400,6 +401,7 @@
         };
         const modifierIconMap = {
           mathOps: { label: "Math ops", src: "imgs/icons/mod-mathops.svg" },
+          mathOpsPlus: { label: "Math ops+", src: "imgs/icons/mod-mathopsplus.svg" },
           misleadColors: { label: "Mislead", src: "imgs/icons/mod-misleadcolors.svg" },
           backgroundColor: { label: "Background", src: "imgs/icons/mod-backgroundcolor.svg" },
           textColor: { label: "Text color", src: "imgs/icons/mod-textcolor.svg" },

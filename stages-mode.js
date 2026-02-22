@@ -58,6 +58,7 @@
   window.getStageModifiers = function getStageModifiers(stage) {
       const defaults = {
         mathOps: false,
+        mathOpsPlus: false,
         misleadColors: false,
         backgroundColor: false,
         textColor: false,
@@ -103,6 +104,7 @@
     const modifiers = window.getStageModifiers(stage);
       return {
         enableMathOps: Boolean(modifiers.mathOps),
+        enableMathOpsPlus: Boolean(modifiers.mathOpsPlus),
         mathChance: typeof modifiers.mathChance === "number" ? modifiers.mathChance : 0.7,
         mathMinCount: typeof modifiers.mathMinCount === "number" ? modifiers.mathMinCount : null,
         mathMaxCount: typeof modifiers.mathMaxCount === "number" ? modifiers.mathMaxCount : null,
