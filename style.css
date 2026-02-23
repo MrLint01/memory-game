@@ -866,8 +866,23 @@ body[data-state="result"] #resultsPanel .stage-complete__stars {
   display: inline-flex;
   gap: 0.65em;
   justify-content: center;
+  position: relative;
   z-index: 1;
 }
+
+body[data-state="result"] #resultsPanel .star-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3 rem;
+}
+
+body[data-state="result"] #resultsPanel .star-time {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
 body[data-state="result"] #resultsPanel .stage-complete__stars .stage-star {
   font-size: 2.9rem;
   opacity: 0;

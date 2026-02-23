@@ -407,8 +407,19 @@
         if (actions) {
           actions.innerHTML = "";
         }
-        const starText = "*".repeat(stars).padEnd(3, "-");
         const stageName = stage && stage.name ? stage.name : `Stage ${stageState.index + 1}`;
+        // Get star times from stages-data
+        const starTimes = stage && stage.starTimes ? stage.starTimes : {};
+        bronzeTime = starTimes.bronze || null;
+        silverTime = starTimes.silver || null;
+        goldTime = starTimes.gold || null;
+        platinumTime = starTimes.platinum || null;
+
+        bronzeLabel = bronzeTime ? `<div class="star-time bronze">${bronzeTime}s</div>` : "";
+        silverLabel = silverTime ? `<div class="star-time silver">${silverTime}s</div>` : "";
+        goldLabel = goldTime ? `<div class="star-time gold">${goldTime}s</div>` : "";
+        platinumLabel = platinumTime ? `<div class="star-time platinum">${platinumTime}s</div>` : "";
+
         resultsPanel.innerHTML = `
           <div class="stage-complete">
             <div class="stage-complete__header">
@@ -416,10 +427,24 @@
               <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s</div>
             </div>
             <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}">
-              <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
-              <span class="stage-star${stars >= 2 ? " is-filled" : ""}">✦</span>
-              <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
-              ${stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : ""}
+              <div class="star-column">
+                <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
+                ${bronzeLabel}
+              </div>
+              <div class="star-column">
+                <span class="stage-star${stars >= 2 ? " is-filled" : ""}">✦</span>
+                ${silverLabel}
+              </div>
+              <div class="star-column">
+                <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
+                ${goldLabel}
+                </div>
+              ${stars >= 4 ? `
+                <div class="star-column">
+                  <span class="stage-star is-filled is-secret">✦</span>
+                  ${platinumLabel}
+                </div>
+                ` : ""}
             </div>
             <div class="stage-complete__bar-track">
               <div class="stage-complete__bar-fill" data-stars="${stars}"></div>
@@ -429,17 +454,17 @@
                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
                 <span class="action-key-hint" aria-hidden="true">(Q)</span>
               </button>
-              <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (N)">
-                <img class="action-icon" src="imgs/next_button.png" alt="" />
-                <span class="action-key-hint" aria-hidden="true">(N)</span>
+              <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
+                <img class="action-icon" src="imgs/home_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(H)</span>
               </button>
               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
                 <span class="action-key-hint" aria-hidden="true">(R)</span>
               </button>
-              <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
-                <img class="action-icon" src="imgs/home_button.png" alt="" />
-                <span class="action-key-hint" aria-hidden="true">(H)</span>
+              <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (N)">
+                <img class="action-icon" src="imgs/next_button.png" alt="" />
+                <span class="action-key-hint" aria-hidden="true">(N)</span>
               </button>
             </div>
           </div>
