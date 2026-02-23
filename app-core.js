@@ -44,6 +44,7 @@ const revealInput = document.getElementById("revealTime");
         ? interruptModal.querySelector(".interrupt-card")
         : null;
       const practiceMathOps = document.getElementById("practiceMathOps");
+      const practiceMathOpsPlus = document.getElementById("practiceMathOpsPlus");
       const practiceMisleadColors = document.getElementById("practiceMisleadColors");
       const practiceBackgroundColor = document.getElementById("practiceBackgroundColor");
       const practiceTextColor = document.getElementById("practiceTextColor");
@@ -73,6 +74,7 @@ const revealInput = document.getElementById("revealTime");
       const stageIntroCard = stageIntroModal
         ? stageIntroModal.querySelector(".modal-card--intro")
         : null;
+      const stagePanel = document.querySelector(".stage.panel");
       const modeSelect = document.getElementById("modeSelect");
       const timerBar = document.getElementById("timerBar");
       const timerFill = document.getElementById("timerFill");
@@ -232,6 +234,7 @@ const revealInput = document.getElementById("revealTime");
           }
           return {
             enableMathOps: false,
+            enableMathOpsPlus: false,
             mathChance: 0.7,
             misleadColors: false,
             misleadChance: 0.6,
@@ -258,6 +261,7 @@ const revealInput = document.getElementById("revealTime");
         }
         return {
           enableMathOps: practiceMathOps.checked,
+          enableMathOpsPlus: Boolean(practiceMathOpsPlus && practiceMathOpsPlus.checked),
           mathChance: clamp(Number(practiceMathChance && practiceMathChance.value) || 0.7, 0, 1),
           misleadColors: practiceMisleadColors.checked,
           misleadChance: clamp(Number(practiceMisleadChance && practiceMisleadChance.value) || 0.6, 0, 1),
@@ -423,6 +427,16 @@ const revealInput = document.getElementById("revealTime");
         updateStageTimerVisibility();
         renderStageInstructions();
         if (nextState === "idle") {
+          if (stagePanel && stageInstructions && stageInstructions.parentElement !== stagePanel) {
+            stagePanel.appendChild(stageInstructions);
+            stageInstructions.style.position = "";
+            stageInstructions.style.left = "";
+            stageInstructions.style.top = "";
+            stageInstructions.style.width = "";
+            stageInstructions.style.height = "";
+            stageInstructions.style.inset = "";
+            stageInstructions.style.zIndex = "";
+          }
           document.body.classList.remove("show-pause");
           document.body.classList.remove("pause-hint");
         }
@@ -442,6 +456,19 @@ const revealInput = document.getElementById("revealTime");
         stageInstructions.innerHTML = "";
         if (gameMode !== "stages") return;
         if (phase !== "show" && phase !== "recall" && phase !== "result") return;
+        if (stagePanel) {
+          if (stageInstructions.parentElement !== document.body) {
+            document.body.appendChild(stageInstructions);
+          }
+          const rect = stagePanel.getBoundingClientRect();
+          stageInstructions.style.position = "fixed";
+          stageInstructions.style.left = `${rect.left}px`;
+          stageInstructions.style.top = `${rect.top}px`;
+          stageInstructions.style.width = `${rect.width}px`;
+          stageInstructions.style.height = `${rect.height}px`;
+          stageInstructions.style.inset = "auto";
+          stageInstructions.style.zIndex = "9999";
+        }
         const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
         if (!stage || !window.getStageInstructionSlides) return;
         const instructionData = window.getStageInstructionSlides(stage);
@@ -1189,6 +1216,8 @@ const revealInput = document.getElementById("revealTime");
                       )
                     : 4)
                 : 1;
+        const fixedCards =
+          gameMode === "stages" && stage && Array.isArray(stage.fixedCards) ? stage.fixedCards : null;
         const uniquePool = categories.reduce((total, category) => {
           const list = dataSets[category];
           return total + (Array.isArray(list) ? list.length : 0);
@@ -1197,6 +1226,22 @@ const revealInput = document.getElementById("revealTime");
         const allowDuplicates = uniquePool > 0 && count > uniquePool;
         const chosen = [];
         const used = new Set();
+        const findFixedItem = (category, label) => {
+          const list = dataSets[category];
+          if (!Array.isArray(list) || !list.length) {
+            return { label };
+          }
+          const match = list.find((entry) => {
+            if (typeof entry === "string") {
+              return entry === label;
+            }
+            return entry && entry.label === label;
+          });
+          if (!match) {
+            return { label };
+          }
+          return typeof match === "string" ? { label: match } : { ...match };
+        };
         const pickFromCategory = (category) => {
           const list = dataSets[category];
           if (!Array.isArray(list) || !list.length) return false;
@@ -1210,6 +1255,16 @@ const revealInput = document.getElementById("revealTime");
           chosen.push({ ...item, category });
           return true;
         };
+        if (fixedCards && fixedCards.length) {
+          fixedCards.slice(0, targetCount).forEach((entry) => {
+            if (!entry || typeof entry.category !== "string" || typeof entry.label !== "string") return;
+            const item = findFixedItem(entry.category, entry.label);
+            const key = `${entry.category}-${item.label}`.toLowerCase();
+            if (!allowDuplicates && used.has(key)) return;
+            used.add(key);
+            chosen.push({ ...item, category: entry.category });
+          });
+        }
         if (cardCounts && typeof cardCounts === "object") {
           Object.entries(cardCounts).forEach(([category, minCount]) => {
             if (!dataSets[category]) return;
@@ -1226,9 +1281,11 @@ const revealInput = document.getElementById("revealTime");
           const category = categories[Math.floor(Math.random() * categories.length)];
           pickFromCategory(category);
         }
-        for (let i = chosen.length - 1; i > 0; i -= 1) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
+        if (!fixedCards || !fixedCards.length) {
+          for (let i = chosen.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
+          }
         }
         const plan = planModifierAssignments(chosen, options);
         const built = chosen.map((item, index) => buildChallenge(item, options, plan[index]));

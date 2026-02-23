@@ -162,6 +162,7 @@
       function formatStageModifiers(modifiers) {
         const entries = [
           { key: "mathOps", label: "Math ops" },
+          { key: "mathOpsPlus", label: "Math ops+" },
           { key: "misleadColors", label: "Misleading colors" },
           { key: "backgroundColor", label: "Background color" },
           { key: "textColor", label: "Text color" },
@@ -400,6 +401,7 @@
         };
         const modifierIconMap = {
           mathOps: { label: "Math ops", src: "imgs/icons/mod-mathops.svg" },
+          mathOpsPlus: { label: "Math ops+", src: "imgs/icons/mod-mathopsplus.svg" },
           misleadColors: { label: "Mislead", src: "imgs/icons/mod-misleadcolors.svg" },
           backgroundColor: { label: "Background", src: "imgs/icons/mod-backgroundcolor.svg" },
           textColor: { label: "Text color", src: "imgs/icons/mod-textcolor.svg" },
@@ -1236,9 +1238,7 @@
               clearTimeout(Number(error.dataset.hideTimer));
             }
             const timerId = window.setTimeout(() => {
-              error.hidden = true;
-              error.classList.remove("show");
-              error.dataset.hideTimer = "";
+              hidePracticeError(error);
             }, 3000);
             error.dataset.hideTimer = String(timerId);
           }
@@ -1246,8 +1246,7 @@
         }
         const error = document.getElementById("practiceTypeError");
         if (error) {
-          error.hidden = true;
-          error.classList.remove("show");
+          hidePracticeError(error);
         }
         modeSelect.value = "practice";
         updateModeUI();
@@ -1261,6 +1260,22 @@
           closePracticeModal();
         }
       });
+
+      function hidePracticeError(error, resetText = "") {
+        if (!error) return;
+        error.classList.remove("show");
+        if (error.dataset.hideTimer) {
+          clearTimeout(Number(error.dataset.hideTimer));
+        }
+        const fadeId = window.setTimeout(() => {
+          error.hidden = true;
+          if (resetText) {
+            error.textContent = resetText;
+          }
+          error.dataset.hideTimer = "";
+        }, 260);
+        error.dataset.hideTimer = String(fadeId);
+      }
 
       if (practiceModal) {
         practiceModal.addEventListener("change", (event) => {
@@ -1288,10 +1303,7 @@
                   clearTimeout(Number(error.dataset.hideTimer));
                 }
                 const timerId = window.setTimeout(() => {
-                  error.hidden = true;
-                  error.classList.remove("show");
-                  error.dataset.hideTimer = "";
-                  error.textContent = "Select at least one card type to start Sandbox.";
+                  hidePracticeError(error, "Select at least one card type to start Sandbox.");
                 }, 2000);
                 error.dataset.hideTimer = String(timerId);
               }
@@ -1321,8 +1333,7 @@
             practiceModal.querySelectorAll(".control-group .checkboxes input[type=\"checkbox\"][value]")
           ).some((input) => input.checked);
           if (anyChecked) {
-            error.hidden = true;
-            error.classList.remove("show");
+            hidePracticeError(error);
           }
         });
       }

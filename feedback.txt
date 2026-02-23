@@ -129,3 +129,7 @@ Betwen every publishing game version, make a presentation what you changed/impor
     - Game theory: Stars. When we did large scale analysis, with stars vs w/o where stars are not required, what happens is that -> People play less on games where there are stars. 
     - You are forcing one to play "one way". Release -> Log Data -> Analysis -> Find Issues/Changes -> Presentation (How you want to change). Every release one new presentation. 
     - You are successful when you address issues from the previous data analysis. 
+
+
+
+num rnds.	num crds.	numbers	colors	letters	direction	shapes	diagonal	maths ops	background color	misleading colors	text color
