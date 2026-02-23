@@ -1,4 +1,3 @@
-
       function setTimer(seconds, label, onComplete, totalSeconds = seconds) {
         clearInterval(timerId);
         const endTime = performance.now() + seconds * 1000;
@@ -252,6 +251,15 @@
         if (typeof window.clearFirstLetterHint === "function") {
           window.clearFirstLetterHint();
         }
+        if (window.tabTutorialActive) { 
+          tabTutorialActive = false; // ADD THIS LINE
+          if (tabTutorialDisabledInputs.length) { // ADD THESE LINES
+            tabTutorialDisabledInputs.forEach((field) => {
+              field.disabled = false;
+            });
+            tabTutorialDisabledInputs = [];
+          }
+        }
         stopFog();
         stopBlur();
         stopGlitching();
@@ -301,6 +309,8 @@
           }
         });
         const stageNumber = Number.isFinite(stageState.index) ? stageState.index + 1 : 1;
+        console.log("enterToRetryEnabled:", window.enterToRetryEnabled);
+        const retryKey = window.enterToRetryEnabled ? "Enter" : "R";
         const title = mode === "stages" ? `Stage ${stageNumber} Failed` : "Round Failed";
         const subtitle = mode === "stages" ? "" : `Streak ${streak}`;
         const buttons =
@@ -309,25 +319,25 @@
                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(Q)</span>
                </button>
-               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
-                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
-                 <span class="action-key-hint" aria-hidden="true">(R)</span>
-               </button>
                <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
                  <img class="action-icon" src="imgs/home_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(H)</span>
+               </button>
+               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
+                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
                </button>`
             : `<button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
                  <img class="action-icon" src="imgs/settings_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(S)</span>
                </button>
-               <button id="practiceRetryButton" class="secondary icon-button" type="button" aria-label="Restart (R)">
-                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
-                 <span class="action-key-hint" aria-hidden="true">(R)</span>
-               </button>
                <button id="practiceBackButton" class="secondary icon-button" type="button" aria-label="Home (H)">
                  <img class="action-icon" src="imgs/home_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(H)</span>
+               </button>
+               <button id="practiceRetryButton" class="secondary icon-button" type="button" aria-label="Restart (${retryKey})">
+                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
                </button>`;
         const actions = document.querySelector(".stage .actions");
         if (actions) {
@@ -421,6 +431,8 @@
         goldLabel = goldTime ? `<div class="star-time gold">${goldTime}s</div>` : "";
         platinumLabel = platinumTime ? `<div class="star-time platinum">${platinumTime}s</div>` : "";
 
+        const retryKey = window.enterToRetryEnabled ? "Enter" : "R";
+
         resultsPanel.innerHTML = `
           <div class="stage-complete">
             <div class="stage-complete__header">
@@ -459,9 +471,9 @@
                 <img class="action-icon" src="imgs/home_button.png" alt="" />
                 <span class="action-key-hint" aria-hidden="true">(H)</span>
               </button>
-              <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (R)">
+              <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
-                <span class="action-key-hint" aria-hidden="true">(R)</span>
+                <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
               </button>
               <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (N)">
                 <img class="action-icon" src="imgs/next_button.png" alt="" />

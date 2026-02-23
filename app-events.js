@@ -184,9 +184,10 @@
       let stageIntroOriginEl = null;
       let flashStagePendingIndex = null;
       let flashCountdownTimers = [];
+      let flashCountdownActive = false;
       let flashWarningEnabled = true;
       let tabTutorialShownRound = null;
-      let tabTutorialActive = false;
+      window.tabTutorialActive = false;
       let tabTutorialDisabledInputs = [];
       let tabTutorialHintEl = null;
       let tabTutorialHintTimeout = null;
@@ -205,6 +206,10 @@
       let stageListMouseListenerAttached = false;
       let stageListSkipListener = null;
       let flashCountdownEnabled = true;
+      let enterToNextEnabled = false;
+      let stageStarShineInterval = null;
+      window.enterToRetryEnabled = false;
+      
 
       function applyStageIntroOrigin(originEl) {
         if (!stageIntroModal || !stageIntroCard) return;
@@ -249,6 +254,7 @@
       }
 
       function clearFlashCountdown() {
+        flashCountdownActive = false;
         flashCountdownTimers.forEach((timerId) => clearTimeout(timerId));
         flashCountdownTimers = [];
         if (flashCountdown) {
@@ -258,7 +264,10 @@
         document.body.classList.remove("flash-countdown-active");
       }
 
-      function runFlashCountdown(onComplete) {
+function runFlashCountdown(onComplete) {
+        if (flashCountdownActive) {
+          return;
+        }
         if (!flashCountdownEnabled) {
           if (typeof onComplete === "function") onComplete();
           return;
@@ -268,6 +277,7 @@
           return;
         }
         clearFlashCountdown();
+        flashCountdownActive = true;
         document.body.classList.add("flash-countdown-active");
         const label = flashCountdown.querySelector(".flash-countdown__num");
         const steps = ["3", "2", "1"];
@@ -288,6 +298,7 @@
           flashCountdownTimers.push(timerId);
         });
         const finishId = window.setTimeout(() => {
+          flashCountdownActive = false;
           clearFlashCountdown();
           if (gameMode === "stages" && stageState && typeof stageState.startTime === "number") {
             stageState.startTime += performance.now() - countdownStart;
@@ -751,6 +762,21 @@
           });
         }
       }
+      
+      function startStarShineLoop() {
+        if (stageStarShineInterval) { 
+          clearInterval(stageStarShineInterval);
+        }
+        stageStarShineInterval = setInterval(() => {
+          if (document.body.dataset.view !== "stages") return;
+          const starsElements = document.querySelectorAll(".stage-list .stage-stars");
+          starsElements.forEach((stars) => {
+            stars.classList.remove("stage-stars--shine");
+            void stars.offsetWidth;
+            stars.classList.add("stage-stars--shine");
+          });
+        }, 5000);
+      }
 
       function openStagesScreen(animate = false) {
         if (stagesScreen) {
@@ -765,9 +791,14 @@
           stagesScreen.removeAttribute("aria-hidden");
         }
         document.body.dataset.view = "stages";
+        startStarShineLoop();
       }
 
       function closeStagesScreen(animateHome = true) {
+        if (stageStarShineInterval) {
+          clearInterval(stageStarShineInterval);
+          stageStarShineInterval = null;
+        }
         if (stagesScreen) {
           stagesScreen.setAttribute("aria-hidden", "true");
         }
@@ -987,15 +1018,17 @@
             const input = event.target && event.target.closest('input[data-index="0"]');
             if (!input || !input.value) return;
             tabTutorialShownRound = round;
-            tabTutorialActive = true;
-            tabTutorialDisabledInputs = [];
-            inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
-              const idx = Number(field.dataset.index);
-              if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
-                field.disabled = true;
-                tabTutorialDisabledInputs.push(field);
-              }
-            });
+            tabTutorialActive = enterToNextEnabled ? false : true;
+            if (!enterToNextEnabled) { 
+              tabTutorialDisabledInputs = [];
+              inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
+                const idx = Number(field.dataset.index);
+                if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
+                  field.disabled = true;
+                  tabTutorialDisabledInputs.push(field);
+                }
+              });
+            }
             return;
           }
           const hintMessage = firstLetterHintStageMessages[stage.id];
@@ -1701,12 +1734,15 @@
             if (nextBtn) nextBtn.click();
             return;
           }
-          if (keyLower === "r") {
-            event.preventDefault();
-            const retryBtn = document.getElementById("stageRetryButton");
-            if (retryBtn) retryBtn.click();
-            return;
+          if (!enterToRetryEnabled) { 
+            if (keyLower === "r") {
+              event.preventDefault();
+              const retryBtn = document.getElementById("stageRetryButton");
+              if (retryBtn) retryBtn.click();
+              return;
+            }
           }
+          
         }
         if (phase === "result" && gameMode === "practice") {
           if (keyLower === "h") {
@@ -1715,12 +1751,15 @@
             if (backBtn) backBtn.click();
             return;
           }
-          if (keyLower === "r") {
-            event.preventDefault();
-            const retryBtn = document.getElementById("practiceRetryButton");
-            if (retryBtn) retryBtn.click();
-            return;
+          if (!enterToRetryEnabled) {
+            if (keyLower === "r") {
+              event.preventDefault();
+              const retryBtn = document.getElementById("practiceRetryButton");
+              if (retryBtn) retryBtn.click();
+              return;
+            }
           }
+          
           if (keyLower === "s") {
             event.preventDefault();
             const settingsBtn = document.getElementById("practiceSettingsButton");
@@ -1740,8 +1779,25 @@
         if (phase === "show") {
           skipRevealNow();
         } else if (phase === "recall") {
+          if (enterToNextEnabled) {
+            const inputs = Array.from(inputGrid.querySelectorAll('input[data-index]'));
+            const activeIndex = inputs.indexOf(document.activeElement);
+            if (activeIndex !== -1 && activeIndex < inputs.length - 1) {
+              event.preventDefault();
+              inputs[activeIndex + 1].focus();
+              return;
+            }
+          }
           checkAnswers();
-        } else if (phase === "result") {
+        } else if (phase === "result" && gameMode === "stages" && enterToRetryEnabled) {
+          event.preventDefault();
+          const retryBtn = document.getElementById("stageRetryButton");
+          if (retryBtn) retryBtn.click();
+          return;
+        } else if (phase === "result" && gameMode === "practice" && enterToRetryEnabled) {
+          event.preventDefault();
+          const retryBtn = document.getElementById("practiceRetryButton");
+          if (retryBtn) retryBtn.click();
           return;
         }
       });
@@ -1848,6 +1904,34 @@
         successAnimationToggle.addEventListener("change", () => {
           window.localStorage.setItem(storageKey, successAnimationToggle.checked ? "1" : "0");
           setSuccessAnimationEnabled(successAnimationToggle.checked);
+        });
+      }
+      
+      if (enterToNextToggle) {
+        const storageKey = "flashRecallEnterToNext";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          enterToNextToggle.checked = saved === "1";
+        }
+
+        enterToNextEnabled = enterToNextToggle.checked;
+        enterToNextToggle.addEventListener("change", () => {
+          enterToNextEnabled = enterToNextToggle.checked;
+          window.localStorage.setItem(storageKey, enterToNextToggle.checked ? "1" : "0");
+        });
+      }
+      
+      if (enterToRetryToggle) {
+        const storageKey = "flashRecallEnterToRetry";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          enterToRetryToggle.checked = saved === "1";
+        }
+
+        enterToRetryEnabled = enterToRetryToggle.checked;
+        enterToRetryToggle.addEventListener("change", () => {
+          enterToRetryEnabled = enterToRetryToggle.checked;
+          window.localStorage.setItem(storageKey, enterToRetryToggle.checked ? "1" : "0");
         });
       }
 

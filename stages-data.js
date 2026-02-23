@@ -387,7 +387,7 @@
       cards: 1,
       revealSeconds: 0.1,
       recallSeconds: 30,
-      categories: ["colors", "directions", "colors"],
+      categories: ["colors", "directions"],
       modifiers: {
       },
       starTimes: { platinum: 2, gold: 3, silver: 15, bronze: 20 },
