@@ -764,6 +764,14 @@ def main() -> None:
             ]:
                 if col in li.columns:
                     feat[col] = li[col].reindex(feat.index)
+            # Missing boolean early-level outcomes should be False (not NaN) for non-participants.
+            for bcol in [f"l{lvl}_failed_first_attempt", f"l{lvl}_completed"]:
+                if bcol in feat.columns:
+                    feat[bcol] = feat[bcol].fillna(False).astype(bool)
+            # Missing counts are zero attempts before first completion.
+            acol = f"l{lvl}_attempts_before_first_completion"
+            if acol in feat.columns:
+                feat[acol] = pd.to_numeric(feat[acol], errors="coerce").fillna(0.0)
 
         feat.reset_index().to_csv(corr_dir / "early_retention_features.csv", index=False)
 
@@ -773,10 +781,17 @@ def main() -> None:
             if c == "retention_seconds":
                 continue
             series = f2[c]
-            if series.dtype == bool:
-                series = series.astype(int)
-            elif not pd.api.types.is_numeric_dtype(series):
-                continue
+            if not pd.api.types.is_numeric_dtype(series):
+                # Convert bool-like/object features (e.g., failed_first_attempt) to numeric.
+                series = series.map(
+                    lambda v: (
+                        1 if str(v).strip().lower() in {"true", "1", "yes", "y", "t"} else
+                        0 if str(v).strip().lower() in {"false", "0", "no", "n", "f"} else
+                        np.nan
+                    )
+                )
+            else:
+                series = pd.to_numeric(series, errors="coerce")
             d = pd.DataFrame({"x": series, "retention_seconds": f2["retention_seconds"]}).dropna()
             if len(d) >= 5:
                 corr_rows.append(
@@ -794,6 +809,15 @@ def main() -> None:
                 ascending=False,
             )
             cdf.to_csv(corr_dir / "early_feature_correlations.csv", index=False)
+            plt.figure(figsize=(10, 6))
+            top_corr = cdf.head(12).set_index("feature")["pearson_corr_with_retention"]
+            top_corr.sort_values().plot(kind="barh")
+            plt.title("Top Early Feature Correlations With Retention (Updated Features)")
+            plt.xlabel("Pearson Correlation")
+            plt.ylabel("Feature")
+            plt.tight_layout()
+            plt.savefig(corr_dir / "top_early_feature_correlations_bar.png", dpi=120)
+            plt.close()
 
     if "cards_failed" in attempts.columns:
         fr = []
