@@ -287,6 +287,16 @@ def attempts_before_first_pass(passed_series: pd.Series) -> int:
     return len(vals)
 
 
+def retries_before_after_first_pass(passed_series: pd.Series) -> tuple[int, int]:
+    vals = passed_series.astype(bool).tolist()
+    if not vals:
+        return 0, 0
+    for i, ok in enumerate(vals):
+        if ok:
+            return i, max(0, len(vals) - i - 1)
+    return max(0, len(vals) - 1), 0
+
+
 def sanitize_version_name(version: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", str(version)).strip("_") or "unknown"
 
@@ -430,10 +440,11 @@ def main() -> None:
     summary.append(f"players_settled_for_quit_metrics: {int(settled_players.shape[0])}")
 
     # New retention by level: player-based and completion-based.
-    if not player_highest_completed.empty and max_completed_level >= 1:
+    if not player_highest_completed.empty:
+        retention_levels = pd.Index(range(0, max(1, max_completed_level) + 1), dtype=int)
         retention_by_level_percent = pd.Series(
-            {level: (player_highest_completed >= level).mean() * 100.0 for level in level_index},
-            index=level_index,
+            {level: (player_highest_completed >= level).mean() * 100.0 for level in retention_levels},
+            index=retention_levels,
         )
         save_line(
             retention_by_level_percent,
@@ -536,34 +547,89 @@ def main() -> None:
             qdf["previous_level"] = qdf["quit_level"] - 1
             qdf = qdf[qdf["previous_level"] >= 1].copy()
             if not qdf.empty:
+                quit_prev_levels = sorted(qdf["previous_level"].astype(int).unique().tolist())
                 qdf["prev_pass"] = [
                     bool(player_level_pass.get((pid, float(prev)), False))
                     or bool(player_level_pass.get((pid, int(prev)), False))
                     for pid, prev in zip(qdf["player_id_norm"], qdf["previous_level"])
                 ]
-                pp = qdf.groupby("previous_level")["prev_pass"].mean().sort_index()
+                prev_pass_pct = float(qdf["prev_pass"].mean() * 100.0)
+                prev_not_pass_pct = 100.0 - prev_pass_pct
+                plt.figure(figsize=(7, 5))
+                plt.bar(
+                    ["Passed Previous Level", "Did Not Pass Previous Level"],
+                    [prev_pass_pct, prev_not_pass_pct],
+                    color=["#1f77b4", "#ff7f0e"],
+                )
+                plt.title("Previous-Level Outcome at Quit (All Players)")
+                plt.xlabel("Outcome")
+                plt.ylabel("Percent of Quits (%)")
+                plt.ylim(0, 100)
+                plt.tight_layout()
+                plt.savefig(args.outdir / "previous_level_pass_rate_when_quit.png", dpi=120)
+                plt.close()
+
+                # Use the exact same quit rows and level index for previous-level time.
+                attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player.get("time_seconds"), errors="coerce")
+                player_level_passed_time = (
+                    attempts_with_player[
+                        attempts_with_player["passed_flag"]
+                        & attempts_with_player["player_id_norm"].notna()
+                        & attempts_with_player["level_number"].notna()
+                        & attempts_with_player["time_seconds"].notna()
+                    ]
+                    .groupby(["player_id_norm", "level_number"])["time_seconds"]
+                    .mean()
+                )
+                qdf["prev_level_time_seconds"] = [
+                    float(player_level_passed_time.get((pid, float(prev)), np.nan))
+                    if pd.notna(player_level_passed_time.get((pid, float(prev)), np.nan))
+                    else float(player_level_passed_time.get((pid, int(prev)), 0.0))
+                    for pid, prev in zip(qdf["player_id_norm"], qdf["previous_level"])
+                ]
+                pt = qdf.groupby("previous_level")["prev_level_time_seconds"].mean().sort_index().reindex(quit_prev_levels, fill_value=0.0)
                 save_bar(
-                    pp * 100.0,
-                    args.outdir / "previous_level_pass_rate_when_quit.png",
-                    "Previous-Level Pass Rate When Players Quit",
+                    pt,
+                    args.outdir / "previous_level_time_before_quit.png",
+                    "Previous-Level Completion Time When Players Quit",
                     "Previous Level",
-                    "Pass Rate (%)",
-                    (0, 100),
+                    "Average Time (seconds)",
                 )
 
-    if {"player_id_norm", "level_number", "time_seconds"} <= set(attempts_with_player.columns) and not player_highest_completed.empty and max_completed_level >= 1:
-        a_time = attempts_with_player.dropna(subset=["player_id_norm", "level_number", "time_seconds"]).copy()
-        player_level_time = a_time.groupby(["player_id_norm", "level_number"])["time_seconds"].sum()
+    if {"player_id_norm", "level_number", "time_seconds", "passed"} <= set(attempts_with_player.columns) and not player_highest_completed.empty and max_completed_level >= 1:
+        attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
+        a_time = attempts_with_player[
+            attempts_with_player["passed_flag"]
+            & attempts_with_player["player_id_norm"].notna()
+            & attempts_with_player["level_number"].notna()
+            & attempts_with_player["time_seconds"].notna()
+        ].copy()
         avg_time_rows: dict[int, float] = {}
-        for level in level_index:
-            eligible = player_highest_completed[player_highest_completed >= level].index
-            if len(eligible) == 0:
-                continue
-            vals = player_level_time.xs(level, level="level_number", drop_level=True) if level in player_level_time.index.get_level_values("level_number") else pd.Series(dtype=float)
-            vals = vals.reindex(eligible).fillna(0.0)
-            avg_time_rows[int(level)] = float(vals.mean())
+        if not a_time.empty:
+            # Player-based average completion time per level:
+            # First average each player's passed attempts at the level, then average across players.
+            player_level_mean_time = a_time.groupby(["player_id_norm", "level_number"])["time_seconds"].mean()
+            for level in level_index:
+                eligible = player_highest_completed[player_highest_completed >= level].index
+                if len(eligible) == 0:
+                    continue
+                vals = (
+                    player_level_mean_time.xs(level, level="level_number", drop_level=True)
+                    if level in player_level_mean_time.index.get_level_values("level_number")
+                    else pd.Series(dtype=float)
+                )
+                vals = vals.reindex(eligible).dropna()
+                if vals.empty:
+                    continue
+                avg_time_rows[int(level)] = float(vals.mean())
         if avg_time_rows:
-            save_bar(pd.Series(avg_time_rows), args.outdir / "avg_time_per_level.png", "Average Player Time on Completed Levels", "Level", "Average Time (seconds)")
+            save_bar(
+                pd.Series(avg_time_rows),
+                args.outdir / "avg_time_per_level.png",
+                "Average Completion Attempt Time Per Level (Players)",
+                "Level",
+                "Average Time (seconds)",
+            )
 
     if {"player_id_norm", "level_number", "stars", "passed"} <= set(attempts_with_player.columns) and not player_highest_completed.empty and max_completed_level >= 1:
         attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
@@ -590,23 +656,144 @@ def main() -> None:
     if {"player_id_norm", "level_number", "passed"} <= set(attempts_with_player.columns) and not player_highest_completed.empty and max_completed_level >= 1:
         attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
         a_retry = attempts_with_player.dropna(subset=["player_id_norm", "level_number"]).copy()
-        g_retry = a_retry.groupby(["player_id_norm", "level_number"])["passed_flag"].apply(attempts_before_first_pass)
-        retries_rows: dict[int, float] = {}
+        g_retry = a_retry.groupby(["player_id_norm", "level_number"])["passed_flag"].apply(retries_before_after_first_pass)
+        g_retry_df = g_retry.apply(pd.Series)
+        g_retry_df.columns = ["before_completion", "after_completion"]
+        retries_before_rows: dict[int, float] = {}
+        retries_after_rows: dict[int, float] = {}
         for level in level_index:
             eligible = player_highest_completed[player_highest_completed >= level].index
             if len(eligible) == 0:
                 continue
-            vals = g_retry.xs(level, level="level_number", drop_level=True) if level in g_retry.index.get_level_values("level_number") else pd.Series(dtype=float)
-            vals = vals.reindex(eligible).fillna(0.0)
-            retries_rows[int(level)] = float(vals.mean())
-        if retries_rows:
-            save_bar(
-                pd.Series(retries_rows),
-                args.outdir / "retries_by_level_completed_split.png",
-                "Average Retries Before Completion Per Level (Players)",
-                "Level",
-                "Average Retries",
+            if level in g_retry_df.index.get_level_values("level_number"):
+                vals_df = g_retry_df.xs(level, level="level_number", drop_level=True)
+            else:
+                vals_df = pd.DataFrame(index=pd.Index([], dtype=object), columns=["before_completion", "after_completion"])
+            vals_df = vals_df.reindex(eligible).fillna(0.0)
+            retries_before_rows[int(level)] = float(vals_df["before_completion"].mean())
+            retries_after_rows[int(level)] = float(vals_df["after_completion"].mean())
+        if retries_before_rows:
+            plot_df = pd.DataFrame(
+                {
+                    "Before Completion": pd.Series(retries_before_rows),
+                    "After Completion": pd.Series(retries_after_rows),
+                }
             )
+            ax = plot_df.plot(kind="bar", figsize=(10, 5), color=["#1f77b4", "#ff7f0e"])
+            ax.set_title("Average Retries Per Level (Before vs After Completion)")
+            ax.set_xlabel("Level")
+            ax.set_ylabel("Average Retries")
+            plt.tight_layout()
+            plt.savefig(args.outdir / "retries_by_level_completed_split.png", dpi=120)
+            plt.close()
+
+    # Round-time histograms per level (successful rounds only).
+    if "rounds" in attempts.columns and "level_number" in attempts.columns:
+        rows: list[dict[str, float]] = []
+        for _, row in attempts.iterrows():
+            lvl = pd.to_numeric(row.get("level_number"), errors="coerce")
+            rounds = row.get("rounds")
+            if not np.isfinite(lvl) or not isinstance(rounds, list):
+                continue
+            for rr in rounds:
+                if not isinstance(rr, dict):
+                    continue
+                passed_round = str(rr.get("passed")).strip().lower() in TRUE_VALUES
+                if not passed_round:
+                    continue
+                ts = pd.to_numeric(rr.get("time_spent"), errors="coerce")
+                if np.isfinite(ts):
+                    rows.append({"level_number": int(lvl), "time_spent": float(ts)})
+
+        rt = pd.DataFrame(rows)
+        if not rt.empty:
+            per_level_dir = args.outdir / "round_time_per_level"
+            per_level_dir.mkdir(parents=True, exist_ok=True)
+            for lvl in sorted(rt["level_number"].unique().tolist()):
+                vals = rt[rt["level_number"] == lvl]["time_spent"].dropna()
+                if vals.empty:
+                    continue
+                plt.figure(figsize=(8, 5))
+                vals.hist(bins=14)
+                plt.title(f"Round Time Distribution (Successful Rounds) - Level {lvl}")
+                plt.xlabel("Round Time (seconds)")
+                plt.ylabel("Count")
+                plt.tight_layout()
+                plt.savefig(per_level_dir / f"level_{int(lvl):02d}_round_time_hist.png", dpi=120)
+                plt.close()
+            summary.append(f"round_time_per_level_graphs_success_only: {int(rt['level_number'].nunique())}")
+
+    # Early-level correlation features (player-level).
+    # Requested feature set excludes retries and total_time for L1-L3.
+    if (
+        {"player_id_norm", "level_number", "passed"} <= set(attempts_with_player.columns)
+        and not player_retention_seconds.empty
+    ):
+        corr_dir = args.outdir / "early_round_correlations"
+        corr_dir.mkdir(parents=True, exist_ok=True)
+
+        attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
+        attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player.get("time_seconds"), errors="coerce")
+        a_early = attempts_with_player.dropna(subset=["player_id_norm", "level_number"]).copy()
+        g_early = a_early.groupby(["player_id_norm", "level_number"]).agg(
+            attempts_before_first_completion=("passed_flag", attempts_before_first_pass),
+            failed_first_attempt=("passed_flag", lambda x: (len(x) > 0) and (not bool(x.iloc[0]))),
+            completed=("passed_flag", "max"),
+            first_attempt_total_time=("time_seconds", "first"),
+        ).reset_index()
+
+        feat = pd.DataFrame(index=player_retention_seconds.index.astype(str))
+        feat.index.name = "player_id_norm"
+        feat["retention_seconds"] = player_retention_seconds.reindex(feat.index).fillna(0.0).astype(float)
+
+        for lvl in [1, 2, 3]:
+            li = g_early[g_early["level_number"] == lvl].rename(
+                columns={
+                    "attempts_before_first_completion": f"l{lvl}_attempts_before_first_completion",
+                    "failed_first_attempt": f"l{lvl}_failed_first_attempt",
+                    "completed": f"l{lvl}_completed",
+                    "first_attempt_total_time": f"l{lvl}_first_attempt_total_time",
+                }
+            ).set_index("player_id_norm")
+
+            for col in [
+                f"l{lvl}_attempts_before_first_completion",
+                f"l{lvl}_failed_first_attempt",
+                f"l{lvl}_completed",
+                f"l{lvl}_first_attempt_total_time",
+            ]:
+                if col in li.columns:
+                    feat[col] = li[col].reindex(feat.index)
+
+        feat.reset_index().to_csv(corr_dir / "early_retention_features.csv", index=False)
+
+        corr_rows = []
+        f2 = feat.copy()
+        for c in f2.columns:
+            if c == "retention_seconds":
+                continue
+            series = f2[c]
+            if series.dtype == bool:
+                series = series.astype(int)
+            elif not pd.api.types.is_numeric_dtype(series):
+                continue
+            d = pd.DataFrame({"x": series, "retention_seconds": f2["retention_seconds"]}).dropna()
+            if len(d) >= 5:
+                corr_rows.append(
+                    {
+                        "feature": c,
+                        "pearson_corr_with_retention": d["x"].corr(d["retention_seconds"]),
+                        "n": len(d),
+                    }
+                )
+
+        if corr_rows:
+            cdf = pd.DataFrame(corr_rows).sort_values(
+                "pearson_corr_with_retention",
+                key=lambda s: s.abs(),
+                ascending=False,
+            )
+            cdf.to_csv(corr_dir / "early_feature_correlations.csv", index=False)
 
     if "cards_failed" in attempts.columns:
         fr = []
@@ -639,25 +826,6 @@ def main() -> None:
             fc.groupby(["level_number", "card_type"]).size().reset_index(name="count").to_csv(args.outdir / "failed_cards_by_level_type.csv", index=False)
             summary.append(f"failed_cards_raw_unknown_count: {raw_unknown_count}")
             summary.append(f"failed_cards_unknown_recovered_by_inference: {inferred_from_unknown_count}")
-
-    if not settled_players.empty and int(settled_players.max()) >= 1:
-        max_settled_level = int(settled_players.max())
-        drop_rows: dict[int, float] = {}
-        for level in range(1, max_settled_level + 1):
-            at_level = int((settled_players >= level).sum())
-            at_next = int((settled_players >= (level + 1)).sum())
-            if at_level <= 0:
-                continue
-            drop_rows[level] = ((at_level - at_next) / at_level) * 100.0
-        if drop_rows:
-            save_bar(
-                pd.Series(drop_rows),
-                args.outdir / "dropoff_by_level.png",
-                "Player Drop-off Rate by Highest Level Completed (Settled Players)",
-                "Level",
-                "Drop-off Rate (%)",
-                (0, 100),
-            )
 
     sandbox_modes = {"sandbox", "practice"}
     sandbox_player_ids: set[str] = set()
