@@ -113,6 +113,23 @@ def save_bar(series: pd.Series, path: Path, title: str, xlabel: str, ylabel: str
     plt.close()
 
 
+def save_line(series: pd.Series, path: Path, title: str, xlabel: str, ylabel: str, ylim: Optional[tuple[float, float]] = None) -> None:
+    if series.empty:
+        return
+    plt.figure(figsize=(9, 5))
+    x = series.index.to_numpy()
+    y = series.to_numpy()
+    plt.plot(x, y, marker="o")
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.tight_layout()
+    plt.savefig(path, dpi=120)
+    plt.close()
+
+
 def infer_quit_summary(events: pd.DataFrame, attempts: pd.DataFrame) -> pd.DataFrame:
     if events.empty or "event_type" not in events.columns:
         return pd.DataFrame()
@@ -319,6 +336,63 @@ def main() -> None:
 
     retention_by_session = build_retention_seconds_by_session(sessions, attempts, events)
     summary.append("retention_metric: attempts.time_seconds sum per session (strict gameplay-only)")
+
+    # Retention curves:
+    # 1) By level: % of sessions that reached each level at least once.
+    # 2) By gameplay time: % of sessions with >= X minutes of gameplay retention.
+    if not attempts.empty and "level_number" in attempts.columns:
+        a_ret = add_session_key(attempts.copy()).dropna(subset=["session_key", "level_number"])
+        if not a_ret.empty:
+            session_highest_level = a_ret.groupby("session_key")["level_number"].max().dropna()
+            if not session_highest_level.empty:
+                max_level = int(session_highest_level.max())
+                level_index = pd.Index(range(1, max_level + 1), dtype=int)
+                retention_by_level_percent = pd.Series(
+                    {
+                        level: (session_highest_level >= level).mean() * 100.0
+                        for level in level_index
+                    },
+                    index=level_index,
+                )
+                save_line(
+                    retention_by_level_percent,
+                    args.outdir / "retention_percent_by_level.png",
+                    "Total Retention by Level",
+                    "Level",
+                    "Retention (%)",
+                    (0, 100),
+                )
+                summary.append("retention_by_level_percent:")
+                for level, rate in retention_by_level_percent.items():
+                    summary.append(f"  level_{int(level)}: {rate:.2f}")
+
+    if not sessions.empty:
+        s_keys = add_session_key(sessions.copy()).dropna(subset=["session_key"])
+        session_keys = pd.Index(s_keys["session_key"].astype(str).unique())
+        if len(session_keys) > 0:
+            session_retention_seconds = (
+                retention_by_session.reindex(session_keys).fillna(0.0).astype(float)
+            )
+            max_minutes = int(np.ceil(session_retention_seconds.max() / 60.0))
+            if max_minutes >= 1:
+                minute_index = pd.Index(range(1, max_minutes + 1), dtype=int)
+                retention_by_time_percent = pd.Series(
+                    {
+                        minute: (session_retention_seconds >= (minute * 60.0)).mean() * 100.0
+                        for minute in minute_index
+                    },
+                    index=minute_index,
+                )
+                save_line(
+                    retention_by_time_percent,
+                    args.outdir / "retention_percent_by_time_played.png",
+                    "Total Retention by Gameplay Time",
+                    "Gameplay Time (minutes)",
+                    "Retention (%)",
+                    (0, 100),
+                )
+                summary.append("retention_by_time_played_percent:")
+                summary.append(f"  max_minutes: {max_minutes}")
 
     if {"player_id"} <= set(sessions.columns):
         s_ret = add_session_key(sessions.copy())
