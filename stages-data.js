@@ -37,7 +37,7 @@
     {
       id: 2,
       name: "Stage 2",
-      stageType: "memory",
+      stageType: "tutorial",
       rounds: 3,
       cards: 2,
       revealSeconds: 30,
@@ -59,7 +59,7 @@
     {
       id: 3,
       name: "Stage 3",
-      stageType: "memory",
+      stageType: "tutorial",
       rounds: 3,
       cards: 2,
       revealSeconds: 15,

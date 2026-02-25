@@ -41,6 +41,7 @@
         try {
           if (!normalized) {
             window.localStorage.removeItem(PLAYER_NAME_KEY);
+            window.localStorage.removeItem(PLAYER_NAME_PROMPT_KEY);
           } else {
             window.localStorage.setItem(PLAYER_NAME_KEY, normalized);
           }
