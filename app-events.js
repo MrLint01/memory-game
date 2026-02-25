@@ -93,6 +93,25 @@
         }
       }
 
+      function shouldShowPlayerNameSetting() {
+        if (getPlayerName()) return true;
+        try {
+          return window.localStorage.getItem(PLAYER_NAME_PROMPT_KEY) === "1";
+        } catch {
+          return false;
+        }
+      }
+
+      function updatePlayerNameSettingVisibility() {
+        const row = document.getElementById("playerNameSettingRow");
+        if (!row) return;
+        if (shouldShowPlayerNameSetting()) {
+          row.removeAttribute("hidden");
+        } else {
+          row.setAttribute("hidden", "");
+        }
+      }
+
       function markPlayerNamePrompted() {
         try {
           window.localStorage.setItem(PLAYER_NAME_PROMPT_KEY, "1");
@@ -1209,6 +1228,7 @@
       }
       if (settingsOpen && settingsModal) {
         settingsOpen.addEventListener("click", () => {
+          updatePlayerNameSettingVisibility();
           setModalState(settingsModal, true);
         });
       }
@@ -1251,12 +1271,14 @@
           if (!normalized) return;
           updatePlayerNameInputs(normalized);
           markPlayerNamePrompted();
+          updatePlayerNameSettingVisibility();
           closePlayerNameModal();
         });
       }
       if (playerNameSkip) {
         playerNameSkip.addEventListener("click", () => {
           markPlayerNamePrompted();
+          updatePlayerNameSettingVisibility();
           closePlayerNameModal();
         });
       }
@@ -1268,6 +1290,7 @@
         playerNameSetting.addEventListener("blur", () => {
           const normalized = setPlayerName(playerNameSetting.value);
           updatePlayerNameInputs(normalized);
+          updatePlayerNameSettingVisibility();
         });
         playerNameSetting.addEventListener("keydown", (event) => {
           if (event.key === "Enter") {
@@ -1315,6 +1338,14 @@
           window.localStorage.removeItem("flashRecallSandboxUnlocks");
           window.localStorage.removeItem("flashRecallPlayerName");
           window.localStorage.removeItem("flashRecallPlayerNamePrompted");
+          if (playerNameSetting) {
+            playerNameSetting.value = "";
+          }
+          const nameRow = document.getElementById("playerNameSettingRow");
+          if (nameRow) {
+            nameRow.setAttribute("hidden", "");
+          }
+          updatePlayerNameSettingVisibility();
           if (typeof window.saveStageProgress === "function") {
             window.saveStageProgress();
           }

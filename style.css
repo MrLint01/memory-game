@@ -321,6 +321,9 @@ h1 {
   gap: 0.45rem;
   position: relative;
 }
+[hidden] {
+  display: none !important;
+}
       .control-group label {
         font-weight: 600;
         font-size: 0.92rem;
