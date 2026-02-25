@@ -99,9 +99,6 @@
               <button id="statsOpen" class="quick-action icon-button" type="button" aria-label="Open stats">
                 <img class="action-icon" src="imgs/stat_button.png" alt="" />
               </button>
-              <button id="referenceOpen" class="quick-action icon-button" type="button" aria-label="Open reference">
-                <img class="action-icon" src="imgs/reference_button.png" alt="" />
-              </button>
               <button id="fullscreenToggle" class="quick-action icon-button" type="button" aria-label="Toggle fullscreen">
                 <img class="action-icon" src="imgs/fullscreen_button.png" alt="" />
               </button>
@@ -372,6 +369,7 @@
       </div>
     </div>
     <div data-include="ui/settings.html"></div>
+    <div data-include="ui/player-name.html"></div>
     <div data-include="ui/stats.html"></div>
     <div data-include="ui/stage-intro.html"></div>
     <div data-include="ui/reference.html"></div>
@@ -397,7 +395,9 @@
     <div class="interrupt-modal" id="interruptModal" aria-hidden="true" hidden>
       <div class="interrupt-card">
         <div class="interrupt-header">
-          <button class="interrupt-close" id="interruptClose" type="button">X</button>
+          <button class="interrupt-close icon-button modal-close" id="interruptClose" type="button" aria-label="Close">
+            <img class="action-icon" src="imgs/x_button.png" alt="" />
+          </button>
         </div>
         <div class="interrupt-body">Pop-up block</div>
       </div>
