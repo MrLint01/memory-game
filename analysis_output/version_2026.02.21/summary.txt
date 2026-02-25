@@ -1,0 +1,200 @@
+Flash Recall Logging Analysis
+================================
+version_filter: 2026.02.21
+sessions: 49
+unique_players: 23
+retention_metric: attempts.time_seconds sum per player (strict gameplay-only)
+players_currently_playing_inferred: 2
+players_settled_for_quit_metrics: 33
+retention_by_level_percent_player_completed:
+  level_1: 51.43
+  level_2: 34.29
+  level_3: 22.86
+  level_4: 17.14
+  level_5: 17.14
+  level_6: 17.14
+  level_7: 17.14
+  level_8: 17.14
+  level_9: 17.14
+  level_10: 17.14
+  level_11: 17.14
+  level_12: 14.29
+  level_13: 11.43
+  level_14: 11.43
+  level_15: 11.43
+  level_16: 11.43
+  level_17: 11.43
+  level_18: 11.43
+  level_19: 11.43
+  level_20: 11.43
+  level_21: 8.57
+  level_22: 8.57
+  level_23: 8.57
+  level_24: 8.57
+  level_25: 8.57
+  level_26: 8.57
+  level_27: 8.57
+  level_28: 8.57
+  level_29: 8.57
+  level_30: 8.57
+  level_31: 8.57
+  level_32: 8.57
+  level_33: 8.57
+  level_34: 8.57
+  level_35: 8.57
+  level_36: 8.57
+  level_37: 8.57
+  level_38: 8.57
+  level_39: 8.57
+  level_40: 8.57
+  level_41: 8.57
+  level_42: 5.71
+  level_43: 5.71
+  level_44: 5.71
+  level_45: 5.71
+  level_46: 2.86
+  level_47: 2.86
+  level_48: 2.86
+  level_49: 2.86
+  level_50: 2.86
+  level_51: 2.86
+  level_52: 2.86
+  level_53: 2.86
+  level_54: 2.86
+  level_55: 2.86
+  level_56: 2.86
+  level_57: 2.86
+  level_58: 2.86
+  level_59: 2.86
+  level_60: 2.86
+  level_61: 2.86
+  level_62: 2.86
+  level_63: 2.86
+  level_64: 2.86
+  level_65: 2.86
+  level_66: 2.86
+  level_67: 2.86
+  level_68: 2.86
+  level_69: 2.86
+  level_70: 2.86
+  level_71: 2.86
+  level_72: 2.86
+  level_73: 2.86
+  level_74: 2.86
+  level_75: 2.86
+  level_76: 2.86
+  level_77: 2.86
+  level_78: 2.86
+  level_79: 2.86
+  level_80: 2.86
+  level_81: 2.86
+  level_82: 2.86
+  level_83: 2.86
+  level_84: 2.86
+  level_85: 2.86
+  level_86: 2.86
+  level_87: 2.86
+  level_88: 2.86
+  level_89: 2.86
+  level_90: 2.86
+retention_by_time_played_percent_player:
+  max_minutes: 43
+unique_players_for_duration_hist: 35
+avg_player_gameplay_minutes: 3.19
+level_completion_rate_percent_player_completed:
+  level_1: 51.43
+  level_2: 34.29
+  level_3: 22.86
+  level_4: 17.14
+  level_5: 17.14
+  level_6: 17.14
+  level_7: 17.14
+  level_8: 17.14
+  level_9: 17.14
+  level_10: 17.14
+  level_11: 17.14
+  level_12: 14.29
+  level_13: 11.43
+  level_14: 11.43
+  level_15: 11.43
+  level_16: 11.43
+  level_17: 11.43
+  level_18: 11.43
+  level_19: 11.43
+  level_20: 11.43
+  level_21: 8.57
+  level_22: 8.57
+  level_23: 8.57
+  level_24: 8.57
+  level_25: 8.57
+  level_26: 8.57
+  level_27: 8.57
+  level_28: 8.57
+  level_29: 8.57
+  level_30: 8.57
+  level_31: 8.57
+  level_32: 8.57
+  level_33: 8.57
+  level_34: 8.57
+  level_35: 8.57
+  level_36: 8.57
+  level_37: 8.57
+  level_38: 8.57
+  level_39: 8.57
+  level_40: 8.57
+  level_41: 8.57
+  level_42: 5.71
+  level_43: 5.71
+  level_44: 5.71
+  level_45: 5.71
+  level_46: 2.86
+  level_47: 2.86
+  level_48: 2.86
+  level_49: 2.86
+  level_50: 2.86
+  level_51: 2.86
+  level_52: 2.86
+  level_53: 2.86
+  level_54: 2.86
+  level_55: 2.86
+  level_56: 2.86
+  level_57: 2.86
+  level_58: 2.86
+  level_59: 2.86
+  level_60: 2.86
+  level_61: 2.86
+  level_62: 2.86
+  level_63: 2.86
+  level_64: 2.86
+  level_65: 2.86
+  level_66: 2.86
+  level_67: 2.86
+  level_68: 2.86
+  level_69: 2.86
+  level_70: 2.86
+  level_71: 2.86
+  level_72: 2.86
+  level_73: 2.86
+  level_74: 2.86
+  level_75: 2.86
+  level_76: 2.86
+  level_77: 2.86
+  level_78: 2.86
+  level_79: 2.86
+  level_80: 2.86
+  level_81: 2.86
+  level_82: 2.86
+  level_83: 2.86
+  level_84: 2.86
+  level_85: 2.86
+  level_86: 2.86
+  level_87: 2.86
+  level_88: 2.86
+  level_89: 2.86
+  level_90: 2.86
+unique_players_for_level_hist: 35
+failed_cards_raw_unknown_count: 0
+failed_cards_unknown_recovered_by_inference: 0
+sandbox_players_percent: 0.00
+sandbox_players_count: 0
+sandbox_time_seconds_observed: n/a

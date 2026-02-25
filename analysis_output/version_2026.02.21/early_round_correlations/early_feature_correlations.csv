@@ -1,0 +1,13 @@
+feature,pearson_corr_with_retention,n
+l2_retries,0.9060519638973872,21
+l3_retries,0.882448450785117,17
+l3_total_time,0.8638564306162141,17
+l2_total_time,0.8325035432098141,21
+l2_attempts_before_first_completion,0.7852647620311869,21
+l3_attempts_before_first_completion,0.7633668024163764,17
+l1_total_time,0.6903847335447365,26
+l1_retries,0.5994652038169627,26
+l1_first_attempt_total_time,-0.1779516643156284,26
+l2_first_attempt_total_time,-0.17534694309041424,21
+l1_attempts_before_first_completion,-0.15352113062851797,26
+l3_first_attempt_total_time,-0.14189905958081026,17

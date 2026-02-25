@@ -160,11 +160,12 @@ def write_csv(df: pd.DataFrame, path: Path) -> None:
     if df.empty:
         pd.DataFrame().to_csv(path, index=False)
         return
-
-    out = df.copy()
+    filtered_df = df[(df["release_channel"] == "github-pages")]
+    if "user_agent" in filtered_df.columns:
+        filtered_df = filtered_df[~filtered_df["user_agent"].str.contains("IPhone|Android", case=False)]
+    out = filtered_df.copy()
     for col in out.columns:
         out[col] = out[col].map(_to_jsonable)
-
     out.to_csv(path, index=False)
 
 
