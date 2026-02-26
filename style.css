@@ -321,13 +321,17 @@ h1 {
   gap: 0.45rem;
   position: relative;
 }
+[hidden] {
+  display: none !important;
+}
       .control-group label {
         font-weight: 600;
         font-size: 0.92rem;
         color: var(--ink);
       }
       .control-group select,
-      .control-group input[type="number"] {
+      .control-group input[type="number"],
+      .control-group input[type="text"] {
         width: 100%;
         padding: 0.55rem 0.7rem;
         font-size: 0.95rem;
@@ -557,8 +561,8 @@ body[data-state="idle"] .quick-actions {
   gap: 0.6rem;
 }
 body[data-state="idle"] .quick-action {
-  flex: 0 0 auto;
-  min-width: 120px;
+  flex: 1 1 0;
+  min-width: 0;
 }
       body[data-state="show"] header,
       body[data-state="show"] .layout aside,
@@ -1484,6 +1488,19 @@ body[data-state="paused"] .hud-pause {
   opacity: 1 !important;
   margin-top: 0.1rem;
 }
+.mode-card__lock.lock-fade {
+  animation: lockFadeOut 900ms ease-out forwards;
+}
+@keyframes lockFadeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
 .mode-card.primary {
   background: var(--panel-muted);
   animation: playPulse 2.2s ease-in-out infinite;
@@ -1849,7 +1866,7 @@ body[data-state="paused"] .hud-pause {
         gap: 0.75rem;
       }
       .quick-action {
-        flex: 0 0 auto;
+        flex: 1 1 0;
         border: 2px solid var(--border);
         background: var(--panel-muted);
         color: var(--ink);
@@ -1899,6 +1916,9 @@ body[data-state="paused"] .hud-pause {
   background: rgba(17, 24, 39, 0.5);
   z-index: 20;
 }
+.modal--confirm {
+  z-index: 30;
+}
 body.pause-active main {
   filter: blur(6px) grayscale(0.6);
   opacity: 0.35;
@@ -1939,15 +1959,16 @@ body.pause-active .interrupt-close {
   border-radius: 0;
   padding: 1.4rem;
   box-shadow: none;
+  position: relative;
   opacity: 0;
   transform: translateY(14px) scale(0.98);
-  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 220ms ease;
-  transition-delay: 40ms;
+  transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 320ms ease;
+  transition-delay: 60ms;
 }
-.modal.show .modal-card {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
+      .modal.show .modal-card {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
 .modal-card--muted {
   background: var(--panel-muted);
 }
@@ -1968,6 +1989,15 @@ body.pause-active .interrupt-close {
   position: relative;
   height: 0;
   margin-top: 0;
+}
+.modal-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  z-index: 3;
+}
+.interrupt-card {
+  position: relative;
 }
 .modal-card--flash .action-key-hint {
   position: absolute;
@@ -2058,7 +2088,7 @@ body.pause-active .interrupt-close {
 .stage-intro-close {
   position: absolute;
   top: -0.8rem;
-  left: -0.8rem;
+  right: -0.8rem;
 }
 .stage-intro-close,
 .stage-intro-start {
@@ -2827,12 +2857,51 @@ body.stage-fail .rotation-icon {
   color: var(--muted);
   font-size: 0.9rem;
 }
+.player-name-note {
+  margin-bottom: 0.85rem;
+}
 .stat-row {
   display: flex;
   justify-content: space-between;
   gap: 0.6rem;
   font-size: 0.9rem;
   color: var(--ink);
+}
+.confirm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.confirm-row[hidden] {
+  display: none !important;
+}
+.confirm-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.confirm-anchor {
+  position: relative;
+}
+.confirm-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.4rem);
+  transform: none;
+  padding: 0.5rem 0.6rem;
+  background: #ffffff;
+  border: 2px solid var(--border);
+  box-shadow: none;
+  z-index: 2;
+  min-width: 230px;
+  max-width: 230px;
+}
+.confirm-actions {
+  display: flex;
+  gap: 0.4rem;
 }
 .modal-actions {
   display: flex;

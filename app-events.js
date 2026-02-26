@@ -20,6 +20,146 @@
         return base;
       }
 
+      const PLAYER_NAME_KEY = "flashRecallPlayerName";
+      const PLAYER_NAME_PROMPT_KEY = "flashRecallPlayerNamePrompted";
+
+      function normalizePlayerName(raw) {
+        if (raw === null || raw === undefined) return "";
+        return String(raw).replace(/\s+/g, " ").trim().slice(0, 16);
+      }
+
+      function getPlayerName() {
+        try {
+          return normalizePlayerName(window.localStorage.getItem(PLAYER_NAME_KEY) || "");
+        } catch {
+          return "";
+        }
+      }
+
+      function setPlayerName(name) {
+        const normalized = normalizePlayerName(name);
+        try {
+          if (!normalized) {
+            window.localStorage.removeItem(PLAYER_NAME_KEY);
+            window.localStorage.removeItem(PLAYER_NAME_PROMPT_KEY);
+          } else {
+            window.localStorage.setItem(PLAYER_NAME_KEY, normalized);
+          }
+        } catch {
+          // ignore storage errors
+        }
+        return normalized;
+      }
+
+      function updatePlayerNameInputs(value) {
+        if (playerNameInput) {
+          playerNameInput.value = value;
+        }
+        if (playerNameSetting) {
+          playerNameSetting.value = value;
+        }
+        if (playerNameSave) {
+          playerNameSave.disabled = !value;
+        }
+      }
+
+      function closePlayerNameModal() {
+        setModalState(playerNameModal, false);
+        clearPlayerNameDelay();
+        playerNameModalOpening = false;
+      }
+
+      function openPlayerNameModal() {
+        playerNameModalOpening = true;
+        window.setTimeout(() => {
+          playerNameModalOpening = false;
+        }, 450);
+        setModalState(playerNameModal, true);
+        const name = getPlayerName();
+        updatePlayerNameInputs(name);
+        if (playerNameInput) {
+          playerNameInput.focus();
+          playerNameInput.select();
+        }
+      }
+
+      function shouldPromptForPlayerName() {
+        if (!playerNameModal) return false;
+        if (getPlayerName()) return false;
+        try {
+          return window.localStorage.getItem(PLAYER_NAME_PROMPT_KEY) !== "1";
+        } catch {
+          return true;
+        }
+      }
+
+      function shouldShowPlayerNameSetting() {
+        if (getPlayerName()) return true;
+        try {
+          return window.localStorage.getItem(PLAYER_NAME_PROMPT_KEY) === "1";
+        } catch {
+          return false;
+        }
+      }
+
+      function updatePlayerNameSettingVisibility() {
+        const row = document.getElementById("playerNameSettingRow");
+        if (!row) return;
+        if (shouldShowPlayerNameSetting()) {
+          row.removeAttribute("hidden");
+        } else {
+          row.setAttribute("hidden", "");
+        }
+      }
+
+      function markPlayerNamePrompted() {
+        try {
+          window.localStorage.setItem(PLAYER_NAME_PROMPT_KEY, "1");
+        } catch {
+          // ignore
+        }
+      }
+
+      let playerNamePromptDelayActive = false;
+      let playerNamePromptDelayTimer = null;
+      let playerNameModalOpening = false;
+
+      function setResultInteractionsEnabled(enabled) {
+        const value = enabled ? "" : "none";
+        if (resultsPanel) {
+          resultsPanel.style.pointerEvents = value;
+        }
+        if (actions) {
+          actions.style.pointerEvents = value;
+        }
+      }
+
+      function clearPlayerNameDelay() {
+        if (playerNamePromptDelayTimer) {
+          window.clearTimeout(playerNamePromptDelayTimer);
+          playerNamePromptDelayTimer = null;
+        }
+        playerNamePromptDelayActive = false;
+        setResultInteractionsEnabled(true);
+      }
+
+      window.getPlayerName = getPlayerName;
+      window.setPlayerName = setPlayerName;
+      window.maybePromptPlayerName = function maybePromptPlayerName() {
+        if (!shouldPromptForPlayerName()) return;
+        playerNamePromptDelayActive = true;
+        setResultInteractionsEnabled(false);
+        playerNamePromptDelayTimer = window.setTimeout(() => {
+          playerNamePromptDelayTimer = null;
+          try {
+            if (!shouldPromptForPlayerName()) return;
+            openPlayerNameModal();
+          } finally {
+            clearPlayerNameDelay();
+          }
+        }, 1200);
+      };
+
       function resetGame() {
         bumpRoundFlowToken();
         if (successAnimationActive) {
@@ -149,6 +289,7 @@
 
       function updatePracticeLock() {
         const unlocked = isPracticeUnlocked();
+        const wasUnlocked = updatePracticeLock.lastUnlocked;
         if (practiceStart) {
           practiceStart.disabled = !unlocked;
           practiceStart.classList.toggle("mode-card--locked", !unlocked);
@@ -156,7 +297,13 @@
           if (lockText) {
             lockText.textContent = unlocked ? "" : "Locked • Clear Stage 5";
           }
+          if (unlocked && wasUnlocked === false && lockText) {
+            lockText.classList.remove("lock-fade");
+            void lockText.offsetWidth;
+            lockText.classList.add("lock-fade");
+          }
         }
+        updatePracticeLock.lastUnlocked = unlocked;
       }
 
       function formatStageModifiers(modifiers) {
@@ -1081,6 +1228,7 @@
       }
       if (settingsOpen && settingsModal) {
         settingsOpen.addEventListener("click", () => {
+          updatePlayerNameSettingVisibility();
           setModalState(settingsModal, true);
         });
       }
@@ -1096,9 +1244,90 @@
           }
         });
       }
+      if (playerNameModal) {
+        playerNameModal.addEventListener("click", (event) => {
+          if (event.target === playerNameModal) {
+            markPlayerNamePrompted();
+            closePlayerNameModal();
+          }
+        });
+      }
+      if (playerNameInput) {
+        playerNameInput.addEventListener("input", () => {
+          const normalized = normalizePlayerName(playerNameInput.value);
+          if (playerNameSave) {
+            playerNameSave.disabled = !normalized;
+          }
+        });
+        playerNameInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && playerNameSave && !playerNameSave.disabled) {
+            playerNameSave.click();
+          }
+        });
+      }
+      if (playerNameSave) {
+        playerNameSave.addEventListener("click", () => {
+          const normalized = setPlayerName(playerNameInput ? playerNameInput.value : "");
+          if (!normalized) return;
+          updatePlayerNameInputs(normalized);
+          markPlayerNamePrompted();
+          updatePlayerNameSettingVisibility();
+          closePlayerNameModal();
+        });
+      }
+      if (playerNameSkip) {
+        playerNameSkip.addEventListener("click", () => {
+          markPlayerNamePrompted();
+          updatePlayerNameSettingVisibility();
+          closePlayerNameModal();
+        });
+      }
+      if (playerNameSetting) {
+        const name = getPlayerName();
+        if (name) {
+          playerNameSetting.value = name;
+        }
+        playerNameSetting.addEventListener("blur", () => {
+          const normalized = setPlayerName(playerNameSetting.value);
+          updatePlayerNameInputs(normalized);
+          updatePlayerNameSettingVisibility();
+        });
+        playerNameSetting.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            playerNameSetting.blur();
+          }
+        });
+      }
       const debugResetProgress = document.getElementById("debugResetProgress");
+      const resetConfirmRow = document.getElementById("resetConfirmRow");
+      const resetConfirmYes = document.getElementById("resetConfirmYes");
+      const resetConfirmNo = document.getElementById("resetConfirmNo");
+      const resetConfirmAnchor = resetConfirmRow ? resetConfirmRow.closest(".confirm-anchor") : null;
+      const hideResetConfirmRow = () => {
+        if (resetConfirmRow) {
+          resetConfirmRow.setAttribute("hidden", "");
+        }
+      };
       if (debugResetProgress) {
         debugResetProgress.addEventListener("click", () => {
+          if (!resetConfirmRow) return;
+          if (resetConfirmRow.hasAttribute("hidden")) {
+            resetConfirmRow.removeAttribute("hidden");
+          } else {
+            resetConfirmRow.setAttribute("hidden", "");
+          }
+        });
+      }
+      if (resetConfirmNo) {
+        resetConfirmNo.addEventListener("click", () => {
+          hideResetConfirmRow();
+        });
+        resetConfirmNo.addEventListener("keydown", (event) => {
+          event.preventDefault();
+        });
+      }
+      if (resetConfirmYes) {
+        resetConfirmYes.addEventListener("click", () => {
           window.stageStars = {};
           window.stageBestTimes = {};
           window.stageCompleted = {};
@@ -1107,6 +1336,16 @@
           window.localStorage.removeItem("flashRecallStats");
           window.localStorage.removeItem("flashRecallFlashWarning");
           window.localStorage.removeItem("flashRecallSandboxUnlocks");
+          window.localStorage.removeItem("flashRecallPlayerName");
+          window.localStorage.removeItem("flashRecallPlayerNamePrompted");
+          if (playerNameSetting) {
+            playerNameSetting.value = "";
+          }
+          const nameRow = document.getElementById("playerNameSettingRow");
+          if (nameRow) {
+            nameRow.setAttribute("hidden", "");
+          }
+          updatePlayerNameSettingVisibility();
           if (typeof window.saveStageProgress === "function") {
             window.saveStageProgress();
           }
@@ -1134,8 +1373,29 @@
               }
             }
           }
+          hideResetConfirmRow();
+        });
+        resetConfirmYes.addEventListener("keydown", (event) => {
+          event.preventDefault();
         });
       }
+      if (settingsModal) {
+        settingsModal.addEventListener("click", (event) => {
+          if (event.target === settingsModal) {
+            hideResetConfirmRow();
+          }
+        });
+      }
+      if (settingsClose) {
+        settingsClose.addEventListener("click", () => {
+          hideResetConfirmRow();
+        });
+      }
+      document.addEventListener("click", (event) => {
+        if (!resetConfirmRow || resetConfirmRow.hasAttribute("hidden")) return;
+        if (resetConfirmAnchor && resetConfirmAnchor.contains(event.target)) return;
+        hideResetConfirmRow();
+      });
       if (statsOpen && statsModal) {
         statsOpen.addEventListener("click", () => {
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
@@ -1611,6 +1871,24 @@
 
       document.addEventListener("keydown", (event) => {
         const keyLower = event.key.toLowerCase();
+        if (playerNamePromptDelayActive && phase === "result" && gameMode === "stages") {
+          event.preventDefault();
+          return;
+        }
+        if (playerNameModal && playerNameModal.classList.contains("show")) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            markPlayerNamePrompted();
+            closePlayerNameModal();
+            return;
+          }
+          if (event.key === "Enter" && playerNameSave && !playerNameSave.disabled) {
+            event.preventDefault();
+            playerNameSave.click();
+            return;
+          }
+          return;
+        }
         if (tabTutorialActive) {
           if (event.key === "Tab") {
             tabTutorialActive = false;

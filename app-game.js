@@ -466,6 +466,10 @@
             barFill.style.width = targetWidth + "%";
           }, 20); // small delay ensures browser painted initial width
         });
+
+        if (typeof window.maybePromptPlayerName === "function") {
+          window.maybePromptPlayerName();
+        }
       }
 
       function lockInputs(locked) {
