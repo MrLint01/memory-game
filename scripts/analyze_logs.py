@@ -311,6 +311,254 @@ def parse_version_key(version: str) -> tuple:
             key.append((1, t.lower()))
     return tuple(key) if key else ((1, str(version).lower()),)
 
+def analyze_level_dropoff_metrics(
+    attempts_with_player: pd.DataFrame,
+    player_highest_completed: pd.Series,
+    outdir: Path
+) -> None:
+    """Generate playtime and retry graphs for players who dropped off between levels."""
+    if attempts_with_player.empty or player_highest_completed.empty:
+        return
+    
+    if not {"player_id_norm", "level_number", "time_seconds", "passed"} <= set(attempts_with_player.columns):
+        return
+    
+    dropoff_dir = outdir / "level_dropoff_analysis"
+    dropoff_dir.mkdir(parents=True, exist_ok=True)
+    
+    attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
+    attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player["time_seconds"], errors="coerce")
+    
+    # Helper to get players who completed level X but not level Y
+    def get_dropoff_players(completed_level: int, not_completed_level: int) -> set[str]:
+        # Players whose highest completed level is exactly completed_level
+        return set(
+            player_highest_completed[player_highest_completed == completed_level]
+            .index.astype(str)
+            .tolist()
+        )
+    
+    # 1. Playtime: Completed L1, did not complete L2
+    l1_dropoff = get_dropoff_players(1, 2)
+    if l1_dropoff:
+        playtime_l1 = (
+            attempts_with_player[
+                attempts_with_player["player_id_norm"].isin(l1_dropoff)
+                & (attempts_with_player["level_number"] == 1)
+            ]
+            .groupby("player_id_norm")["time_seconds"]
+            .first()  # Changed from .sum() to .first()
+        )
+        save_hist_values(
+            playtime_l1,
+            dropoff_dir / "playtime_level1_dropoff_before_level2.png",
+            "First Attempt Playtime on Level 1 (Players Who Completed L1 But Not L2)",
+            "Time (seconds)",
+            bins=20,
+        )
+
+    # 2. Playtime: Completed L2, did not complete L3
+    l2_dropoff = get_dropoff_players(2, 3)
+    if l2_dropoff:
+        playtime_l2 = (
+            attempts_with_player[
+                attempts_with_player["player_id_norm"].isin(l2_dropoff)
+                & (attempts_with_player["level_number"] == 2)
+            ]
+            .groupby("player_id_norm")["time_seconds"]
+            .first()  # Changed from .sum() to .first()
+        )
+        save_hist_values(
+            playtime_l2,
+            dropoff_dir / "playtime_level2_dropoff_before_level3.png",
+            "First Attempt Playtime on Level 2 (Players Who Completed L2 But Not L3)",
+            "Time (seconds)",
+            bins=20,
+        )
+    
+    # 3. Retries: Completed L1, did not complete L2
+    if l1_dropoff:
+        l1_attempts = attempts_with_player[
+            attempts_with_player["player_id_norm"].isin(l1_dropoff)
+            & (attempts_with_player["level_number"] == 1)
+        ]
+        retries_split = (
+            l1_attempts.groupby("player_id_norm")["passed_flag"]
+            .apply(retries_before_after_first_pass)
+            .apply(pd.Series)
+        )
+        retries_split.columns = ["before_completion", "after_completion"]
+        retries_split.index = [str(pid)[:6] for pid in retries_split.index]
+        
+        plt.figure(figsize=(10, 5))
+        retries_split.plot(kind="bar", color=["#1f77b4", "#ff7f0e"])
+        plt.title("Retries on Level 1 (Players Who Completed L1 But Not L2)")
+        plt.xlabel("Player")
+        plt.ylabel("Number of Retries")
+        plt.legend(["Before Completion", "After Completion"])
+        plt.tight_layout()
+        plt.savefig(dropoff_dir / "retries_level1_dropoff_before_level2.png", dpi=120)
+        plt.close()
+
+    # 4. Retries: Completed L2, did not complete L3
+    if l2_dropoff:
+        l2_attempts = attempts_with_player[
+            attempts_with_player["player_id_norm"].isin(l2_dropoff)
+            & (attempts_with_player["level_number"] == 2)
+        ]
+        retries_split = (
+            l2_attempts.groupby("player_id_norm")["passed_flag"]
+            .apply(retries_before_after_first_pass)
+            .apply(pd.Series)
+        )
+        retries_split.columns = ["before_completion", "after_completion"]
+        retries_split.index = [str(pid)[:6] for pid in retries_split.index]
+        
+        plt.figure(figsize=(10, 5))
+        retries_split.plot(kind="bar", color=["#1f77b4", "#ff7f0e"])
+        plt.title("Retries on Level 2 (Players Who Completed L2 But Not L3)")
+        plt.xlabel("Player")
+        plt.ylabel("Number of Retries")
+        plt.legend(["Before Completion", "After Completion"])
+        plt.tight_layout()
+        plt.savefig(dropoff_dir / "retries_level2_dropoff_before_level3.png", dpi=120)
+        plt.close()
+    
+    # Graphs for players who DID complete the next level
+    l1_continued = set(player_highest_completed[player_highest_completed >= 2].index.astype(str).tolist())
+    l2_continued = set(player_highest_completed[player_highest_completed >= 3].index.astype(str).tolist())
+
+    # 5. First attempt playtime L1 (players who completed L2+)
+    if l1_continued:
+        playtime_l1_cont = (
+            attempts_with_player[
+                attempts_with_player["player_id_norm"].isin(l1_continued)
+                & (attempts_with_player["level_number"] == 1)
+            ]
+            .groupby("player_id_norm")["time_seconds"]
+            .first()
+        )
+        save_hist_values(
+            playtime_l1_cont,
+            dropoff_dir / "playtime_level1_continued_to_level2.png",
+            "First Attempt Playtime on Level 1 (Players Who Completed L2+)",
+            "Time (seconds)",
+            bins=20,
+        )
+
+    # 6. First attempt playtime L2 (players who completed L3+)
+    if l2_continued:
+        playtime_l2_cont = (
+            attempts_with_player[
+                attempts_with_player["player_id_norm"].isin(l2_continued)
+                & (attempts_with_player["level_number"] == 2)
+            ]
+            .groupby("player_id_norm")["time_seconds"]
+            .first()
+        )
+        save_hist_values(
+            playtime_l2_cont,
+            dropoff_dir / "playtime_level2_continued_to_level3.png",
+            "First Attempt Playtime on Level 2 (Players Who Completed L3+)",
+            "Time (seconds)",
+            bins=20,
+        )
+
+    # 7. Retries L1 (players who completed L2+)
+    if l1_continued:
+        l1_cont_attempts = attempts_with_player[
+            attempts_with_player["player_id_norm"].isin(l1_continued)
+            & (attempts_with_player["level_number"] == 1)
+        ]
+        retries_split = (
+            l1_cont_attempts.groupby("player_id_norm")["passed_flag"]
+            .apply(retries_before_after_first_pass)
+            .apply(pd.Series)
+        )
+        retries_split.columns = ["before_completion", "after_completion"]
+        retries_split.index = [str(pid)[:6] for pid in retries_split.index]
+        
+        plt.figure(figsize=(10, 5))
+        retries_split.plot(kind="bar", color=["#1f77b4", "#ff7f0e"])
+        plt.title("Retries on Level 1 (Players Who Completed L2+)")
+        plt.xlabel("Player")
+        plt.ylabel("Number of Retries")
+        plt.legend(["Before Completion", "After Completion"])
+        plt.tight_layout()
+        plt.savefig(dropoff_dir / "retries_level1_continued_to_level2.png", dpi=120)
+        plt.close()
+
+    # 8. Retries L2 (players who completed L3+)
+    if l2_continued:
+        l2_cont_attempts = attempts_with_player[
+            attempts_with_player["player_id_norm"].isin(l2_continued)
+            & (attempts_with_player["level_number"] == 2)
+        ]
+        retries_split = (
+            l2_cont_attempts.groupby("player_id_norm")["passed_flag"]
+            .apply(retries_before_after_first_pass)
+            .apply(pd.Series)
+        )
+        retries_split.columns = ["before_completion", "after_completion"]
+        retries_split.index = [str(pid)[:6] for pid in retries_split.index]
+        
+        plt.figure(figsize=(10, 5))
+        retries_split.plot(kind="bar", color=["#1f77b4", "#ff7f0e"])
+        plt.title("Retries on Level 2 (Players Who Completed L3+)")
+        plt.xlabel("Player")
+        plt.ylabel("Number of Retries")
+        plt.legend(["Before Completion", "After Completion"])
+        plt.tight_layout()
+        plt.savefig(dropoff_dir / "retries_level2_continued_to_level3.png", dpi=120)
+        plt.close()
+
+        # Check if dropoff players attempted the next level
+    l1_dropoff_attempted_l2 = set(
+        attempts_with_player[
+            attempts_with_player["player_id_norm"].isin(l1_dropoff)
+            & (attempts_with_player["level_number"] == 2)
+        ]["player_id_norm"].unique()
+    )
+    l1_dropoff_not_attempted_l2 = l1_dropoff - l1_dropoff_attempted_l2
+
+    plt.figure(figsize=(7, 5))
+    plt.bar(
+        ["Attempted L2", "Did Not Attempt L2"],
+        [len(l1_dropoff_attempted_l2), len(l1_dropoff_not_attempted_l2)],
+        color=["#2ecc71", "#e74c3c"]
+    )
+    plt.title("L2 Attempt Rate (Players Who Completed L1 But Not L2)")
+    plt.ylabel("Player Count")
+    plt.tight_layout()
+    plt.savefig(dropoff_dir / "level2_attempt_rate_by_l1_dropoff.png", dpi=120)
+    plt.close()
+
+    l2_dropoff_attempted_l3 = set(
+        attempts_with_player[
+            attempts_with_player["player_id_norm"].isin(l2_dropoff)
+            & (attempts_with_player["level_number"] == 3)
+        ]["player_id_norm"].unique()
+    )
+    l2_dropoff_not_attempted_l3 = l2_dropoff - l2_dropoff_attempted_l3
+
+    plt.figure(figsize=(7, 5))
+    plt.bar(
+        ["Attempted L3", "Did Not Attempt L3"],
+        [len(l2_dropoff_attempted_l3), len(l2_dropoff_not_attempted_l3)],
+        color=["#2ecc71", "#e74c3c"]
+    )
+    plt.title("L3 Attempt Rate (Players Who Completed L2 But Not L3)")
+    plt.ylabel("Player Count")
+    plt.tight_layout()
+    plt.savefig(dropoff_dir / "level3_attempt_rate_by_l2_dropoff.png", dpi=120)
+    plt.close()
+
+    # Add summary statistics
+    summary_lines = [
+        f"Players who completed L1 but not L2: {len(l1_dropoff)}",
+        f"Players who completed L2 but not L3: {len(l2_dropoff)}",
+    ]
+    (dropoff_dir / "dropoff_summary.txt").write_text("\n".join(summary_lines), encoding="utf-8")
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Analyze Flash Recall logs")
@@ -908,6 +1156,8 @@ def main() -> None:
             )
     else:
         summary.append("sandbox_time_seconds_observed: n/a")
+    # Add after the sandbox analysis and before the final summary write
+    analyze_level_dropoff_metrics(attempts_with_player, player_highest_completed, args.outdir)
 
     (args.outdir / "summary.txt").write_text("\n".join(summary) + "\n", encoding="utf-8")
     if not sessions.empty:

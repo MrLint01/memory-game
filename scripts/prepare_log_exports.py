@@ -160,9 +160,25 @@ def write_csv(df: pd.DataFrame, path: Path) -> None:
     if df.empty:
         pd.DataFrame().to_csv(path, index=False)
         return
-    filtered_df = df[(df["release_channel"] == "github-pages")]
+    filtered_df = df[(df["release_channel"] == "github-pages")].copy()
     if "user_agent" in filtered_df.columns:
         filtered_df = filtered_df[~filtered_df["user_agent"].str.contains("IPhone|Android", case=False)]
+    
+    # use different timestamp columns depending on what's available:
+    timestamp_col = None
+    if "created_at" in filtered_df.columns:
+        timestamp_col = "created_at"  # For attempts
+    elif "event_timestamp" in filtered_df.columns:
+        timestamp_col = "event_timestamp"  # For events
+    elif "started_at" in filtered_df.columns:
+        timestamp_col = "started_at"  # For sessions
+    
+    if timestamp_col:
+        filtered_df[f"{timestamp_col}_dt"] = pd.to_datetime(filtered_df[timestamp_col], utc=True, errors="coerce")
+        cutoff_date = pd.Timestamp("2026-02-21", tz="UTC")
+        filtered_df = filtered_df[filtered_df[f"{timestamp_col}_dt"] >= cutoff_date]
+        filtered_df = filtered_df.drop(columns=[f"{timestamp_col}_dt"])
+    
     out = filtered_df.copy()
     for col in out.columns:
         out[col] = out[col].map(_to_jsonable)
