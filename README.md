@@ -148,6 +148,25 @@ python scripts/analyze_logs.py \
   --extra-version 2026.02.10
 ```
 
+### One-command pipeline (export -> CSV -> graphs)
+You can run all 3 steps with one bash script:
+
+```bash
+./scripts/export_to_graphs.sh \
+  --service-account C:/keys/flash-recall-service-account.json
+```
+
+Optional sample run with extra analyzer args:
+
+```bash
+./scripts/export_to_graphs.sh \
+  --service-account C:/keys/flash-recall-service-account.json \
+  --limit 100 \
+  --extra-version 2026.02.10
+```
+
+You can still use `--` if you want to forward arbitrary args directly to `analyze_logs.py`.
+
 Current outputs (per version folder) include:
 - `summary.txt`
 - `session_duration_hist.png` (gameplay-time based)

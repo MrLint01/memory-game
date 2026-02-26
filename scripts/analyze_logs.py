@@ -560,6 +560,70 @@ def analyze_level_dropoff_metrics(
     ]
     (dropoff_dir / "dropoff_summary.txt").write_text("\n".join(summary_lines), encoding="utf-8")
 
+def sort_attempts_for_sequence(attempts_df: pd.DataFrame) -> pd.DataFrame:
+    """Sort attempts in likely chronological order for sequence-derived metrics."""
+    out = attempts_df.copy()
+    out["_row_order"] = np.arange(len(out))
+    if "created_at" in out.columns:
+        out["_created_at_ts"] = pd.to_datetime(out["created_at"], utc=True, errors="coerce")
+        return out.sort_values(["_created_at_ts", "_row_order"], na_position="last")
+    return out.sort_values(["_row_order"])
+
+
+def level_attempt_mask(feat_df: pd.DataFrame, level: int) -> pd.Series:
+    """Mask of players who attempted a given level at least once."""
+    candidate_cols = [
+        f"l{level}_first_attempt_succeeded",
+        f"l{level}_failed_first_attempt",
+        f"l{level}_first_attempt_time",
+    ]
+    available = [c for c in candidate_cols if c in feat_df.columns]
+    if not available:
+        return pd.Series(False, index=feat_df.index)
+    mask = pd.Series(False, index=feat_df.index)
+    for c in available:
+        mask = mask | feat_df[c].notna()
+    return mask
+
+
+def pearson_with_bootstrap_ci(
+    x: pd.Series,
+    y: pd.Series,
+    n_boot: int = 1000,
+    ci: float = 0.95,
+    seed: int = 42,
+) -> tuple[float, float, float]:
+    """Return Pearson r and bootstrap CI bounds."""
+    d = pd.DataFrame({"x": pd.to_numeric(x, errors="coerce"), "y": pd.to_numeric(y, errors="coerce")}).dropna()
+    if len(d) < 3:
+        return np.nan, np.nan, np.nan
+    xv = d["x"].to_numpy(dtype=float)
+    yv = d["y"].to_numpy(dtype=float)
+    if np.std(xv) == 0 or np.std(yv) == 0:
+        return np.nan, np.nan, np.nan
+
+    r = float(np.corrcoef(xv, yv)[0, 1])
+    rng = np.random.default_rng(seed)
+    boot_vals: list[float] = []
+    n = len(xv)
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, size=n)
+        xb = xv[idx]
+        yb = yv[idx]
+        if np.std(xb) == 0 or np.std(yb) == 0:
+            continue
+        rb = float(np.corrcoef(xb, yb)[0, 1])
+        if np.isfinite(rb):
+            boot_vals.append(rb)
+    if not boot_vals:
+        return r, np.nan, np.nan
+
+    alpha = 1.0 - ci
+    lo = float(np.percentile(boot_vals, 100.0 * (alpha / 2.0)))
+    hi = float(np.percentile(boot_vals, 100.0 * (1.0 - alpha / 2.0)))
+    return r, lo, hi
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Analyze Flash Recall logs")
     p.add_argument("--sessions", type=Path)
@@ -781,13 +845,6 @@ def main() -> None:
 
         if {"player_id_norm", "level_number", "passed"} <= set(attempts_with_player.columns):
             attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
-            player_level_pass = (
-                attempts_with_player[
-                    attempts_with_player["player_id_norm"].notna() & attempts_with_player["level_number"].notna()
-                ]
-                .groupby(["player_id_norm", "level_number"])["passed_flag"]
-                .max()
-            )
             qdf = pd.DataFrame({
                 "player_id_norm": quit_level_by_player.index.astype(str),
                 "quit_level": quit_level_by_player.values.astype(int),
@@ -796,29 +853,89 @@ def main() -> None:
             qdf = qdf[qdf["previous_level"] >= 1].copy()
             if not qdf.empty:
                 quit_prev_levels = sorted(qdf["previous_level"].astype(int).unique().tolist())
+                # Event-based quit outcome:
+                # At each quit event (per session), was the last attempt before quit a success or failure?
+                quit_outcomes = pd.DataFrame()
+                if not events.empty and "event_type" in events.columns and not attempts.empty:
+                    e_quit = add_session_key(events.copy())
+                    e_quit["event_type_norm"] = e_quit["event_type"].astype(str).str.strip().str.lower()
+                    quit_event_types = {"quit_reason", "quit_inferred_inactivity", "before_unload"}
+                    e_quit = e_quit[e_quit["event_type_norm"].isin(quit_event_types)].copy()
+                    e_quit["quit_time"] = pd.to_numeric(e_quit.get("client_timestamp_ms"), errors="coerce")
+                    fallback_ts = pd.to_datetime(e_quit.get("event_timestamp"), utc=True, errors="coerce")
+                    fallback_ms = (fallback_ts.astype("int64") / 1_000_000).where(fallback_ts.notna(), np.nan)
+                    e_quit["quit_time"] = e_quit["quit_time"].fillna(fallback_ms)
+                    e_quit = e_quit.dropna(subset=["session_key", "quit_time"])
+                    if not e_quit.empty:
+                        quit_latest = (
+                            e_quit.sort_values("quit_time")
+                            .groupby("session_key", as_index=False)
+                            .tail(1)[["session_key", "quit_time"]]
+                        )
+                        a_quit = add_session_key(attempts.copy())
+                        if "passed_flag" not in a_quit.columns:
+                            a_quit["passed_flag"] = bool_series(a_quit["passed"]) if "passed" in a_quit.columns else False
+                        a_quit["attempt_time"] = pd.to_datetime(a_quit.get("created_at"), utc=True, errors="coerce")
+                        a_quit["attempt_time_ms"] = (a_quit["attempt_time"].astype("int64") / 1_000_000).where(a_quit["attempt_time"].notna(), np.nan)
+                        rows: list[dict[str, Any]] = []
+                        for _, qr in quit_latest.iterrows():
+                            sk = qr["session_key"]
+                            qt = float(qr["quit_time"])
+                            aa = a_quit[a_quit["session_key"] == sk].copy()
+                            if aa.empty:
+                                continue
+                            aa_valid = aa.dropna(subset=["attempt_time_ms"]).sort_values("attempt_time_ms")
+                            if not aa_valid.empty:
+                                aa_valid = aa_valid[aa_valid["attempt_time_ms"] <= qt]
+                            if aa_valid.empty:
+                                # If attempt timestamps are missing/no match, use last attempt in session as fallback.
+                                aa_valid = aa.sort_index()
+                            if aa_valid.empty:
+                                continue
+                            last_attempt = aa_valid.iloc[-1]
+                            rows.append(
+                                {
+                                    "session_key": sk,
+                                    "last_attempt_passed": bool(last_attempt.get("passed_flag", False)),
+                                }
+                            )
+                        quit_outcomes = pd.DataFrame(rows)
+
+                if not quit_outcomes.empty:
+                    pass_pct = float(quit_outcomes["last_attempt_passed"].mean() * 100.0)
+                    fail_pct = 100.0 - pass_pct
+                    plt.figure(figsize=(7, 5))
+                    plt.bar(
+                        ["Last Attempt Succeeded", "Last Attempt Failed"],
+                        [pass_pct, fail_pct],
+                        color=["#1f77b4", "#1f77b4"],
+                    )
+                    plt.title("Last Attempt Outcome at Quit Event")
+                    plt.xlabel("Outcome")
+                    plt.ylabel("Percent of Quits (%)")
+                    plt.ylim(0, 100)
+                    plt.tight_layout()
+                    plt.savefig(args.outdir / "previous_level_pass_rate_when_quit.png", dpi=120)
+                    plt.close()
+                    summary.append(f"quit_events_with_last_attempt: {int(quit_outcomes.shape[0])}")
+                    summary.append(f"quit_events_last_attempt_failed_percent: {fail_pct:.2f}")
+                else:
+                    summary.append("quit_events_with_last_attempt: 0")
+
+                # Use the exact same quit rows and level index for previous-level time.
+                attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player.get("time_seconds"), errors="coerce")
+                player_level_pass = (
+                    attempts_with_player[
+                        attempts_with_player["player_id_norm"].notna() & attempts_with_player["level_number"].notna()
+                    ]
+                    .groupby(["player_id_norm", "level_number"])["passed_flag"]
+                    .max()
+                )
                 qdf["prev_pass"] = [
                     bool(player_level_pass.get((pid, float(prev)), False))
                     or bool(player_level_pass.get((pid, int(prev)), False))
                     for pid, prev in zip(qdf["player_id_norm"], qdf["previous_level"])
                 ]
-                prev_pass_pct = float(qdf["prev_pass"].mean() * 100.0)
-                prev_not_pass_pct = 100.0 - prev_pass_pct
-                plt.figure(figsize=(7, 5))
-                plt.bar(
-                    ["Passed Previous Level", "Did Not Pass Previous Level"],
-                    [prev_pass_pct, prev_not_pass_pct],
-                    color=["#1f77b4", "#ff7f0e"],
-                )
-                plt.title("Previous-Level Outcome at Quit (All Players)")
-                plt.xlabel("Outcome")
-                plt.ylabel("Percent of Quits (%)")
-                plt.ylim(0, 100)
-                plt.tight_layout()
-                plt.savefig(args.outdir / "previous_level_pass_rate_when_quit.png", dpi=120)
-                plt.close()
-
-                # Use the exact same quit rows and level index for previous-level time.
-                attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player.get("time_seconds"), errors="coerce")
                 player_level_passed_time = (
                     attempts_with_player[
                         attempts_with_player["passed_flag"]
@@ -904,6 +1021,7 @@ def main() -> None:
     if {"player_id_norm", "level_number", "passed"} <= set(attempts_with_player.columns) and not player_highest_completed.empty and max_completed_level >= 1:
         attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
         a_retry = attempts_with_player.dropna(subset=["player_id_norm", "level_number"]).copy()
+        a_retry = sort_attempts_for_sequence(a_retry)
         g_retry = a_retry.groupby(["player_id_norm", "level_number"])["passed_flag"].apply(retries_before_after_first_pass)
         g_retry_df = g_retry.apply(pd.Series)
         g_retry_df.columns = ["before_completion", "after_completion"]
@@ -983,11 +1101,12 @@ def main() -> None:
         attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
         attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player.get("time_seconds"), errors="coerce")
         a_early = attempts_with_player.dropna(subset=["player_id_norm", "level_number"]).copy()
+        a_early = sort_attempts_for_sequence(a_early)
         g_early = a_early.groupby(["player_id_norm", "level_number"]).agg(
             attempts_before_first_completion=("passed_flag", attempts_before_first_pass),
             failed_first_attempt=("passed_flag", lambda x: (len(x) > 0) and (not bool(x.iloc[0]))),
-            completed=("passed_flag", "max"),
-            first_attempt_total_time=("time_seconds", "first"),
+            first_attempt_succeeded=("passed_flag", lambda x: bool(x.iloc[0]) if len(x) > 0 else np.nan),
+            first_attempt_time=("time_seconds", "first"),
         ).reset_index()
 
         feat = pd.DataFrame(index=player_retention_seconds.index.astype(str))
@@ -999,23 +1118,25 @@ def main() -> None:
                 columns={
                     "attempts_before_first_completion": f"l{lvl}_attempts_before_first_completion",
                     "failed_first_attempt": f"l{lvl}_failed_first_attempt",
-                    "completed": f"l{lvl}_completed",
-                    "first_attempt_total_time": f"l{lvl}_first_attempt_total_time",
+                    "first_attempt_succeeded": f"l{lvl}_first_attempt_succeeded",
+                    "first_attempt_time": f"l{lvl}_first_attempt_time",
                 }
             ).set_index("player_id_norm")
 
             for col in [
                 f"l{lvl}_attempts_before_first_completion",
                 f"l{lvl}_failed_first_attempt",
-                f"l{lvl}_completed",
-                f"l{lvl}_first_attempt_total_time",
+                f"l{lvl}_first_attempt_succeeded",
+                f"l{lvl}_first_attempt_time",
             ]:
                 if col in li.columns:
                     feat[col] = li[col].reindex(feat.index)
-            # Missing boolean early-level outcomes should be False (not NaN) for non-participants.
-            for bcol in [f"l{lvl}_failed_first_attempt", f"l{lvl}_completed"]:
+            # Preserve NaN for first-attempt outcome fields so they represent "did not attempt".
+            for bcol in [f"l{lvl}_failed_first_attempt", f"l{lvl}_first_attempt_succeeded"]:
                 if bcol in feat.columns:
-                    feat[bcol] = feat[bcol].fillna(False).astype(bool)
+                    feat[bcol] = feat[bcol].map(
+                        lambda v: True if str(v).strip().lower() == "true" else (False if str(v).strip().lower() == "false" else np.nan)
+                    )
             # Missing counts are zero attempts before first completion.
             acol = f"l{lvl}_attempts_before_first_completion"
             if acol in feat.columns:
@@ -1025,27 +1146,39 @@ def main() -> None:
 
         corr_rows = []
         f2 = feat.copy()
-        for c in f2.columns:
+        for i, c in enumerate(f2.columns):
             if c == "retention_seconds":
                 continue
-            series = f2[c]
-            if not pd.api.types.is_numeric_dtype(series):
-                # Convert bool-like/object features (e.g., failed_first_attempt) to numeric.
-                series = series.map(
+            raw = f2[c]
+            # First, try numeric coercion (handles numeric-looking object columns).
+            series_num = pd.to_numeric(raw, errors="coerce")
+            if series_num.notna().sum() >= max(1, int(0.5 * raw.notna().sum())):
+                series = series_num
+            else:
+                # Fallback for bool-like/object features (e.g., failed_first_attempt).
+                series = raw.map(
                     lambda v: (
                         1 if str(v).strip().lower() in {"true", "1", "yes", "y", "t"} else
                         0 if str(v).strip().lower() in {"false", "0", "no", "n", "f"} else
                         np.nan
                     )
                 )
-            else:
-                series = pd.to_numeric(series, errors="coerce")
-            d = pd.DataFrame({"x": series, "retention_seconds": f2["retention_seconds"]}).dropna()
+            d = pd.DataFrame({"x": series, "retention_seconds": f2["retention_seconds"]})
+            m = re.match(r"^l([123])_", str(c))
+            if m:
+                lvl = int(m.group(1))
+                d = d[level_attempt_mask(f2, lvl)]
+            d = d.dropna()
             if len(d) >= 5:
+                r, ci_low, ci_high = pearson_with_bootstrap_ci(
+                    d["x"], d["retention_seconds"], n_boot=1000, ci=0.95, seed=42 + i
+                )
                 corr_rows.append(
                     {
                         "feature": c,
-                        "pearson_corr_with_retention": d["x"].corr(d["retention_seconds"]),
+                        "pearson_corr_with_retention": r,
+                        "pearson_ci_low_95": ci_low,
+                        "pearson_ci_high_95": ci_high,
                         "n": len(d),
                     }
                 )
@@ -1058,14 +1191,88 @@ def main() -> None:
             )
             cdf.to_csv(corr_dir / "early_feature_correlations.csv", index=False)
             plt.figure(figsize=(10, 6))
-            top_corr = cdf.head(12).set_index("feature")["pearson_corr_with_retention"]
-            top_corr.sort_values().plot(kind="barh")
-            plt.title("Top Early Feature Correlations With Retention (Updated Features)")
-            plt.xlabel("Pearson Correlation")
+            plot_cdf = cdf[~cdf["feature"].astype(str).str.endswith("_completed")].copy()
+            top_df = plot_cdf.head(12).set_index("feature")[
+                ["pearson_corr_with_retention", "pearson_ci_low_95", "pearson_ci_high_95"]
+            ].sort_values("pearson_corr_with_retention")
+            vals = top_df["pearson_corr_with_retention"]
+            err_left = (vals - top_df["pearson_ci_low_95"]).clip(lower=0).fillna(0.0)
+            err_right = (top_df["pearson_ci_high_95"] - vals).clip(lower=0).fillna(0.0)
+            xerr = np.vstack([err_left.to_numpy(), err_right.to_numpy()])
+            plt.barh(vals.index, vals.to_numpy(), xerr=xerr, color="#4C72B0", ecolor="#333333", capsize=3)
+            plt.title("Feature vs Retention Correlation")
+            plt.xlabel("Correlation (r)")
             plt.ylabel("Feature")
             plt.tight_layout()
             plt.savefig(corr_dir / "top_early_feature_correlations_bar.png", dpi=120)
             plt.close()
+
+            # Secondary chart: same features, with retention outliers removed.
+            # Outliers-removed view: explicitly exclude the known high-retention outlier player.
+            excluded_outlier_player_id = "21f368e9-852a-47d9-9df1-bf1ee65d6992"
+            feat_trim = feat[feat.index.astype(str) != excluded_outlier_player_id].copy()
+            summary.append(f"early_corr_outlier_excluded_player_id: {excluded_outlier_player_id}")
+            summary.append(f"early_corr_rows_removed_as_outliers: {int(max(0, len(feat) - len(feat_trim)))}")
+
+            corr_rows_trim = []
+            for i, c in enumerate(feat_trim.columns):
+                if c == "retention_seconds":
+                    continue
+                raw_t = feat_trim[c]
+                series_num_t = pd.to_numeric(raw_t, errors="coerce")
+                if series_num_t.notna().sum() >= max(1, int(0.5 * raw_t.notna().sum())):
+                    series_t = series_num_t
+                else:
+                    series_t = raw_t.map(
+                        lambda v: (
+                            1 if str(v).strip().lower() in {"true", "1", "yes", "y", "t"} else
+                            0 if str(v).strip().lower() in {"false", "0", "no", "n", "f"} else
+                            np.nan
+                        )
+                    )
+                d_t = pd.DataFrame({"x": series_t, "retention_seconds": feat_trim["retention_seconds"]})
+                m_t = re.match(r"^l([123])_", str(c))
+                if m_t:
+                    lvl_t = int(m_t.group(1))
+                    d_t = d_t[level_attempt_mask(feat_trim, lvl_t)]
+                d_t = d_t.dropna()
+                if len(d_t) >= 5:
+                    r_t, ci_low_t, ci_high_t = pearson_with_bootstrap_ci(
+                        d_t["x"], d_t["retention_seconds"], n_boot=1000, ci=0.95, seed=1042 + i
+                    )
+                    corr_rows_trim.append(
+                        {
+                            "feature": c,
+                            "pearson_corr_with_retention": r_t,
+                            "pearson_ci_low_95": ci_low_t,
+                            "pearson_ci_high_95": ci_high_t,
+                            "n": len(d_t),
+                        }
+                    )
+
+            if corr_rows_trim:
+                cdf_trim = pd.DataFrame(corr_rows_trim).sort_values(
+                    "pearson_corr_with_retention",
+                    key=lambda s: s.abs(),
+                    ascending=False,
+                )
+                cdf_trim.to_csv(corr_dir / "early_feature_correlations_outliers_removed.csv", index=False)
+                plt.figure(figsize=(10, 6))
+                plot_cdf_trim = cdf_trim[~cdf_trim["feature"].astype(str).str.endswith("_completed")].copy()
+                top_df_trim = plot_cdf_trim.head(12).set_index("feature")[
+                    ["pearson_corr_with_retention", "pearson_ci_low_95", "pearson_ci_high_95"]
+                ].sort_values("pearson_corr_with_retention")
+                vals_t = top_df_trim["pearson_corr_with_retention"]
+                err_left_t = (vals_t - top_df_trim["pearson_ci_low_95"]).clip(lower=0).fillna(0.0)
+                err_right_t = (top_df_trim["pearson_ci_high_95"] - vals_t).clip(lower=0).fillna(0.0)
+                xerr_t = np.vstack([err_left_t.to_numpy(), err_right_t.to_numpy()])
+                plt.barh(vals_t.index, vals_t.to_numpy(), xerr=xerr_t, color="#4C72B0", ecolor="#333333", capsize=3)
+                plt.title("Feature vs Retention Correlation (Outliers Removed)")
+                plt.xlabel("Correlation (r)")
+                plt.ylabel("Feature")
+                plt.tight_layout()
+                plt.savefig(corr_dir / "top_early_feature_correlations_bar_outliers_removed.png", dpi=120)
+                plt.close()
 
     if "cards_failed" in attempts.columns:
         fr = []
@@ -1105,24 +1312,84 @@ def main() -> None:
     sandbox_time_seconds = 0.0
     sandbox_dir = args.outdir / "sandbox_statistics"
     sandbox_dir.mkdir(parents=True, exist_ok=True)
+    # Prevent stale sandbox charts from prior runs from persisting in output.
+    for stale_name in [
+        "sandbox_participation_unique_players.png",
+        "sandbox_avg_playtime_per_player.png",
+        "sandbox_playtime_per_player_hist.png",
+        "sandbox_top20_players_by_playtime.png",
+    ]:
+        stale_path = sandbox_dir / stale_name
+        if stale_path.exists():
+            stale_path.unlink()
     sandbox_time_by_player: dict[str, float] = {}
     if not player_highest_completed.empty:
         total_player_ids = set(player_highest_completed.index.astype(str).tolist())
-    if not attempts_with_player.empty and {"mode", "player_id_norm", "time_seconds"} <= set(attempts_with_player.columns):
-        a_sb = attempts_with_player[
-            attempts_with_player["mode"].astype(str).str.lower().isin(sandbox_modes)
-        ].copy()
-        sandbox_player_ids.update(a_sb["player_id_norm"].dropna().astype(str).tolist())
-        a_sb["time_seconds"] = pd.to_numeric(a_sb["time_seconds"], errors="coerce")
-        vals = a_sb["time_seconds"].dropna()
-        sandbox_time_seconds = float(vals.sum()) if not vals.empty else 0.0
-        by_player = (
-            a_sb.dropna(subset=["player_id_norm", "time_seconds"])
-            .groupby("player_id_norm")["time_seconds"]
-            .sum()
-        )
-        for pid, secs in by_player.items():
-            sandbox_time_by_player[str(pid)] = float(secs)
+    if not attempts_with_player.empty and {"player_id_norm"} <= set(attempts_with_player.columns):
+        a_sb = attempts_with_player.copy()
+        a_sb["time_seconds"] = pd.to_numeric(a_sb.get("time_seconds"), errors="coerce")
+
+        # 1) Round-level sandbox/practice timing (preferred when available).
+        for _, row in a_sb.iterrows():
+            pid = row.get("player_id_norm")
+            if pd.isna(pid):
+                continue
+            rounds = row.get("rounds")
+            if not isinstance(rounds, list):
+                continue
+            round_secs = 0.0
+            for rr in rounds:
+                if not isinstance(rr, dict):
+                    continue
+                rr_mode = str(rr.get("mode") or "").strip().lower()
+                if rr_mode not in sandbox_modes:
+                    continue
+                ts = pd.to_numeric(rr.get("time_spent"), errors="coerce")
+                if np.isfinite(ts):
+                    round_secs += float(ts)
+            if round_secs > 0:
+                pid_str = str(pid)
+                sandbox_player_ids.add(pid_str)
+                sandbox_time_by_player[pid_str] = sandbox_time_by_player.get(pid_str, 0.0) + round_secs
+
+        # 2) Attempt-level fallback where the attempt itself is sandbox/practice
+        # and round-level sandbox time is not present.
+        if "mode" in a_sb.columns:
+            for _, row in a_sb.iterrows():
+                pid = row.get("player_id_norm")
+                if pd.isna(pid):
+                    continue
+                mode = str(row.get("mode") or "").strip().lower()
+                if mode not in sandbox_modes:
+                    continue
+                pid_str = str(pid)
+                sandbox_player_ids.add(pid_str)
+                rounds = row.get("rounds")
+                has_sandbox_round = False
+                if isinstance(rounds, list):
+                    for rr in rounds:
+                        if isinstance(rr, dict) and str(rr.get("mode") or "").strip().lower() in sandbox_modes:
+                            has_sandbox_round = True
+                            break
+                if has_sandbox_round:
+                    continue
+                ts = row.get("time_seconds")
+                if np.isfinite(ts):
+                    sandbox_time_by_player[pid_str] = sandbox_time_by_player.get(pid_str, 0.0) + float(ts)
+
+    # Events still contribute sandbox participation even when attempts are missing.
+    if not events.empty and "mode" in events.columns:
+        e_player_col = pick_player_column(events)
+        if e_player_col is not None:
+            e_sb_players = (
+                events[events["mode"].astype(str).str.lower().isin(sandbox_modes)][e_player_col]
+                .dropna()
+                .astype(str)
+                .tolist()
+            )
+            sandbox_player_ids.update(e_sb_players)
+
+    sandbox_time_seconds = float(sum(sandbox_time_by_player.values())) if sandbox_time_by_player else 0.0
     if total_player_ids:
         sandbox_percent = (len(sandbox_player_ids) / len(total_player_ids)) * 100.0
         summary.append(f"sandbox_players_percent: {sandbox_percent:.2f}")
@@ -1141,18 +1408,14 @@ def main() -> None:
         summary.append(f"sandbox_time_seconds_observed: {sandbox_time_seconds:.2f}")
         if sandbox_time_by_player:
             player_time_series = pd.Series(sandbox_time_by_player)
-            save_hist_minutes(
-                player_time_series,
-                sandbox_dir / "sandbox_playtime_per_player_hist.png",
-                "Sandbox Playtime Per Unique Player"
-            )
-            top = (player_time_series / 60.0).sort_values(ascending=False).head(20)
+            avg_minutes = float(player_time_series.mean() / 60.0)
+            summary.append(f"sandbox_avg_playtime_minutes_per_player: {avg_minutes:.2f}")
             save_bar(
-                top,
-                sandbox_dir / "sandbox_top20_players_by_playtime.png",
-                "Top 20 Players by Sandbox Playtime",
-                "Player (anonymized id)",
-                "Sandbox Playtime (minutes)"
+                pd.Series({"Average Sandbox Playtime": avg_minutes}),
+                sandbox_dir / "sandbox_avg_playtime_per_player.png",
+                "Average Sandbox Playtime Per Player",
+                "Metric",
+                "Sandbox Playtime (minutes)",
             )
     else:
         summary.append("sandbox_time_seconds_observed: n/a")
