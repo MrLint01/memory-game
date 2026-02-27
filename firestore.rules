@@ -15,5 +15,12 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if request.auth.uid == resource.data.user_id;
     }
+
+    match /leaderboards/{version}/stages/{stageId}/entries/{entryId} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.resource.data.player_id == entryId;
+      allow delete: if false;
+    }
   }
 }

@@ -11,6 +11,8 @@ const firebaseConfig = {
 };
 
 const PLAYER_ID_STORAGE_KEY = "flash_recall_player_id_v1";
+const DISABLE_TELEMETRY_ON_LOCALHOST =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 const INACTIVITY_ACTIVE_PAUSE_MS = 1 * 60 * 1000;
 const INACTIVITY_QUIT_MS = 3 * 60 * 1000;
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
@@ -44,6 +46,136 @@ const playerId = getOrCreatePlayerId();
 const sessionId = generateId();
 const gameVersion = window.FLASH_RECALL_VERSION || "dev";
 const releaseChannel = window.FLASH_RECALL_RELEASE_CHANNEL || deriveReleaseChannel();
+
+const leaderboardSyncKey = `flashRecallLeaderboardSynced_${gameVersion}`;
+
+function getDisplayNameFallback() {
+  if (typeof window.getPlayerName === "function") {
+    const name = window.getPlayerName();
+    if (name) return name;
+  }
+  return `Player ${playerId}`;
+}
+
+function getStageLeaderboardPath(stageId, stageVersion) {
+  const safeStageId = String(stageId);
+  const safeVersion = Number(stageVersion) || 1;
+  return `leaderboards/v_${gameVersion}/stages/stage_${safeStageId}_v${safeVersion}/entries`;
+}
+
+async function fetchLeaderboardDoc(path, id) {
+  if (!firebaseDb) return null;
+  try {
+    const docRef = firebaseDb.doc(`${path}/${id}`);
+    const snap = await docRef.get();
+    if (!snap.exists) return null;
+    return { id: snap.id, ...snap.data() };
+  } catch (error) {
+    console.warn("Failed to fetch leaderboard doc", error);
+    return null;
+  }
+}
+
+async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, playerName) {
+  if (!firebaseDb || !currentUserId) return;
+  const bestTimeMs = Number.isFinite(timeSeconds) ? Math.round(timeSeconds * 1000) : null;
+  if (!Number.isFinite(bestTimeMs)) return;
+  const path = getStageLeaderboardPath(stageId, stageVersion);
+  const entryId = playerId;
+  const existing = await fetchLeaderboardDoc(path, entryId);
+  const resolvedBest =
+    existing && Number.isFinite(existing.best_time_ms)
+      ? Math.min(existing.best_time_ms, bestTimeMs)
+      : bestTimeMs;
+  const resolvedName = playerName || getDisplayNameFallback();
+  if (
+    existing &&
+    Number.isFinite(existing.best_time_ms) &&
+    existing.best_time_ms <= bestTimeMs &&
+    existing.player_name === resolvedName
+  ) {
+    return;
+  }
+  const payload = {
+    player_id: playerId,
+    player_name: resolvedName,
+    best_time_ms: resolvedBest,
+    active: true,
+    game_version: gameVersion,
+    stage_version: Number(stageVersion) || 1,
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try {
+    await firebaseDb.doc(`${path}/${entryId}`).set(payload, { merge: true });
+  } catch (error) {
+    console.warn("Failed to update leaderboard", error);
+  }
+}
+
+async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
+  if (!firebaseDb) return { top: [], me: null };
+  const path = getStageLeaderboardPath(stageId, stageVersion);
+  try {
+    const fetchLimit = Math.max(limit * 3, 10);
+    const querySnap = await firebaseDb
+      .collection(path)
+      .orderBy("best_time_ms", "asc")
+      .limit(fetchLimit)
+      .get();
+    const top = querySnap.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((entry) => entry.active !== false)
+      .slice(0, limit);
+    const me = await fetchLeaderboardDoc(path, playerId);
+    const safeMe = me && me.active === false ? null : me;
+    return { top, me: safeMe };
+  } catch (error) {
+    console.warn("Failed to fetch leaderboard", error);
+    return { top: [], me: null };
+  }
+}
+
+async function syncLocalBestTimesOnce(force = false) {
+  if (!firebaseDb || !currentUserId) return;
+  try {
+    if (!force && window.localStorage.getItem(leaderboardSyncKey) === "1") return;
+    const bestTimes = window.stageBestTimes || {};
+    const writes = [];
+    Object.entries(bestTimes).forEach(([key, value]) => {
+      const match = String(key).match(/^(\d+)_v(\d+)$/);
+      if (!match) return;
+      const stageId = match[1];
+      const stageVersion = Number(match[2]) || 1;
+      const timeSeconds = Number(value);
+      if (!Number.isFinite(timeSeconds)) return;
+      writes.push(updateStageLeaderboard(stageId, stageVersion, timeSeconds, getDisplayNameFallback()));
+    });
+    await Promise.all(writes);
+    window.localStorage.setItem(leaderboardSyncKey, "1");
+  } catch (error) {
+    console.warn("Failed to sync leaderboard", error);
+  }
+}
+
+async function deactivateLocalLeaderboardEntries(bestTimesOverride = null) {
+  if (!firebaseDb || !currentUserId) return;
+  try {
+    const bestTimes = bestTimesOverride || window.stageBestTimes || {};
+    const writes = [];
+    Object.keys(bestTimes).forEach((key) => {
+      const match = String(key).match(/^(\d+)_v(\d+)$/);
+      if (!match) return;
+      const stageId = match[1];
+      const stageVersion = Number(match[2]) || 1;
+      const path = getStageLeaderboardPath(stageId, stageVersion);
+      const docRef = firebaseDb.doc(`${path}/${playerId}`);
+      writes.push(docRef.set({ active: false }, { merge: true }));
+    });
+    await Promise.all(writes);
+  } catch (error) {
+    console.warn("Failed to deactivate leaderboard entries", error);
+  }
+}
 
 function deriveReleaseChannel() {
   const host = String(window.location.hostname || "").toLowerCase();
@@ -157,6 +289,7 @@ function scheduleFlush() {
 }
 
 function enqueueEvent(eventType, payload = {}, options = {}) {
+  if (DISABLE_TELEMETRY_ON_LOCALHOST) return;
   const eventDoc = {
     event_type: eventType,
     user_id: currentUserId || null,
@@ -396,14 +529,18 @@ async function initializeFirebase() {
   try {
     firebaseApp = firebase.initializeApp(firebaseConfig);
     firebaseDb = firebase.firestore();
-
-    bindLifecycleListeners();
+    if (!DISABLE_TELEMETRY_ON_LOCALHOST) {
+      bindLifecycleListeners();
+    }
 
     firebase.auth().onAuthStateChanged(async (user) => {
       if (user) {
         currentUserId = user.uid;
         console.log("Firebase anonymous user authenticated:", currentUserId);
-        await createNewSession();
+        if (!DISABLE_TELEMETRY_ON_LOCALHOST) {
+          await createNewSession();
+        }
+        await syncLocalBestTimesOnce();
       } else {
         try {
           await firebase.auth().signInAnonymously();
@@ -481,6 +618,7 @@ function trackRoundCompletion(roundNumber, passed, timeSpent, metadata = {}) {
 }
 
 async function trackLevelStart(levelNumber, metadata = {}) {
+  if (DISABLE_TELEMETRY_ON_LOCALHOST) return;
   if (!isReadyForWrites()) {
     enqueueEvent("level_start_buffered", {
       level_number: normalizeLevelNumber(levelNumber),
@@ -511,6 +649,7 @@ async function trackLevelStart(levelNumber, metadata = {}) {
 }
 
 async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, entries, endReason = "level_end", metadata = {}) {
+  if (DISABLE_TELEMETRY_ON_LOCALHOST) return;
   if (!isReadyForWrites()) {
     console.warn("Firebase not initialized yet");
     return;
@@ -592,6 +731,7 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
 }
 
 async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted, endReason = "session_end") {
+  if (DISABLE_TELEMETRY_ON_LOCALHOST) return;
   if (hasEndedSession) return;
   hasEndedSession = true;
 
@@ -675,11 +815,24 @@ window.trackLevelSession = trackLevelSession;
 window.trackSessionEnd = trackSessionEnd;
 window.trackQuitReason = trackQuitReason;
 window.getLoggingDebugSnapshot = getLoggingDebugSnapshot;
+window.updateStageLeaderboard = updateStageLeaderboard;
+window.fetchStageLeaderboard = fetchStageLeaderboard;
+window.getLeaderboardReady = () => Boolean(firebaseDb && currentUserId);
+window.getLeaderboardPlayerId = () => playerId;
+window.rotateLeaderboardPlayerId = () => {
+  try {
+    window.localStorage.removeItem(PLAYER_ID_STORAGE_KEY);
+    window.localStorage.removeItem(leaderboardSyncKey);
+  } catch (error) {
+    console.warn("Failed to rotate player id", error);
+  }
+};
+window.getLeaderboardDisplayName = getDisplayNameFallback;
+window.syncLocalBestTimesOnce = syncLocalBestTimesOnce;
+window.deactivateLocalLeaderboardEntries = deactivateLocalLeaderboardEntries;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initializeFirebase);
 } else {
   initializeFirebase();
 }
-
-

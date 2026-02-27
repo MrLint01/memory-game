@@ -12,13 +12,48 @@
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return false;
       if (parsed.stars && typeof parsed.stars === "object") {
-        window.stageStars = parsed.stars;
+        const stars = { ...parsed.stars };
+        // One-time migration: copy legacy keys without version suffix into v1 keys.
+        Object.keys(stars).forEach((key) => {
+          if (/_v\d+$/.test(key)) return;
+          const legacyValue = stars[key];
+          const v1Key = `${key}_v1`;
+          if (stars[v1Key] === undefined && Number.isFinite(Number(legacyValue))) {
+            stars[v1Key] = legacyValue;
+          }
+          delete stars[key];
+        });
+        window.stageStars = stars;
       }
       if (parsed.completed && typeof parsed.completed === "object") {
-        window.stageCompleted = parsed.completed;
+        const completed = { ...parsed.completed };
+        // One-time migration: copy legacy keys without version suffix into v1 keys.
+        Object.keys(completed).forEach((key) => {
+          if (/_v\d+$/.test(key)) return;
+          const v1Key = `${key}_v1`;
+          if (completed[v1Key] === undefined) {
+            completed[v1Key] = Boolean(completed[key]);
+          }
+          delete completed[key];
+        });
+        window.stageCompleted = completed;
       }
       if (parsed.bestTimes && typeof parsed.bestTimes === "object") {
-        window.stageBestTimes = parsed.bestTimes;
+        const bestTimes = { ...parsed.bestTimes };
+        // One-time migration: copy legacy keys without version suffix into v1 keys.
+        Object.keys(bestTimes).forEach((key) => {
+          if (/_v\d+$/.test(key)) return;
+          const legacyValue = bestTimes[key];
+          const v1Key = `${key}_v1`;
+          if (bestTimes[v1Key] === undefined && Number.isFinite(Number(legacyValue))) {
+            bestTimes[v1Key] = legacyValue;
+          }
+          delete bestTimes[key];
+        });
+        window.stageBestTimes = bestTimes;
+      }
+      if (typeof window.syncLocalBestTimesOnce === "function") {
+        window.syncLocalBestTimesOnce();
       }
       return true;
     } catch (error) {
@@ -42,6 +77,23 @@
   loadStageProgress();
 
   window.saveStageProgress = saveStageProgress;
+
+  window.getStageVersion = function getStageVersion(stage) {
+    const version = stage && Number(stage.version);
+    return Number.isFinite(version) && version > 0 ? version : 1;
+  };
+
+  window.getStageBestTimeKey = function getStageBestTimeKey(stage, index) {
+    const id = stage && stage.id ? String(stage.id) : String(index + 1);
+    const version = window.getStageVersion ? window.getStageVersion(stage) : 1;
+    return `${id}_v${version}`;
+  };
+
+  window.getStageStarsKey = function getStageStarsKey(stage, index) {
+    const id = stage && stage.id ? String(stage.id) : String(index + 1);
+    const version = window.getStageVersion ? window.getStageVersion(stage) : 1;
+    return `${id}_v${version}`;
+  };
 
   window.getStageConfig = function getStageConfig(index) {
     if (!Array.isArray(window.stagesConfig)) return null;

@@ -2,6 +2,7 @@
   window.stagesConfig = [
     {
       id: 1,
+      version: 1,
       name: "Stage 1",
       stageType: "tutorial",
       rounds: 3,
@@ -36,6 +37,7 @@
     },
     {
       id: 2,
+      version: 1,
       name: "Stage 2",
       stageType: "tutorial",
       rounds: 3,
@@ -58,6 +60,7 @@
     },
     {
       id: 3,
+      version: 1,
       name: "Stage 3",
       stageType: "tutorial",
       rounds: 3,
@@ -80,6 +83,7 @@
     },
     {
       id: 4,
+      version: 1,
       name: "Stage 4",
       stageType: "memory",
       rounds: 3,
@@ -101,6 +105,7 @@
     },
     {
       id: 5,
+      version: 1,
       name: "Stage 5",
       stageType: "tutorial",
       rounds: 3,
@@ -123,6 +128,7 @@
     },
     {
       id: 6,
+      version: 1,
       name: "Stage 6",
       stageType: "tutorial",
       rounds: 3,
@@ -145,6 +151,7 @@
     },
     {
       id: 7,
+      version: 1,
       name: "Stage 7",
       stageType: "tutorial",
       rounds: 3,
@@ -167,6 +174,7 @@
     },
     {
       id: 8,
+      version: 1,
       name: "Stage 8",
       stageType: "memory",
       rounds: 3,
@@ -189,6 +197,7 @@
     },
     {
       id: 9,
+      version: 1,
       name: "Stage 9",
       stageType: "memory",
       rounds: 3,
@@ -211,6 +220,7 @@
     },
     {
       id: 10,
+      version: 1,
       name: "Stage 10",
       stageType: "memory",
       rounds: 2,
@@ -224,6 +234,7 @@
     },
     {
       id: 11,
+      version: 1,
       name: "Stage 11",
       stageType: "flash",
       rounds: 3,
@@ -237,6 +248,7 @@
     },
     {
       id: 12,
+      version: 1,
       name: "Stage 12",
       stageType: "tutorial",
       rounds: 3,
@@ -253,6 +265,7 @@
     },
     {
       id: 13,
+      version: 1,
       name: "Stage 13",
       stageType: "memory",
       rounds: 3,
@@ -268,6 +281,7 @@
     },
     {
       id: 14,
+      version: 1,
       name: "Stage 14",
       stageType: "memory",
       rounds: 3,
@@ -286,6 +300,7 @@
     },
     {
       id: 15,
+      version: 1,
       name: "Stage 15",
       stageType: "flash",
       rounds: 3,
@@ -300,6 +315,7 @@
     },
     {
       id: 16,
+      version: 1,
       name: "Stage 16",
       stageType: "tutorial",
       rounds: 3,
@@ -317,6 +333,7 @@
     },
     {
       id: 17,
+      version: 1,
       name: "Stage 17",
       stageType: "memory",
       rounds: 3,
@@ -334,6 +351,7 @@
     },
     {
       id: 18,
+      version: 1,
       name: "Stage 18",
       stageType: "memory",
       rounds: 2,
@@ -350,6 +368,7 @@
     },
     {
       id: 19,
+      version: 1,
       name: "Stage 19",
       stageType: "flash",
       rounds: 3,
@@ -363,6 +382,7 @@
     },
     {
       id: 20,
+      version: 1,
       name: "Stage 20",
       stageType: "memory",
       rounds: 1,
@@ -381,6 +401,7 @@
     },
     {
       id: 21,
+      version: 1,
       name: "Stage 21",
       stageType: "flash",
       rounds: 3,
@@ -395,6 +416,7 @@
     },
     {
       id: 22,
+      version: 1,
       name: "Stage 22",
       stageType: "tutorial",
       rounds: 3,
@@ -410,6 +432,7 @@
     },
     {
       id: 23,
+      version: 1,
       name: "Stage 23",
       stageType: "memory",
       rounds: 3,
@@ -428,6 +451,7 @@
     },
     {
       id: 24,
+      version: 1,
       name: "Stage 24",
       stageType: "memory",
       rounds: 1,
@@ -446,6 +470,7 @@
     },
     {
       id: 25,
+      version: 1,
       name: "Stage 25",
       stageType: "flash",
       rounds: 3,
@@ -464,6 +489,7 @@
     },
     {
       id: 26,
+      version: 1,
       name: "Stage 26",
       stageType: "memory",
       rounds: 1,
@@ -479,6 +505,7 @@
     },
     {
       id: 27,
+      version: 1,
       name: "Stage 27",
       stageType: "tutorial",
       rounds: 3,
@@ -492,6 +519,7 @@
     },
     {
       id: 28,
+      version: 1,
       name: "Stage 28",
       stageType: "memory",
       rounds: 3,
@@ -504,6 +532,7 @@
     },
     {
       id: 29,
+      version: 1,
       name: "Stage 29",
       stageType: "memory",
       rounds: 3,
@@ -519,6 +548,7 @@
     },
     {
       id: 30,
+      version: 1,
       name: "Stage 30",
       stageType: "memory",
       rounds: 3,
@@ -535,6 +565,7 @@
     },
     {
       id: 31,
+      version: 1,
       name: "Stage 31",
       stageType: "tutorial",
       rounds: 3,
@@ -551,6 +582,7 @@
     },
     {
       id: 32,
+      version: 1,
       name: "Stage 32",
       stageType: "memory",
       rounds: 3,
@@ -563,6 +595,7 @@
     },
     {
       id: 33,
+      version: 1,
       name: "Stage 33",
       stageType: "memory",
       rounds: 3,
@@ -581,6 +614,7 @@
     },
     {
       id: 34,
+      version: 1,
       name: "Stage 34",
       stageType: "memory",
       rounds: 1,
@@ -599,6 +633,7 @@
     },
     {
       id: 35,
+      version: 1,
       name: "Stage 35",
       stageType: "memory",
       rounds: 3,
@@ -620,6 +655,7 @@
     },
     {
       id: 36,
+      version: 1,
       name: "Stage 36",
       stageType: "flash",
       rounds: 3,
@@ -641,6 +677,7 @@
     },
     {
       id: 37,
+      version: 1,
       name: "Stage 37",
       stageType: "memory",
       rounds: 1,
@@ -653,6 +690,7 @@
     },
     {
       id: 38,
+      version: 1,
       name: "Stage 38",
       stageType: "memory",
       rounds: 3,
@@ -665,6 +703,7 @@
     },
     {
       id: 39,
+      version: 1,
       name: "Stage 39",
       stageType: "memory",
       rounds: 3,
@@ -677,6 +716,7 @@
     },
     {
       id: 40,
+      version: 1,
       name: "Stage 40",
       stageType: "memory",
       rounds: 3,
@@ -689,6 +729,7 @@
     },
     {
       id: 41,
+      version: 1,
       name: "Stage 41",
       stageType: "memory",
       rounds: 3,
@@ -701,6 +742,7 @@
     },
     {
       id: 42,
+      version: 1,
       name: "Stage 42",
       stageType: "memory",
       rounds: 3,
@@ -713,6 +755,7 @@
     },
     {
       id: 43,
+      version: 1,
       name: "Stage 43",
       stageType: "flash",
       rounds: 3,
@@ -725,6 +768,7 @@
     },
     {
       id: 44,
+      version: 1,
       name: "Stage 44",
       stageType: "flash",
       rounds: 3,
@@ -737,6 +781,7 @@
     },
     {
       id: 45,
+      version: 1,
       name: "Stage 45",
       stageType: "tutorial",
       rounds: 3,
@@ -749,6 +794,7 @@
     },
             {
       id: 46,
+      version: 1,
       name: "Stage 46",
       stageType: "memory",
       rounds: 1,
@@ -761,6 +807,7 @@
     },
     {
       id: 47,
+      version: 1,
       name: "Stage 47",
       stageType: "memory",
       rounds: 3,
@@ -773,6 +820,7 @@
     },
     {
       id: 48,
+      version: 1,
       name: "Stage 48",
       stageType: "memory",
       rounds: 3,
@@ -785,6 +833,7 @@
     },
     {
       id: 49,
+      version: 1,
       name: "Stage 49",
       stageType: "memory",
       rounds: 3,
@@ -797,6 +846,7 @@
     },
     {
       id: 50,
+      version: 1,
       name: "Stage 50",
       stageType: "flash",
       rounds: 3,
@@ -809,6 +859,7 @@
     },
     {
       id: 51,
+      version: 1,
       name: "Stage 51",
       stageType: "memory",
       rounds: 1,
@@ -822,6 +873,7 @@
     },
     {
       id: 52,
+      version: 1,
       name: "Stage 52",
       stageType: "memory",
       rounds: 1,
@@ -835,6 +887,7 @@
     },
     {
       id: 53,
+      version: 1,
       name: "Stage 53",
       stageType: "flash",
       rounds: 3,
@@ -847,6 +900,7 @@
     },
     {
       id: 54,
+      version: 1,
       name: "Stage 54",
       stageType: "memory",
       rounds: 1,
@@ -859,6 +913,7 @@
     },
     {
       id: 55,
+      version: 1,
       name: "Stage 55",
       stageType: "flash",
       rounds: 3,
@@ -871,6 +926,7 @@
     },
     {
       id: 56,
+      version: 1,
       name: "Stage 56",
       stageType: "flash",
       rounds: 3,
@@ -883,6 +939,7 @@
     },
     {
       id: 57,
+      version: 1,
       name: "Stage 57",
       stageType: "memory",
       rounds: 3,
@@ -895,6 +952,7 @@
     },
     {
       id: 58,
+      version: 1,
       name: "Stage 58",
       stageType: "memory",
       rounds: 1,
@@ -907,6 +965,7 @@
     },
     {
       id: 59,
+      version: 1,
       name: "Stage 59",
       stageType: "memory",
       rounds: 1,
@@ -919,6 +978,7 @@
     },
     {
       id: 60,
+      version: 1,
       name: "Stage 60",
       stageType: "memory",
       rounds: 2,
@@ -931,6 +991,7 @@
     },
     {
       id: 61,
+      version: 1,
       name: "Stage 61",
       stageType: "memory",
       rounds: 2,
@@ -948,6 +1009,7 @@
     },
     {
       id: 62,
+      version: 1,
       name: "Stage 62",
       stageType: "memory",
       rounds: 1,
@@ -965,6 +1027,7 @@
     },
     {
       id: 63,
+      version: 1,
       name: "Stage 63",
       stageType: "memory",
       rounds: 1,
@@ -977,6 +1040,7 @@
     },
     {
       id: 64,
+      version: 1,
       name: "Stage 64",
       stageType: "tutorial",
       rounds: 1,
@@ -989,6 +1053,7 @@
     },
     {
       id: 65,
+      version: 1,
       name: "Stage 65",
       stageType: "memory",
       rounds: 3,
@@ -1001,6 +1066,7 @@
     },
     {
       id: 66,
+      version: 1,
       name: "Stage 66",
       stageType: "memory",
       rounds: 3,
@@ -1013,6 +1079,7 @@
     },
     {
       id: 67,
+      version: 1,
       name: "Stage 67",
       stageType: "memory",
       rounds: 1,
@@ -1029,6 +1096,7 @@
     },
     {
       id: 68,
+      version: 1,
       name: "Stage 68",
       stageType: "memory",
       rounds: 2,
@@ -1041,6 +1109,7 @@
     },
     {
       id: 69,
+      version: 1,
       name: "Stage 69",
       stageType: "memory",
       rounds: 3,
@@ -1053,6 +1122,7 @@
     },
     {
       id: 70,
+      version: 1,
       name: "Stage 70",
       stageType: "memory",
       rounds: 3,
@@ -1065,6 +1135,7 @@
     },
     {
       id: 71,
+      version: 1,
       name: "Stage 71",
       stageType: "memory",
       rounds: 1,
@@ -1077,6 +1148,7 @@
     },
     {
       id: 72,
+      version: 1,
       name: "Stage 72",
       stageType: "flash",
       rounds: 3,
@@ -1089,6 +1161,7 @@
     },
     {
       id: 73,
+      version: 1,
       name: "Stage 73",
       stageType: "memory",
       rounds: 1,
@@ -1101,6 +1174,7 @@
     },
     {
       id: 74,
+      version: 1,
       name: "Stage 74",
       stageType: "memory",
       rounds: 1,
@@ -1114,6 +1188,7 @@
     },
     {
       id: 75,
+      version: 1,
       name: "Stage 75",
       stageType: "flash",
       rounds: 3,
@@ -1126,6 +1201,7 @@
     },
     {
       id: 76,
+      version: 1,
       name: "Stage 76",
       stageType: "flash",
       rounds: 3,
@@ -1138,6 +1214,7 @@
     },
     {
       id: 77,
+      version: 1,
       name: "Stage 77",
       stageType: "flash",
       rounds: 3,
@@ -1158,6 +1235,7 @@
     },
     {
       id: 78,
+      version: 1,
       name: "Stage 78",
       stageType: "memory",
       rounds: 2,
@@ -1170,6 +1248,7 @@
     },
     {
       id: 79,
+      version: 1,
       name: "Stage 79",
       stageType: "memory",
       rounds: 1,
@@ -1190,6 +1269,7 @@
     },
     {
       id: 80,
+      version: 1,
       name: "Stage 80",
       stageType: "memory",
       rounds: 2,
@@ -1202,6 +1282,7 @@
     },
     {
       id: 81,
+      version: 1,
       name: "Stage 81",
       stageType: "tutorial",
       rounds: 3,
@@ -1219,6 +1300,7 @@
     },
     {
       id: 82,
+      version: 1,
       name: "Stage 82",
       stageType: "memory",
       rounds: 3,
@@ -1240,6 +1322,7 @@
     },
     {
       id: 83,
+      version: 1,
       name: "Stage 83",
       stageType: "flash",
       rounds: 3,
@@ -1257,6 +1340,7 @@
     },
     {
       id: 84,
+      version: 1,
       name: "Stage 84",
       stageType: "memory",
       rounds: 3,
@@ -1274,6 +1358,7 @@
     },
     {
       id: 85,
+      version: 1,
       name: "Stage 85",
       stageType: "memory",
       rounds: 3,
@@ -1293,6 +1378,7 @@
     },
     {
       id: 86,
+      version: 1,
       name: "Stage 86",
       stageType: "memory",
       rounds: 1,
@@ -1305,6 +1391,7 @@
     },
     {
       id: 87,
+      version: 1,
       name: "Stage 87",
       stageType: "memory",
       rounds: 1,
@@ -1317,6 +1404,7 @@
     },
     {
       id: 88,
+      version: 1,
       name: "Stage 88",
       stageType: "flash",
       rounds: 3,
@@ -1329,6 +1417,7 @@
     },
     {
       id: 89,
+      version: 1,
       name: "Stage 89",
       stageType: "memory",
       rounds: 1,
@@ -1341,6 +1430,7 @@
     },
     {
       id: 90,
+      version: 1,
       name: "Stage 90",
       stageType: "tutorial",
       rounds: 1,
@@ -1354,6 +1444,7 @@
     },
     {
       id: 91,
+      version: 1,
       name: "Stage 91",
       stageType: "memory",
       rounds: 3,
@@ -1366,6 +1457,7 @@
     },
     {
       id: 92,
+      version: 1,
       name: "Stage 92",
       stageType: "memory",
       rounds: 1,
@@ -1385,6 +1477,7 @@
     },
     {
       id: 93,
+      version: 1,
       name: "Stage 93",
       stageType: "memory",
       rounds: 1,
@@ -1397,6 +1490,7 @@
     },
     {
       id: 94,
+      version: 1,
       name: "Stage 94",
       stageType: "memory",
       rounds: 2,
@@ -1418,6 +1512,7 @@
     },
     {
       id: 95,
+      version: 1,
       name: "Stage 95",
       stageType: "memory",
       rounds: 2,
@@ -1440,6 +1535,7 @@
     },
     {
       id: 96,
+      version: 1,
       name: "Stage 96",
       stageType: "memory",
       rounds: 3,
@@ -1452,6 +1548,7 @@
     },
     {
       id: 97,
+      version: 1,
       name: "Stage 97",
       stageType: "flash",
       rounds: 3,
@@ -1464,6 +1561,7 @@
     },
     {
       id: 98,
+      version: 1,
       name: "Stage 98",
       stageType: "flash",
       rounds: 3,
@@ -1482,6 +1580,7 @@
     },
     {
       id: 99,
+      version: 1,
       name: "Stage 99",
       stageType: "memory",
       rounds: 3,
@@ -1494,6 +1593,7 @@
     },
     {
       id: 100,
+      version: 1,
       name: "Stage 100",
       stageType: "memory",
       rounds: 3,
@@ -1506,6 +1606,7 @@
     },
     {
       id: 101,
+      version: 1,
       name: "Stage 101",
       stageType: "memory",
       rounds: 3,
