@@ -1,5 +1,5 @@
 (function () {
-  var version = "2026.02.21";
+  var version = "2026.02.24";
   var host = String(window.location.hostname || "").toLowerCase();
   var channel = "custom";
 
