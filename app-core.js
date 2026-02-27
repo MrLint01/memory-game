@@ -76,6 +76,9 @@ const revealInput = document.getElementById("revealTime");
       const stageIntroList = document.getElementById("stageIntroList");
       const stageIntroClose = document.getElementById("stageIntroClose");
       const stageIntroStart = document.getElementById("stageIntroStart");
+      const leaderboardOpen = document.getElementById("leaderboardOpen");
+      const leaderboardModal = document.getElementById("leaderboardModal");
+      const leaderboardClose = document.getElementById("leaderboardClose");
       const stageIntroCard = stageIntroModal
         ? stageIntroModal.querySelector(".modal-card--intro")
         : null;

@@ -365,8 +365,11 @@
       }
 
       function saveStageStars(stage, stars, elapsedSeconds) {
-        if (!stage || !window.stageStars) return;
-        const key = stage.id ? String(stage.id) : String(stageState.index + 1);
+        if (!stage || !window.stageStars) return { hadBest: false };
+        const key = window.getStageStarsKey
+          ? window.getStageStarsKey(stage, stageState.index)
+          : (stage.id ? String(stage.id) : String(stageState.index + 1));
+        let hadBest = false;
         
         // Save stars (keep the highest)
         const hasEntry = Object.prototype.hasOwnProperty.call(window.stageStars, key);
@@ -390,17 +393,22 @@
           if (!window.stageBestTimes) {
             window.stageBestTimes = {};
           }
-          const currentBest = Number(window.stageBestTimes[key]);
+          const bestKey = window.getStageBestTimeKey
+            ? window.getStageBestTimeKey(stage, stageState.index)
+            : key;
+          const currentBest = Number(window.stageBestTimes[bestKey]);
+          hadBest = Number.isFinite(currentBest);
           if (!Number.isFinite(currentBest) || elapsedSeconds < currentBest) {
-            window.stageBestTimes[key] = elapsedSeconds;
+            window.stageBestTimes[bestKey] = elapsedSeconds;
           }
           if (window.saveStageProgress) {
             window.saveStageProgress();
           }
         }
+        return { hadBest };
       }
 
-      function showStageComplete(elapsedSeconds, stars, stage) {
+      function showStageComplete(elapsedSeconds, stars, stage, options = {}) {
         if (typeof window.clearTabKeyHint === "function") {
           window.clearTabKeyHint();
         }
@@ -437,7 +445,7 @@
           <div class="stage-complete">
             <div class="stage-complete__header">
               <strong>${stageName} complete!</strong>
-              <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s</div>
+              <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s <span class="stage-meta--best" id="stageCompleteBestTime"></span></div>
             </div>
             <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}">
               <div class="star-column">
@@ -461,6 +469,17 @@
             </div>
             <div class="stage-complete__bar-track">
               <div class="stage-complete__bar-fill" data-stars="${stars}"></div>
+            </div>
+            <div class="leaderboard-panel" id="stageClearLeaderboard" data-stage-index="${stageState.index}">
+              <div class="leaderboard-panel__title">Leaderboard</div>
+              <div class="leaderboard-list" id="stageClearLeaderboardList">
+                <div class="leaderboard-row">
+                  <span>#</span>
+                  <span>Player</span>
+                  <span>Time</span>
+                </div>
+                <div class="leaderboard-row leaderboard-row--empty" id="stageClearLeaderboardEmpty">No data yet</div>
+              </div>
             </div>
             <div class="stage-complete__actions">
               <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
@@ -504,6 +523,22 @@
           }, 20); // small delay ensures browser painted initial width
         });
 
+        const bestEl = document.getElementById("stageCompleteBestTime");
+        if (bestEl && options.showBest) {
+          const bestKey = window.getStageBestTimeKey
+            ? window.getStageBestTimeKey(stage, stageState.index)
+            : (stage && stage.id ? String(stage.id) : String(stageState.index + 1));
+          const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[bestKey]);
+          bestEl.textContent = Number.isFinite(bestSeconds)
+            ? `(Best: ${bestSeconds.toFixed(2)}s)`
+            : "";
+        } else if (bestEl) {
+          bestEl.textContent = "";
+        }
+
+        if (typeof window.renderStageLeaderboard === "function") {
+          window.renderStageLeaderboard(stage, stageState.index, "stageClearLeaderboardList", "stageClearLeaderboardEmpty");
+        }
         if (typeof window.maybePromptPlayerName === "function") {
           window.maybePromptPlayerName();
         }
@@ -600,7 +635,20 @@
               stageState.elapsedMs = elapsedSeconds * 1000;
               const stars = getStageStars(elapsedSeconds, stage);
           stageState.lastStars = stars;
-          saveStageStars(stage, stars, elapsedSeconds);
+          const saveResult = saveStageStars(stage, stars, elapsedSeconds);
+          if (typeof window.updateStageLeaderboard === "function") {
+            const stageId = stage && stage.id ? String(stage.id) : String(stageState.index + 1);
+            const stageVersion = window.getStageVersion ? window.getStageVersion(stage) : 1;
+            const name = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+            const leaderboardWrite = window.updateStageLeaderboard(stageId, stageVersion, elapsedSeconds, name);
+            if (leaderboardWrite && typeof leaderboardWrite.then === "function") {
+              leaderboardWrite.then(() => {
+                if (typeof window.renderStageLeaderboard === "function") {
+                  window.renderStageLeaderboard(stage, stageState.index, "stageClearLeaderboardList", "stageClearLeaderboardEmpty");
+                }
+              });
+            }
+          }
               // Analytics: Track level session
               if (typeof trackLevelSession === 'function') {
                 const activeContext = typeof window.getActiveLevelContext === "function"
@@ -611,7 +659,9 @@
               lastCompletedLevel = stageState.index + 1;
               lockInputs(true);
               renderCards(true);
-              showStageComplete(elapsedSeconds, stars, stage);
+              showStageComplete(elapsedSeconds, stars, stage, {
+                showBest: Boolean(saveResult && saveResult.hadBest)
+              });
               if (submitBtn) {
                 submitBtn.disabled = true;
               }

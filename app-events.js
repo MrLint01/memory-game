@@ -51,6 +51,27 @@
         return normalized;
       }
 
+      function updateLeaderboardNameForExistingTimes(newName) {
+        if (!newName) return Promise.resolve();
+        if (typeof window.updateStageLeaderboard !== "function") return Promise.resolve();
+        const bestTimes = window.stageBestTimes || {};
+        const entries = Object.entries(bestTimes);
+        if (!entries.length) return Promise.resolve();
+        const updates = [];
+        entries.forEach(([key, value]) => {
+          const match = String(key).match(/^(\\d+)_v(\\d+)$/);
+          if (!match) return;
+          const stageId = match[1];
+          const stageVersion = Number(match[2]) || 1;
+          const timeSeconds = Number(value);
+          if (!Number.isFinite(timeSeconds)) return;
+          updates.push(window.updateStageLeaderboard(stageId, stageVersion, timeSeconds, newName));
+        });
+        return Promise.all(updates).catch((error) => {
+          console.warn("Failed to update leaderboard names", error);
+        });
+      }
+
       function updatePlayerNameInputs(value) {
         if (playerNameInput) {
           playerNameInput.value = value;
@@ -255,20 +276,13 @@
       function openPracticeModal() {
         setModalState(practiceModal, true);
         const starsEl = document.getElementById("sandboxStars");
-        if (
-          starsEl &&
-          typeof window.getSandboxStarsAvailable === "function" &&
-          typeof window.getSandboxStarsEarned === "function"
-        ) {
+        if (starsEl && typeof window.getSandboxStarsAvailable === "function") {
           const availableEl = starsEl.querySelector(".sandbox-stars__available");
-          const totalEl = starsEl.querySelector(".sandbox-stars__total");
           const available = window.getSandboxStarsAvailable();
-          const total = window.getSandboxStarsEarned();
-          if (availableEl && totalEl) {
+          if (availableEl) {
             availableEl.textContent = String(available);
-            totalEl.textContent = String(total);
           } else {
-            starsEl.textContent = `✦ ${available}/${total}`;
+            starsEl.textContent = `✦ ${available}`;
           }
         }
         updateCategoryControls();
@@ -283,7 +297,9 @@
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         const unlockStageIndex = 4; // Stage 5 (0-based index)
         const unlockStage = stages[unlockStageIndex];
-        const unlockKey = unlockStage && unlockStage.id ? String(unlockStage.id) : String(unlockStageIndex + 1);
+        const unlockKey = window.getStageStarsKey
+          ? window.getStageStarsKey(unlockStage, unlockStageIndex)
+          : (unlockStage && unlockStage.id ? String(unlockStage.id) : String(unlockStageIndex + 1));
         return Boolean(window.stageCompleted && window.stageCompleted[unlockKey]);
       }
 
@@ -495,7 +511,9 @@ function runFlashCountdown(onComplete) {
         stageIntroTitle.textContent = stageName;
         if (stageIntroStars) {
           stageIntroStars.innerHTML = "";
-          const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+          const stageKey = window.getStageStarsKey
+            ? window.getStageStarsKey(stage, index)
+            : (stage && stage.id ? String(stage.id) : String(index + 1));
           const starsEarned = window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0;
           [1, 2, 3].forEach((value) => {
             const star = document.createElement("span");
@@ -511,8 +529,10 @@ function runFlashCountdown(onComplete) {
           }
         }
         if (stageIntroBest) {
-          const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
-          const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[stageKey]);
+          const bestKey = window.getStageBestTimeKey
+            ? window.getStageBestTimeKey(stage, index)
+            : (stage && stage.id ? String(stage.id) : String(index + 1));
+          const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[bestKey]);
           stageIntroBest.textContent = Number.isFinite(bestSeconds)
             ? `Best: ${bestSeconds.toFixed(2)}s`
             : "Best: —";
@@ -621,10 +641,26 @@ function runFlashCountdown(onComplete) {
           renderIconSection("Modifiers", modifierItems);
         }
         stageIntroPendingIndex = index;
+        if (leaderboardOpen) {
+          leaderboardOpen.dataset.stageIndex = String(index);
+        }
         stageIntroOriginEl = originEl;
         setModalState(stageIntroModal, true);
         applyStageIntroOrigin(stageIntroOriginEl);
         return true;
+      }
+
+      function hasAnyStageCompletion(stage, index) {
+        if (!window.stageCompleted) return false;
+        const stageId = stage && stage.id ? String(stage.id) : String(index + 1);
+        const currentKey = window.getStageStarsKey
+          ? window.getStageStarsKey(stage, index)
+          : stageId;
+        if (window.stageCompleted[currentKey]) return true;
+        const prefix = `${stageId}_v`;
+        return Object.keys(window.stageCompleted).some(
+          (key) => key.startsWith(prefix) && window.stageCompleted[key]
+        );
       }
 
       function isStageUnlocked(stageIndex) {
@@ -641,11 +677,8 @@ function runFlashCountdown(onComplete) {
 
         // If the previous stage is completed, keep it unlocked (default progression).
         const prevStage = stages[stageIndex - 1];
-        if (prevStage) {
-          const prevStageKey = prevStage && prevStage.id ? String(prevStage.id) : String(stageIndex);
-          if (window.stageCompleted[prevStageKey] === true) {
-            return true;
-          }
+        if (prevStage && hasAnyStageCompletion(prevStage, stageIndex - 1)) {
+          return true;
         }
 
         // Tutorial unlock rule:
@@ -658,8 +691,7 @@ function runFlashCountdown(onComplete) {
         for (let i = 0; i < tutorialIndices.length; i += 1) {
           const tIndex = tutorialIndices[i];
           const tutorialStage = stages[tIndex];
-          const tutorialKey = tutorialStage && tutorialStage.id ? String(tutorialStage.id) : String(tIndex + 1);
-          if (!window.stageCompleted[tutorialKey]) continue;
+          if (!hasAnyStageCompletion(tutorialStage, tIndex)) continue;
           const nextTutorialIndex = tutorialIndices[i + 1] ?? stages.length - 1;
           if (stageIndex > tIndex && stageIndex <= nextTutorialIndex) {
             return true;
@@ -697,11 +729,15 @@ function runFlashCountdown(onComplete) {
         const stagesProgress = document.getElementById("stagesProgress");
         if (stagesTotal || stagesProgress) {
           const totalStars = stages.reduce((sum, stage, index) => {
-            const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+            const stageKey = window.getStageStarsKey
+              ? window.getStageStarsKey(stage, index)
+              : (stage && stage.id ? String(stage.id) : String(index + 1));
             return sum + (window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0);
           }, 0);
           const completedCount = stages.reduce((sum, stage, index) => {
-            const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+            const stageKey = window.getStageStarsKey
+              ? window.getStageStarsKey(stage, index)
+              : (stage && stage.id ? String(stage.id) : String(index + 1));
             return sum + (window.stageCompleted && window.stageCompleted[stageKey] ? 1 : 0);
           }, 0);
           if (stagesTotal) {
@@ -721,12 +757,20 @@ function runFlashCountdown(onComplete) {
         stageList.innerHTML = pageStages
           .map((stage, offset) => {
             const index = pageStart + offset;
-            const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+            const stageKey = window.getStageStarsKey
+              ? window.getStageStarsKey(stage, index)
+              : (stage && stage.id ? String(stage.id) : String(index + 1));
+            const completionKey = window.getStageStarsKey
+              ? window.getStageStarsKey(stage, index)
+              : (stage && stage.id ? String(stage.id) : String(index + 1));
             const stars = window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0;
+            const bestKey = window.getStageBestTimeKey
+              ? window.getStageBestTimeKey(stage, index)
+              : stageKey;
             const bestTimeSeconds = Number(
-              window.stageBestTimes && window.stageBestTimes[stageKey]
+              window.stageBestTimes && window.stageBestTimes[bestKey]
             );
-            const isCompleted = window.stageCompleted && window.stageCompleted[stageKey];
+            const isCompleted = window.stageCompleted && window.stageCompleted[completionKey];
             const stageType = stage && stage.stageType ? String(stage.stageType).toLowerCase() : "";
             const stageTypeIcon =
               stageType === "flash"
@@ -1021,8 +1065,155 @@ function runFlashCountdown(onComplete) {
           closeStageIntro();
         });
       }
+      if (leaderboardOpen && leaderboardModal) {
+        leaderboardOpen.addEventListener("click", async () => {
+          setModalState(leaderboardModal, true);
+          if (typeof window.syncLocalBestTimesOnce === "function") {
+            try {
+              await window.syncLocalBestTimesOnce(true);
+            } catch (error) {
+              console.warn("Leaderboard sync failed", error);
+            }
+          }
+          if (typeof window.renderStageLeaderboard === "function") {
+            const rawIndex = leaderboardOpen.dataset.stageIndex ?? stageIntroPendingIndex;
+            const index = Number.isFinite(Number(rawIndex)) ? Number(rawIndex) : stageIntroPendingIndex;
+            const stage = Number.isFinite(index) && window.getStageConfig ? window.getStageConfig(index) : null;
+            if (stage) {
+              window.renderStageLeaderboard(stage, index, "leaderboardModalList", "leaderboardModalEmpty");
+            }
+          }
+        });
+      }
+      if (leaderboardClose && leaderboardModal) {
+        leaderboardClose.addEventListener("click", () => {
+          setModalState(leaderboardModal, false);
+        });
+      }
+      if (leaderboardModal) {
+        leaderboardModal.addEventListener("click", (event) => {
+          if (event.target === leaderboardModal) {
+            setModalState(leaderboardModal, false);
+          }
+        });
+      }
+      window.renderStageLeaderboard = async function renderStageLeaderboard(stage, index, listId, emptyId) {
+        const listEl = document.getElementById(listId);
+        const emptyEl = document.getElementById(emptyId);
+        if (!listEl) return;
+        const stageId = stage && stage.id ? String(stage.id) : String(index + 1);
+        const stageVersion = window.getStageVersion ? window.getStageVersion(stage) : 1;
+        listEl.dataset.stageId = stageId;
+        listEl.dataset.stageVersion = String(stageVersion);
+        const retryCount = Number(listEl.dataset.lbRetryCount || 0);
+        const snapshot = typeof window.getLoggingDebugSnapshot === "function"
+          ? window.getLoggingDebugSnapshot()
+          : null;
+        const headerRow = document.createElement("div");
+        headerRow.className = "leaderboard-row";
+        headerRow.innerHTML = "<span>#</span><span>Player</span><span>Time</span>";
+        const loadingRow = document.createElement("div");
+        loadingRow.className = "leaderboard-row leaderboard-row--empty";
+        loadingRow.textContent = "Loading…";
+        listEl.replaceChildren(headerRow, loadingRow);
+        const leaderboardReady = typeof window.getLeaderboardReady === "function"
+          ? window.getLeaderboardReady()
+          : true;
+        if (typeof window.fetchStageLeaderboard !== "function" || (snapshot && !snapshot.ready && !leaderboardReady)) {
+          if (retryCount < 5) {
+            listEl.dataset.lbRetryCount = String(retryCount + 1);
+            window.setTimeout(() => {
+              window.renderStageLeaderboard(stage, index, listId, emptyId);
+            }, 600);
+          } else if (emptyEl) {
+            loadingRow.textContent = "No data yet";
+          }
+          return;
+        }
+        listEl.dataset.lbRetryCount = "0";
+        try {
+          const { top, me } = await window.fetchStageLeaderboard(stageId, stageVersion, 5);
+          const rows = [];
+          const localName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+          let meEntry = null;
+          let meRank = null;
+          (Array.isArray(top) ? top : []).forEach((entry, idx) => {
+            const row = document.createElement("div");
+            row.className = "leaderboard-row leaderboard-row--data";
+            if (entry.player_id && window.getLeaderboardPlayerId && entry.player_id === window.getLeaderboardPlayerId()) {
+              row.classList.add("leaderboard-row--me-top");
+              meEntry = entry;
+              meRank = idx + 1;
+            }
+            const time = Number(entry.best_time_ms);
+            const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "—";
+            const isMe =
+              entry.player_id && window.getLeaderboardPlayerId && entry.player_id === window.getLeaderboardPlayerId();
+            const name = isMe && localName ? localName : (entry.player_name || `Player ${entry.player_id || "?"}`);
+            row.dataset.playerId = entry.player_id || "";
+            row.innerHTML = `<span>${idx + 1}</span><span class="leaderboard-name">${name}</span><span>${timeText}</span>`;
+            rows.push(row);
+          });
+          if (meEntry || me) {
+            const source = meEntry || me;
+            const row = document.createElement("div");
+            row.className = "leaderboard-row leaderboard-row--me";
+            const time = Number(source.best_time_ms);
+            const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "—";
+            const name = localName || source.player_name || `Player ${source.player_id || "?"}`;
+            row.dataset.playerId = source.player_id || "";
+            const rankText = meRank ? String(meRank) : "—";
+            row.innerHTML = `<span>${rankText}</span><span class="leaderboard-name">${name}</span><span>${timeText}</span>`;
+            rows.push(row);
+          }
+          if (rows.length) {
+            listEl.replaceChildren(headerRow, ...rows);
+          } else {
+            loadingRow.textContent = "No data yet";
+            listEl.replaceChildren(headerRow, loadingRow);
+          }
+        } catch (error) {
+          console.warn("Failed to render leaderboard", error);
+          loadingRow.textContent = "No data yet";
+          listEl.replaceChildren(headerRow, loadingRow);
+        }
+      };
+
+      window.refreshVisibleLeaderboards = function refreshVisibleLeaderboards() {
+        const stageList = document.getElementById("stageClearLeaderboardList");
+        if (stageList && stageList.dataset.stageId) {
+          const stage = window.getStageConfig
+            ? window.getStageConfig(Number(stageList.dataset.stageId) - 1)
+            : null;
+          if (stage) {
+            window.renderStageLeaderboard(stage, Number(stageList.dataset.stageId) - 1, "stageClearLeaderboardList", "stageClearLeaderboardEmpty");
+          }
+        }
+        const modalList = document.getElementById("leaderboardModalList");
+        if (modalList && leaderboardModal && leaderboardModal.classList.contains("show")) {
+          const index = stageIntroPendingIndex;
+          const stage = Number.isFinite(index) && window.getStageConfig ? window.getStageConfig(index) : null;
+          if (stage) {
+            window.renderStageLeaderboard(stage, index, "leaderboardModalList", "leaderboardModalEmpty");
+          }
+        }
+      };
+
+      window.updateVisibleLeaderboardName = function updateVisibleLeaderboardName(newName) {
+        const playerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
+        if (!playerId || !newName) return;
+        document.querySelectorAll(".leaderboard-row[data-player-id]").forEach((row) => {
+          if (row.dataset.playerId === playerId) {
+            const nameEl = row.querySelector(".leaderboard-name");
+            if (nameEl) nameEl.textContent = newName;
+          }
+        });
+      };
       if (stageIntroStart && stageIntroModal) {
         stageIntroStart.addEventListener("click", () => {
+          if (leaderboardModal) {
+            setModalState(leaderboardModal, false);
+          }
           const index = stageIntroPendingIndex;
           if (!Number.isFinite(index)) return;
           const stage = window.getStageConfig ? window.getStageConfig(index) : null;
@@ -1305,6 +1496,14 @@ function runFlashCountdown(onComplete) {
           updatePlayerNameInputs(normalized);
           markPlayerNamePrompted();
           updatePlayerNameSettingVisibility();
+          if (typeof window.updateVisibleLeaderboardName === "function") {
+            window.updateVisibleLeaderboardName(normalized);
+          }
+          updateLeaderboardNameForExistingTimes(normalized).finally(() => {
+            if (typeof window.refreshVisibleLeaderboards === "function") {
+              window.setTimeout(() => window.refreshVisibleLeaderboards(), 800);
+            }
+          });
           closePlayerNameModal();
         });
       }
@@ -1320,10 +1519,24 @@ function runFlashCountdown(onComplete) {
         if (name) {
           playerNameSetting.value = name;
         }
-        playerNameSetting.addEventListener("blur", () => {
+        const applyPlayerNameFromSettings = () => {
           const normalized = setPlayerName(playerNameSetting.value);
           updatePlayerNameInputs(normalized);
           updatePlayerNameSettingVisibility();
+          if (typeof window.updateVisibleLeaderboardName === "function") {
+            window.updateVisibleLeaderboardName(normalized);
+          }
+          updateLeaderboardNameForExistingTimes(normalized).finally(() => {
+            if (typeof window.refreshVisibleLeaderboards === "function") {
+              window.setTimeout(() => window.refreshVisibleLeaderboards(), 800);
+            }
+          });
+        };
+        playerNameSetting.addEventListener("blur", () => {
+          applyPlayerNameFromSettings();
+        });
+        playerNameSetting.addEventListener("change", () => {
+          applyPlayerNameFromSettings();
         });
         playerNameSetting.addEventListener("keydown", (event) => {
           if (event.key === "Enter") {
@@ -1360,7 +1573,8 @@ function runFlashCountdown(onComplete) {
         });
       }
       if (resetConfirmYes) {
-        resetConfirmYes.addEventListener("click", () => {
+        resetConfirmYes.addEventListener("click", async () => {
+          const bestTimesSnapshot = window.stageBestTimes ? { ...window.stageBestTimes } : {};
           window.stageStars = {};
           window.stageBestTimes = {};
           window.stageCompleted = {};
@@ -1382,6 +1596,16 @@ function runFlashCountdown(onComplete) {
           if (typeof window.saveStageProgress === "function") {
             window.saveStageProgress();
           }
+          if (typeof window.deactivateLocalLeaderboardEntries === "function") {
+            await window.deactivateLocalLeaderboardEntries(bestTimesSnapshot);
+          }
+          if (typeof window.rotateLeaderboardPlayerId === "function") {
+            window.rotateLeaderboardPlayerId();
+            window.setTimeout(() => {
+              window.location.reload();
+            }, 50);
+            return;
+          }
           if (typeof window.getSandboxUnlockState === "function") {
             window.getSandboxUnlockState();
           }
@@ -1391,18 +1615,11 @@ function runFlashCountdown(onComplete) {
           if (practiceModal && practiceModal.classList.contains("show")) {
             updateCategoryControls();
             const starsEl = document.getElementById("sandboxStars");
-            if (
-              starsEl &&
-              typeof window.getSandboxStarsAvailable === "function" &&
-              typeof window.getSandboxStarsEarned === "function"
-            ) {
+            if (starsEl && typeof window.getSandboxStarsAvailable === "function") {
               const availableEl = starsEl.querySelector(".sandbox-stars__available");
-              const totalEl = starsEl.querySelector(".sandbox-stars__total");
               const available = window.getSandboxStarsAvailable();
-              const total = window.getSandboxStarsEarned();
-              if (availableEl && totalEl) {
+              if (availableEl) {
                 availableEl.textContent = String(available);
-                totalEl.textContent = String(total);
               }
             }
           }
@@ -1422,6 +1639,19 @@ function runFlashCountdown(onComplete) {
       if (settingsClose) {
         settingsClose.addEventListener("click", () => {
           hideResetConfirmRow();
+          if (playerNameSetting) {
+            const normalized = setPlayerName(playerNameSetting.value);
+            updatePlayerNameInputs(normalized);
+            updatePlayerNameSettingVisibility();
+            if (typeof window.updateVisibleLeaderboardName === "function") {
+              window.updateVisibleLeaderboardName(normalized);
+            }
+            updateLeaderboardNameForExistingTimes(normalized).finally(() => {
+              if (typeof window.refreshVisibleLeaderboards === "function") {
+                window.setTimeout(() => window.refreshVisibleLeaderboards(), 800);
+              }
+            });
+          }
         });
       }
       document.addEventListener("click", (event) => {
@@ -1440,11 +1670,15 @@ function runFlashCountdown(onComplete) {
           if (stagesClearedEl || stagesTotalEl || starsEarnedEl) {
             const totalStages = stages.length;
             const stagesCleared = stages.reduce((sum, stage, index) => {
-              const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+              const stageKey = window.getStageStarsKey
+                ? window.getStageStarsKey(stage, index)
+                : (stage && stage.id ? String(stage.id) : String(index + 1));
               return sum + (window.stageCompleted && window.stageCompleted[stageKey] ? 1 : 0);
             }, 0);
             const starsEarned = stages.reduce((sum, stage, index) => {
-              const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
+              const stageKey = window.getStageStarsKey
+                ? window.getStageStarsKey(stage, index)
+                : (stage && stage.id ? String(stage.id) : String(index + 1));
               return sum + (window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0);
             }, 0);
             if (stagesClearedEl) stagesClearedEl.textContent = String(stagesCleared);
@@ -1483,7 +1717,10 @@ function runFlashCountdown(onComplete) {
             const totals = stages.reduce(
               (acc, stage, index) => {
                 const stageKey = stage && stage.id ? String(stage.id) : String(index + 1);
-                const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[stageKey]);
+                const bestKey = window.getStageBestTimeKey
+                  ? window.getStageBestTimeKey(stage, index)
+                  : stageKey;
+                const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[bestKey]);
                 if (!Number.isFinite(bestSeconds)) return acc;
                 const rounds = Number(stage.rounds) || 1;
                 const cards = window.getStageCardCount ? window.getStageCardCount(stage) : stage.cards || 1;
@@ -1604,20 +1841,13 @@ function runFlashCountdown(onComplete) {
             }
             updateCategoryControls();
             const starsEl = document.getElementById("sandboxStars");
-            if (
-              starsEl &&
-              typeof window.getSandboxStarsAvailable === "function" &&
-              typeof window.getSandboxStarsEarned === "function"
-            ) {
+            if (starsEl && typeof window.getSandboxStarsAvailable === "function") {
               const availableEl = starsEl.querySelector(".sandbox-stars__available");
-              const totalEl = starsEl.querySelector(".sandbox-stars__total");
               const available = window.getSandboxStarsAvailable();
-              const total = window.getSandboxStarsEarned();
-              if (availableEl && totalEl) {
+              if (availableEl) {
                 availableEl.textContent = String(available);
-                totalEl.textContent = String(total);
               } else {
-                starsEl.textContent = `✦ ${available}/${total}`;
+                starsEl.textContent = `✦ ${available}`;
               }
             }
           }
@@ -1969,6 +2199,16 @@ function runFlashCountdown(onComplete) {
               stageIntroStart.click();
             }
             return;
+          }
+          return;
+        }
+        if (leaderboardModal && leaderboardModal.classList.contains("show")) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setModalState(leaderboardModal, false);
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
           }
           return;
         }
