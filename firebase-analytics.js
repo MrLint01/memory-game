@@ -11,7 +11,7 @@ const firebaseConfig = {
 };
 
 const PLAYER_ID_STORAGE_KEY = "flash_recall_player_id_v1";
-const DISABLE_TELEMETRY_ON_LOCALHOST =
+const DISABLE_TELEMETRY_ON_LOCALHOST = false;
   window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 const INACTIVITY_ACTIVE_PAUSE_MS = 1 * 60 * 1000;
 const INACTIVITY_QUIT_MS = 3 * 60 * 1000;
@@ -60,7 +60,7 @@ function getDisplayNameFallback() {
 function getStageLeaderboardPath(stageId, stageVersion) {
   const safeStageId = String(stageId);
   const safeVersion = Number(stageVersion) || 1;
-  return `leaderboards/v_${gameVersion}/stages/stage_${safeStageId}_v${safeVersion}/entries`;
+  return `leaderboards/stage_${safeStageId}/versions/v${safeVersion}/entries`;
 }
 
 async function fetchLeaderboardDoc(path, id) {

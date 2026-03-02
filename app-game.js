@@ -252,8 +252,8 @@
           window.clearFirstLetterHint();
         }
         if (window.tabTutorialActive) { 
-          tabTutorialActive = false; // ADD THIS LINE
-          if (tabTutorialDisabledInputs.length) { // ADD THESE LINES
+          tabTutorialActive = false;
+          if (tabTutorialDisabledInputs.length) {
             tabTutorialDisabledInputs.forEach((field) => {
               field.disabled = false;
             });
@@ -318,10 +318,6 @@
             ? `<button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(Q)</span>
-               </button>
-               <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
-                 <img class="action-icon" src="imgs/home_button.png" alt="" />
-                 <span class="action-key-hint" aria-hidden="true">(H)</span>
                </button>
                <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
                  <img class="action-icon" src="imgs/retry_button.png" alt="" />
@@ -485,10 +481,6 @@
               <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (Q)">
                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
                 <span class="action-key-hint" aria-hidden="true">(Q)</span>
-              </button>
-              <button id="stageHomeButton" class="secondary icon-button" type="button" aria-label="Home">
-                <img class="action-icon" src="imgs/home_button.png" alt="" />
-                <span class="action-key-hint" aria-hidden="true">(H)</span>
               </button>
               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />

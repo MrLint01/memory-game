@@ -2240,12 +2240,6 @@ function runFlashCountdown(onComplete) {
             if (menuBtn) menuBtn.click();
             return;
           }
-          if (keyLower === "h") {
-            event.preventDefault();
-            const homeBtn = document.getElementById("stageHomeButton");
-            if (homeBtn) homeBtn.click();
-            return;
-          }
           if (keyLower === "n") {
             event.preventDefault();
             const nextBtn = document.getElementById("stageNextButton");

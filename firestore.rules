@@ -16,7 +16,7 @@ service cloud.firestore {
       allow read, update, delete: if request.auth.uid == resource.data.user_id;
     }
 
-    match /leaderboards/{version}/stages/{stageId}/entries/{entryId} {
+    match /leaderboards/{stageId}/versions/{versionId}/entries/{playerId} {
       allow read: if true;
       allow create, update: if request.auth != null
         && request.resource.data.player_id == entryId;
