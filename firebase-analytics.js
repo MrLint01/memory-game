@@ -113,7 +113,7 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
 }
 
 async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
-  if (!firebaseDb) return { top: [], me: null };
+  if (!firebaseDb) return { top: [], me: null, meRank: null };
   const path = getStageLeaderboardPath(stageId, stageVersion);
   try {
     const fetchLimit = Math.max(limit * 3, 10);
@@ -128,10 +128,23 @@ async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
       .slice(0, limit);
     const me = await fetchLeaderboardDoc(path, playerId);
     const safeMe = me && me.active === false ? null : me;
-    return { top, me: safeMe };
+    let meRank = null;
+    if (safeMe && Number.isFinite(safeMe.best_time_ms)) {
+      try {
+        const rankSnap = await firebaseDb
+          .collection(path)
+          .where("best_time_ms", "<", safeMe.best_time_ms)
+          .get();
+        const activeAhead = rankSnap.docs.filter((doc) => doc.data().active !== false).length;
+        meRank = activeAhead + 1;
+      } catch (error) {
+        console.warn("Failed to fetch leaderboard rank", error);
+      }
+    }
+    return { top, me: safeMe, meRank };
   } catch (error) {
     console.warn("Failed to fetch leaderboard", error);
-    return { top: [], me: null };
+    return { top: [], me: null, meRank: null };
   }
 }
 

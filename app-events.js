@@ -1132,11 +1132,11 @@ function runFlashCountdown(onComplete) {
         }
         listEl.dataset.lbRetryCount = "0";
         try {
-          const { top, me } = await window.fetchStageLeaderboard(stageId, stageVersion, 5);
+          const { top, me, meRank: fetchedMeRank } = await window.fetchStageLeaderboard(stageId, stageVersion, 5);
           const rows = [];
           const localName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
           let meEntry = null;
-          let meRank = null;
+          let meRank = Number.isFinite(fetchedMeRank) ? fetchedMeRank : null;
           (Array.isArray(top) ? top : []).forEach((entry, idx) => {
             const row = document.createElement("div");
             row.className = "leaderboard-row leaderboard-row--data";
