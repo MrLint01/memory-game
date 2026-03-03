@@ -1844,7 +1844,9 @@ function runFlashCountdown(onComplete) {
         openSplashScreen();
         attachSplashStartListeners();
       } else {
-        closeSplashScreen();
+        splashReturnToHome = true;
+        openSplashScreen();
+        attachSplashStartListeners();
       }
 
       if (stagesOpen) {
