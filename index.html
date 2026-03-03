@@ -4,6 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Flash Recall</title>
+    <style>
+      body[data-view="splash"] .layout,
+      body[data-view="splash"] .stages-screen,
+      body[data-view="splash"] header {
+        display: none !important;
+      }
+      body[data-view="splash"] #splashScreen {
+        display: flex !important;
+      }
+    </style>
     <link rel="stylesheet" href="style.css" />
     <link rel="preload" href="imgs/back_button.png" as="image" />
     <link rel="preload" href="imgs/chain_1.png" as="image" />
@@ -71,10 +81,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-  <body data-state="idle" data-mode="practice" data-view="home" data-theme="mono-ink" data-font="original" data-layout="classic">
+  <body data-state="idle" data-mode="practice" data-view="splash" data-theme="mono-ink" data-font="original" data-layout="classic">
     <main>
       <header>
-        <div class="title-wrap">
+        <div class="title-wrap" id="mainMenuTitle">
           <div class="title-cards" aria-hidden="true">
             <span class="title-card card-a"></span>
             <span class="title-card card-b"></span>
@@ -86,16 +96,12 @@
           </h1>
         </div>
       </header>
-      <section class="splash-screen" id="splashScreen" aria-hidden="true">
+      <section class="splash-screen" id="splashScreen" aria-hidden="false">
         <h1 class="splash-title" data-text="Flash Recall">
           <span class="splash-title__text">Flash Recall</span>
           <span class="splash-title__shine" aria-hidden="true">Flash Recall</span>
         </h1>
         <div class="splash-message" role="status">Press Any Key to Start</div>
-      </section>
-      <section class="splash-loading" id="splashLoading" aria-hidden="true">
-        <div class="splash-loading__text">Loading…</div>
-        <div class="splash-loading__bar" aria-hidden="true"><span></span></div>
       </section>
       <section class="layout">
         <aside class="panel">
@@ -158,6 +164,10 @@
         </div>
       </section>
     </main>
+    <section class="splash-loading" id="splashLoading" aria-hidden="true">
+      <div class="splash-loading__text">Loading…</div>
+      <div class="splash-loading__bar" aria-hidden="true"><span></span></div>
+    </section>
     <div class="modal" id="practiceModal" aria-hidden="true">
       <div class="modal-card modal-card--sandbox">
         <div class="sandbox-header">

@@ -5,6 +5,7 @@ const revealInput = document.getElementById("revealTime");
       const splashScreen = document.getElementById("splashScreen");
       const splashLoading = document.getElementById("splashLoading");
       const mainHeader = document.querySelector("header");
+      const mainMenuTitle = document.getElementById("mainMenuTitle");
       const referenceOpen = document.getElementById("referenceOpen");
       const fullscreenToggle = document.getElementById("fullscreenToggle");
       const stagesOpen = document.getElementById("stagesOpen");

@@ -449,35 +449,38 @@
         const stageNextKey =
           typeof window.getActionKeyLabel === "function" ? window.getActionKeyLabel("stageNext") : "N";
         const retryKey = retryActionKey;
+        const starGap = stars < 4 ? "1rem" : "0.65rem";
 
         resultsPanel.innerHTML = `
           <div class="stage-complete">
-            <div class="stage-complete__header">
-              <strong>${stageName} complete!</strong>
-              <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s <span class="stage-meta--best" id="stageCompleteBestTime"></span></div>
-            </div>
-            <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}">
-              <div class="star-column">
-                <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
-                ${bronzeLabel}
+            <div class="stage-complete__left-column">
+              <div class="stage-complete__header">
+                <strong>${stageName} complete!</strong>
+                <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s <span class="stage-meta--best" id="stageCompleteBestTime"></span></div>
               </div>
-              <div class="star-column">
-                <span class="stage-star${stars >= 2 ? " is-filled" : ""}">✦</span>
-                ${silverLabel}
-              </div>
-              <div class="star-column">
-                <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
-                ${goldLabel}
-                </div>
-              ${stars >= 4 ? `
+              <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}" style="gap: ${starGap};">
                 <div class="star-column">
-                  <span class="stage-star is-filled is-secret">✦</span>
-                  ${platinumLabel}
+                  <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
+                  ${bronzeLabel}
                 </div>
-                ` : ""}
-            </div>
-            <div class="stage-complete__bar-track">
-              <div class="stage-complete__bar-fill" data-stars="${stars}"></div>
+                <div class="star-column">
+                  <span class="stage-star${stars >= 2 ? " is-filled" : ""}">✦</span>
+                  ${silverLabel}
+                </div>
+                <div class="star-column">
+                  <span class="stage-star${stars >= 3 ? " is-filled" : ""}">✦</span>
+                  ${goldLabel}
+                  </div>
+                ${stars >= 4 ? `
+                  <div class="star-column">
+                    <span class="stage-star is-filled is-secret">✦</span>
+                    ${platinumLabel}
+                  </div>
+                  ` : ""}
+              </div>
+              <div class="stage-complete__bar-track">
+                <div class="stage-complete__bar-fill" data-stars="${stars}"></div>
+              </div>
             </div>
             <div class="leaderboard-panel" id="stageClearLeaderboard" data-stage-index="${stageState.index}">
               <div class="leaderboard-panel__title">Leaderboard</div>
@@ -514,12 +517,52 @@
 
         barFills.forEach(barFill => {
           const stars = parseInt(barFill.dataset.stars, 10) || 0;
-
+          
           // set the final width based on stars
+          // Set final width based on stars and how close to the next star threshold the time was
           let targetWidth = 0;
-          if (stars === 1) targetWidth = 33.33;
-          else if (stars === 2) targetWidth = 55;
-          else if (stars >= 3) targetWidth = 100;
+          let bronzeFill = 30;
+          let silverFill = 50;
+          let goldFill = 71;
+
+          let nextTargetFill = bronzeFill;
+          let timeDiffBetweenTargets = null;
+          let timeFromPreviousTarget = null;
+
+          if (stars === 1) {
+            targetWidth = bronzeFill;
+            nextTargetFill = silverFill;
+            timeDiffBetweenTargets = bronzeTime - silverTime;
+            timeFromPreviousTarget = bronzeTime - elapsedSeconds;
+          }
+          else if (stars === 2) {
+            targetWidth = silverFill;
+            nextTargetFill = goldFill;
+            timeDiffBetweenTargets = silverTime - goldTime;
+            timeFromPreviousTarget = silverTime - elapsedSeconds;
+          }
+          else if (stars >= 3) {
+            targetWidth = 100;
+          }
+
+          if (timeDiffBetweenTargets && timeFromPreviousTarget && Number.isFinite(elapsedSeconds)) {
+            const fillPercentDiff = nextTargetFill - targetWidth;
+            // Make the fill difference between current and target into a percentage, add this to targetWidth
+            const fillAdditionalPercent = timeFromPreviousTarget / timeDiffBetweenTargets * fillPercentDiff;
+            console.log({ timeFromPreviousTarget, timeDiffBetweenTargets, fillPercentDiff, fillAdditionalPercent });
+            targetWidth += fillAdditionalPercent;
+          }
+
+          if (stars === 0) {
+            targetWidth = 5;
+            distanceToBronze = elapsedSeconds - bronzeTime;
+            if (distanceToBronze < 10) {
+              // For times close to bronze, show a hint of the bronze fill
+              targetWidth += bronzeFill / 10 * (10 - distanceToBronze);
+              targetWidth = Math.min(targetWidth, bronzeFill - 0.5);
+            }
+          }
+          
           barFill.style.width = "0";
           barFill.offsetWidth; // force browser to register width:0
             // Trigger transition
@@ -544,6 +587,59 @@
         if (typeof window.renderStageLeaderboard === "function") {
           window.renderStageLeaderboard(stage, stageState.index, "stageClearLeaderboardList", "stageClearLeaderboardEmpty");
         }
+        // const stageId = stage?.id || (stageState.index + 1);
+        // const stageVersion = stage?.stageVersion || stage?.levelVersion || 1;
+
+        // if (typeof window.fetchStageLeaderboard === 'function') {
+        //   window.fetchStageLeaderboard(stageId, stageVersion, 10)
+        //     .then(result => {
+        //       if (!result || !result.top) return;
+              
+        //       const timeMetaEl = document.querySelector('.stage-complete__header .stage-meta');
+        //       if (!timeMetaEl) return;
+              
+        //       const currentPlayerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : null;
+        //       const playerTimeMs = Math.round(elapsedSeconds * 1000);
+              
+        //       // Calculate rank from leaderboard data
+        //       let rank = null;
+        //       let totalPlayers = result.top.length;
+              
+        //       // Check if player is in top list
+        //       const playerInTop = result.top.findIndex(entry => entry.player_id === currentPlayerId);
+        //       if (playerInTop !== -1) {
+        //         rank = playerInTop + 1;
+        //       } else if (result.me) {
+        //         // Player not in top list but has a score
+        //         // Count how many in top list are faster
+        //         const fasterCount = result.top.filter(entry => entry.best_time_ms < playerTimeMs).length;
+        //         rank = fasterCount + 1;
+        //         totalPlayers = result.top.length + 1; // Approximate (at least this many)
+        //       }
+              
+        //       if (!rank || totalPlayers < 2) return;
+              
+        //       const percentBeaten = Math.round(((totalPlayers - rank) / (totalPlayers - 1)) * 100);
+        //       const playersSlowerThan = totalPlayers - rank;
+              
+        //       const rankEl = document.createElement('div');
+        //       rankEl.className = 'stage-meta stage-rank-message';
+              
+        //       if (rank === 1) {
+        //         rankEl.innerHTML = `<span class="rank-first">#1 out of ${totalPlayers}+ players!</span>`;
+        //       } else if (percentBeaten >= 80) {
+        //         rankEl.innerHTML = `<span class="rank-top">Top ${100 - percentBeaten}%! Better than ${playersSlowerThan}+ players</span>`;
+        //       } else {
+        //         rankEl.innerHTML = `<span class="rank-above-average">Better than ${percentBeaten}% of top players</span>`;
+        //       }
+              
+        //       timeMetaEl.parentNode.appendChild(rankEl);
+        //     })
+        //     .catch(error => {
+        //       console.error('Error displaying rank:', error);
+        //     });
+        // }
+
         if (typeof window.maybePromptPlayerName === "function") {
           window.maybePromptPlayerName();
         }
