@@ -422,30 +422,24 @@ async function fetchProgressLeaderboard(metric, limit = 5, options = {}) {
     });
   }
   try {
-    const pageBase = 250;
-    const allEntries = [];
-    let lastDoc = null;
-    while (true) {
-      const remaining = remainingLeaderboardReads();
-      if (remaining < 1) {
-        leaderboardReadBudget.blocked = true;
-        saveLeaderboardReadBudget();
-        break;
-      }
-      const pageSize = Math.max(1, Math.min(pageBase, remaining));
-      let queryRef = firebaseDb.collection(PROGRESS_LEADERBOARD_PATH).orderBy(metric, "desc").limit(pageSize);
-      if (lastDoc) {
-        queryRef = queryRef.startAfter(lastDoc);
-      }
-      const pageSnap = await queryRef.get();
-      incrementLeaderboardReads(pageSnap.size);
-      if (pageSnap.empty) break;
-      pageSnap.docs.forEach((doc) => {
-        allEntries.push({ id: doc.id, ...doc.data() });
+    const remaining = remainingLeaderboardReads();
+    if (remaining < 1) {
+      leaderboardReadBudget.blocked = true;
+      saveLeaderboardReadBudget();
+      return getDefaultStatsLeaderboardResult({
+        ...(cached || {}),
+        errorCode: "read_budget_exceeded",
+        errorMessage: "Leaderboard read limit reached for this player."
       });
-      lastDoc = pageSnap.docs[pageSnap.docs.length - 1];
-      if (pageSnap.size < pageSize) break;
     }
+    const cappedLimit = Math.max(1, Math.min(Number(limit) || 5, 5, remaining));
+    const queryRef = firebaseDb.collection(PROGRESS_LEADERBOARD_PATH).orderBy(metric, "desc").limit(cappedLimit);
+    const pageSnap = await queryRef.get();
+    incrementLeaderboardReads(pageSnap.size);
+    const allEntries = [];
+    pageSnap.docs.forEach((doc) => {
+      allEntries.push({ id: doc.id, ...doc.data() });
+    });
     setCachedStatsLeaderboard(metric, allEntries);
     const view = computeStatsLeaderboardView(allEntries, metric, limit);
     return getDefaultStatsLeaderboardResult({
