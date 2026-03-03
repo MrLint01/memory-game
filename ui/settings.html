@@ -7,13 +7,14 @@
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="audio">Audio</button>
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="appearance">Appearance</button>
     </div>
+    <hr class="settings-divider" />
     <div class="controls">
       <div class="settings-pane is-active" data-settings-pane="general">
         <div class="control-group" id="playerNameSettingRow">
           <label for="playerNameSetting">Player name</label>
           <input id="playerNameSetting" type="text" maxlength="16" autocomplete="nickname" />
         </div>
-        <div class="control-group">
+        <div class="control-group control-group--keybinds">
           <label>Accessibility</label>
           <div class="checkboxes">
             <label>
@@ -52,9 +53,9 @@
             </label>
           </div>
         </div>
-        <div class="control-group">
+        <hr class="settings-divider settings-divider--section" />
+        <div class="control-group control-group--keybinds">
           <label>Action keybinds</label>
-          <div id="keybindStatus" class="small" aria-live="polite"></div>
           <div class="keybind-grid">
             <div class="keybind-row">
               <span>Retry level</span>
@@ -77,7 +78,10 @@
               <button id="keybindPracticeSettings" class="secondary keybind-btn" type="button">S</button>
             </div>
           </div>
-          <button id="keybindResetDefaults" class="secondary" type="button">Reset keybinds</button>
+          <div id="keybindStatus" class="small" aria-live="polite"></div>
+          <div class="keybind-reset-row">
+            <button id="keybindResetDefaults" class="secondary" type="button">Reset keybinds</button>
+          </div>
         </div>
       </div>
       <div class="settings-pane" data-settings-pane="appearance" hidden>
@@ -94,30 +98,35 @@
             </label>
           </div>
         </div>
-        <div class="control-group">
-          <label for="appearanceTheme">Theme</label>
-          <select id="appearanceTheme">
-            <option value="mono-ink">Monochrome Ink</option>
-            <option value="paper-night">Paper Night</option>
-            <option value="pastel-dawn">Pastel Dawn</option>
-            <option value="pastel-mint">Pastel Mint</option>
-            <option value="sunset-pop">Sunset Pop</option>
-            <option value="ocean-deep">Ocean Deep</option>
-            <option value="forest-camp">Forest Camp</option>
-            <option value="cherry-cream">Cherry Cream</option>
-            <option value="steel-grid">Steel Grid</option>
-          </select>
-          <label for="appearanceFont">Font</label>
-          <select id="appearanceFont">
-            <option value="original">Original (Chakra)</option>
-            <option value="arcade">Arcade Bold</option>
-            <option value="mono">Mono Classic</option>
-            <option value="rounded">Rounded Friendly</option>
-            <option value="space">Space Grotesk</option>
-            <option value="poster">Poster Impact</option>
-          </select>
-          <button id="appearanceShuffle" class="secondary" type="button">Shuffle style</button>
+        <hr class="settings-divider settings-divider--section" />
+        <div class="appearance-row">
+          <div class="control-group">
+            <label for="appearanceTheme">Theme</label>
+            <select id="appearanceTheme">
+              <option value="mono-ink">Monochrome Ink</option>
+              <option value="paper-night">Paper Night</option>
+              <option value="pastel-dawn">Pastel Dawn</option>
+              <option value="pastel-mint">Pastel Mint</option>
+              <option value="sunset-pop">Sunset Pop</option>
+              <option value="ocean-deep">Ocean Deep</option>
+              <option value="forest-camp">Forest Camp</option>
+              <option value="cherry-cream">Cherry Cream</option>
+              <option value="steel-grid">Steel Grid</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="appearanceFont">Font</label>
+            <select id="appearanceFont">
+              <option value="original">Original (Chakra)</option>
+              <option value="arcade">Arcade Bold</option>
+              <option value="mono">Mono Classic</option>
+              <option value="rounded">Rounded Friendly</option>
+              <option value="space">Space Grotesk</option>
+              <option value="poster">Poster Impact</option>
+            </select>
+          </div>
         </div>
+        <button id="appearanceShuffle" class="secondary" type="button">Shuffle style</button>
       </div>
       <div class="settings-pane" data-settings-pane="audio" hidden>
         <div class="control-group">

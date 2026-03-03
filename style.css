@@ -81,6 +81,28 @@ body[data-theme="paper-night"] {
   --main-accent: rgba(76, 113, 255, 0.22);
   --field-bg: #0f1836;
 }
+body[data-theme="paper-night"] .stage-intro-chip,
+body[data-theme="paper-night"] .stage-intro-icon {
+  background: var(--panel-muted);
+  color: var(--ink);
+}
+body[data-theme="paper-night"] .stage-intro-chip::after {
+  color: var(--ink);
+}
+body[data-theme="ocean-deep"] .stage-intro-chip,
+body[data-theme="ocean-deep"] .stage-intro-icon,
+body[data-theme="forest-camp"] .stage-intro-chip,
+body[data-theme="forest-camp"] .stage-intro-icon,
+body[data-theme="steel-grid"] .stage-intro-chip,
+body[data-theme="steel-grid"] .stage-intro-icon {
+  background: var(--panel-muted);
+  color: var(--ink);
+}
+body[data-theme="ocean-deep"] .stage-intro-chip::after,
+body[data-theme="forest-camp"] .stage-intro-chip::after,
+body[data-theme="steel-grid"] .stage-intro-chip::after {
+  color: var(--ink);
+}
 body[data-theme="pastel-dawn"] {
   --ink: #3c3357;
   --muted: #72638f;
@@ -278,10 +300,12 @@ body[data-view="loading"] .splash-loading {
 }
 body[data-view="stages"] {
   overflow-x: hidden;
+  background: var(--panel-muted);
 }
 body[data-view="stages"] main {
   width: min(2200px, 96vw);
   padding: 2.6rem 2.8rem;
+  background: transparent;
 }
 main {
         width: min(1140px, 96vw);
@@ -2097,6 +2121,9 @@ body[data-state="paused"] .hud-pause {
   border: none;
   padding: 0;
   cursor: pointer;
+  box-shadow: none;
+  outline: none;
+  appearance: none;
 }
 .stages-page-prev {
   position: fixed;
@@ -2110,6 +2137,9 @@ body[data-state="paused"] .hud-pause {
   border: none;
   padding: 0;
   cursor: pointer;
+  box-shadow: none;
+  outline: none;
+  appearance: none;
 }
 .stages-page-next::before,
 .stages-page-prev::before {
@@ -2659,14 +2689,15 @@ body.pause-active .interrupt-close {
 }
 .stats-leaderboard-open {
   position: absolute;
-  top: 0.4rem;
-  left: 0.4rem;
+  top: -0.8rem;
+  left: -0.8rem;
   width: 52px;
   height: 52px;
   z-index: 2;
 }
 #statsModal .modal-card h3 {
-  padding-left: 3.2rem;
+  padding-left: 0;
+  text-align: center;
 }
 .stage-intro-close,
 .stage-intro-start {
@@ -3468,6 +3499,25 @@ body.stage-fail .rotation-icon {
   gap: 0.45rem;
   margin-bottom: 0.85rem;
 }
+.settings-divider {
+  border: 0;
+  border-top: 2px solid var(--border);
+  margin: 0 0 0.9rem;
+}
+.settings-divider--section {
+  margin: 0.7rem 0;
+}
+.appearance-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  align-items: start;
+}
+@media (max-width: 640px) {
+  .appearance-row {
+    grid-template-columns: 1fr;
+  }
+}
 .settings-tab {
   padding: 0.45rem 0.55rem;
   font-size: 0.75rem;
@@ -3515,9 +3565,26 @@ body.stage-fail .rotation-icon {
   outline: 2px dashed var(--border);
   outline-offset: 1px;
 }
+#keybindResetDefaults {
+  margin-top: 0.1rem;
+  width: 100%;
+}
 #keybindStatus {
   min-height: 1.1rem;
   color: var(--muted);
+}
+.control-group--keybinds {
+  gap: 0.15rem;
+}
+.control-group--keybinds > label {
+  margin-bottom: 0;
+}
+.control-group--keybinds #keybindStatus {
+  min-height: 0;
+  margin-top: 0.3rem;
+}
+.control-group--keybinds .keybind-grid {
+  margin-top: 0;
 }
 .audio-dial-grid {
   display: grid;
@@ -3574,6 +3641,11 @@ body.stage-fail .rotation-icon {
   gap: 0.6rem;
   font-size: 0.9rem;
   color: var(--ink);
+}
+.stat-divider {
+  border: 0;
+  border-top: 2px solid var(--border);
+  margin: 0.7rem 0 0.9rem;
 }
 .stat-row__value-group {
   display: inline-flex;
