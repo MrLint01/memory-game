@@ -60,10 +60,10 @@ body[data-theme="mono-ink"] {
   --ink: #111827;
   --muted: #4b5563;
   --border: #111827;
-  --panel: #ffffff;
-  --panel-muted: #eceff3;
+  --panel: #f9fbff;
+  --panel-muted: #e9edf3;
   --card: #ffffff;
-  --app-bg: #f8fafc;
+  --app-bg: #e7ebf1;
   --main-bg: #ffffff;
   --main-accent: rgba(17, 24, 39, 0.08);
   --field-bg: #ffffff;
@@ -3741,12 +3741,7 @@ body.stage-fail .rotation-icon {
 }
 
 body[data-theme] .modal-card,
-body[data-theme] .mode-card,
-body[data-theme] button,
-body[data-theme] button.secondary,
-body[data-theme] .link-button,
 body[data-theme] .stage-card,
-body[data-theme] .input-slot input,
 body[data-theme] .interrupt-card,
 body[data-theme] .interrupt-close {
   background: var(--panel);
@@ -3754,12 +3749,24 @@ body[data-theme] .interrupt-close {
   border-color: var(--border);
 }
 body[data-theme] .panel,
-body[data-theme] .icon-tile,
-body[data-theme] .stat-field,
-body[data-theme] .result-pill {
+body[data-theme] .stat-field {
   background: var(--panel);
   color: var(--ink);
   border-color: var(--border);
+}
+body[data-theme] .mode-card,
+body[data-theme] button,
+body[data-theme] button.secondary,
+body[data-theme] .link-button,
+body[data-theme] .icon-tile,
+body[data-theme] .result-pill {
+  background: var(--panel-muted);
+  color: var(--ink);
+  border-color: var(--border);
+}
+body[data-theme] button.icon-button,
+body[data-theme] .quick-action {
+  background: var(--panel);
 }
 body[data-theme] .card {
   background: var(--card);
