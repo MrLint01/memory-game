@@ -557,7 +557,12 @@ const revealInput = document.getElementById("revealTime");
             box.style.fontSize = entry.size;
           }
           if (entry.color) {
-            box.style.color = entry.color;
+            const theme = document.body.dataset.theme;
+            const forceThemeInk = theme === "paper-night"
+              || theme === "ocean-deep"
+              || theme === "forest-camp"
+              || theme === "steel-grid";
+            box.style.color = forceThemeInk ? "var(--ink)" : entry.color;
           }
           stageInstructions.appendChild(box);
           requestAnimationFrame(() => {

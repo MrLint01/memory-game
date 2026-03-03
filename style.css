@@ -3466,14 +3466,16 @@ body.stage-fail .rotation-icon {
   white-space: normal;
 }
 .icon-choice input:checked + .icon-tile {
-  border-color: var(--border);
+  border-color: var(--main-accent);
   background: var(--panel-muted);
-  box-shadow: none;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15);
   transform: translateY(-2px);
 }
 @supports (color: color-mix(in srgb, #000 0%, #fff 100%)) {
   .icon-choice input:checked + .icon-tile {
-    background: color-mix(in srgb, var(--panel-muted) 70%, var(--main-accent) 30%);
+    background: color-mix(in srgb, var(--panel-muted) 60%, #ffffff 40%);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--main-accent) 55%, transparent),
+      0 6px 14px rgba(15, 23, 42, 0.12);
   }
 }
 .icon-choice input:focus-visible + .icon-tile {
