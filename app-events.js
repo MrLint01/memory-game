@@ -68,7 +68,7 @@
       };
       const defaultKeybinds = {
         retry: "r",
-        stageNext: "n",
+        stageNext: "enter",
         stageQuit: "q",
         practiceHome: "h",
         practiceSettings: "s",
@@ -77,8 +77,7 @@
       const defaultControlSettings = {
         successAnimation: true,
         flashCountdown: true,
-        enterToNext: false,
-        enterToRetry: false,
+        enterToNext: true,
         flashWarningEnabled: true,
         ...(settingsDefaults.controls || {})
       };
@@ -690,9 +689,8 @@
       let stageListMouseListenerAttached = false;
       let stageListSkipListener = null;
       let flashCountdownEnabled = true;
-      let enterToNextEnabled = false;
+      let enterToNextEnabled = true;
       let stageStarShineInterval = null;
-      window.enterToRetryEnabled = false;
       
 
       function applyStageIntroOrigin(originEl) {
@@ -2913,7 +2911,10 @@ function runFlashCountdown(onComplete) {
           const conflict = Object.keys(keybinds).find(
             (action) => action !== activeRebindAction && normalizeKey(keybinds[action]) === key
           );
-          if (conflict) {
+          const isRetryNextPair =
+            (activeRebindAction === "retry" && conflict === "stageNext") ||
+            (activeRebindAction === "stageNext" && conflict === "retry");
+          if (conflict && !isRetryNextPair) {
             event.preventDefault();
             setKeybindStatus(`"${getKeyLabel(key)}" is already used. Choose another key.`);
             return;
@@ -3023,6 +3024,30 @@ function runFlashCountdown(onComplete) {
           return;
         }
         if (event.key === "Escape") {
+          if (gameMode === "stages" && (stageState.active || phase === "result")) {
+            event.preventDefault();
+            if (stageState.active && !stageState.completed) {
+              const backElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
+                ? stageState.elapsedSeconds
+                : (performance.now() - (stageState.startTime || performance.now())) / 1000;
+              const backEntries = window.__lastEntries || [];
+              const activeContext = typeof window.getActiveLevelContext === "function"
+                ? window.getActiveLevelContext()
+                : null;
+              if (typeof trackQuitReason === "function") {
+                trackQuitReason("menu_quit", activeContext || {});
+              }
+              if (typeof window.recordLevelAttemptStats === "function") {
+                window.recordLevelAttemptStats(false);
+              }
+              if (typeof trackLevelSession === 'function') {
+                trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries, "menu_quit", activeContext || {});
+              }
+            }
+            resetStageProgress();
+            resetGame();
+            openStagesScreen(false);
+          }
           return;
         }
         if (phase === "result" && gameMode === "stages") {
@@ -3034,18 +3059,24 @@ function runFlashCountdown(onComplete) {
             return;
           }
           if (keybindMatches(event, "stageNext")) {
-            event.preventDefault();
             const nextBtn = document.getElementById("stageNextButton");
-            if (nextBtn) nextBtn.click();
-            return;
-          }
-          if (!enterToRetryEnabled) { 
-            if (keybindMatches(event, "retry")) {
+            if (nextBtn) {
               event.preventDefault();
-              const retryBtn = document.getElementById("stageRetryButton");
-              if (retryBtn) retryBtn.click();
+              nextBtn.click();
               return;
             }
+          }
+          if (keybindMatches(event, "retry")) {
+            event.preventDefault();
+            const retryBtn = document.getElementById("stageRetryButton");
+            if (retryBtn) retryBtn.click();
+            return;
+          }
+          if (event.key === "Enter" && document.body.classList.contains("stage-fail")) {
+            event.preventDefault();
+            const retryBtn = document.getElementById("stageRetryButton");
+            if (retryBtn) retryBtn.click();
+            return;
           }
           
         }
@@ -3056,13 +3087,17 @@ function runFlashCountdown(onComplete) {
             if (backBtn) backBtn.click();
             return;
           }
-          if (!enterToRetryEnabled) {
-            if (keybindMatches(event, "retry")) {
-              event.preventDefault();
-              const retryBtn = document.getElementById("practiceRetryButton");
-              if (retryBtn) retryBtn.click();
-              return;
-            }
+          if (keybindMatches(event, "retry")) {
+            event.preventDefault();
+            const retryBtn = document.getElementById("practiceRetryButton");
+            if (retryBtn) retryBtn.click();
+            return;
+          }
+          if (event.key === "Enter" && document.body.classList.contains("stage-fail")) {
+            event.preventDefault();
+            const retryBtn = document.getElementById("practiceRetryButton");
+            if (retryBtn) retryBtn.click();
+            return;
           }
           
           if (keybindMatches(event, "practiceSettings")) {
@@ -3084,26 +3119,14 @@ function runFlashCountdown(onComplete) {
         if (phase === "show") {
           skipRevealNow();
         } else if (phase === "recall") {
-          if (enterToNextEnabled) {
-            const inputs = Array.from(inputGrid.querySelectorAll('input[data-index]'));
-            const activeIndex = inputs.indexOf(document.activeElement);
-            if (activeIndex !== -1 && activeIndex < inputs.length - 1) {
-              event.preventDefault();
-              inputs[activeIndex + 1].focus();
-              return;
-            }
+          const inputs = Array.from(inputGrid.querySelectorAll('input[data-index]'));
+          const activeIndex = inputs.indexOf(document.activeElement);
+          if (activeIndex !== -1 && activeIndex < inputs.length - 1) {
+            event.preventDefault();
+            inputs[activeIndex + 1].focus();
+            return;
           }
           checkAnswers();
-        } else if (phase === "result" && gameMode === "stages" && enterToRetryEnabled) {
-          event.preventDefault();
-          const retryBtn = document.getElementById("stageRetryButton");
-          if (retryBtn) retryBtn.click();
-          return;
-        } else if (phase === "result" && gameMode === "practice" && enterToRetryEnabled) {
-          event.preventDefault();
-          const retryBtn = document.getElementById("practiceRetryButton");
-          if (retryBtn) retryBtn.click();
-          return;
         }
       });
 
@@ -3264,38 +3287,8 @@ function runFlashCountdown(onComplete) {
           setSuccessAnimationEnabled(successAnimationToggle.checked);
         });
       }
-      
-      if (enterToNextToggle) {
-        const storageKey = "flashRecallEnterToNext";
-        const saved = window.localStorage.getItem(storageKey);
-        if (saved !== null) {
-          enterToNextToggle.checked = saved === "1";
-        } else {
-          enterToNextToggle.checked = Boolean(defaultControlSettings.enterToNext);
-        }
+      enterToNextEnabled = true;
 
-        enterToNextEnabled = enterToNextToggle.checked;
-        enterToNextToggle.addEventListener("change", () => {
-          enterToNextEnabled = enterToNextToggle.checked;
-          window.localStorage.setItem(storageKey, enterToNextToggle.checked ? "1" : "0");
-        });
-      }
-      
-      if (enterToRetryToggle) {
-        const storageKey = "flashRecallEnterToRetry";
-        const saved = window.localStorage.getItem(storageKey);
-        if (saved !== null) {
-          enterToRetryToggle.checked = saved === "1";
-        } else {
-          enterToRetryToggle.checked = Boolean(defaultControlSettings.enterToRetry);
-        }
-
-        enterToRetryEnabled = enterToRetryToggle.checked;
-        enterToRetryToggle.addEventListener("change", () => {
-          enterToRetryEnabled = enterToRetryToggle.checked;
-          window.localStorage.setItem(storageKey, enterToRetryToggle.checked ? "1" : "0");
-        });
-      }
 
       if (flashCountdownToggle) {
         const storageKey = "flashRecallFlashCountdown";

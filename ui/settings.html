@@ -4,7 +4,7 @@
     <div class="settings-tabs" role="tablist" aria-label="Settings tabs">
       <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-settings-tab="general">General</button>
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="controls">Controls</button>
-      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="audio">Audio</button>
+      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="audio" hidden aria-hidden="true" tabindex="-1">Audio</button>
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="appearance">Appearance</button>
     </div>
     <div class="controls">
@@ -40,19 +40,6 @@
       </div>
       <div class="settings-pane" data-settings-pane="controls" hidden>
         <div class="control-group">
-          <label>Keyboard controls</label>
-          <div class="checkboxes">
-            <label>
-              <input id="enterToNextToggle" type="checkbox"/>
-              Press Enter to move to next card input
-            </label>
-            <label>
-              <input id="enterToRetryToggle" type="checkbox"/>
-              Press Enter to retry stage on result screen
-            </label>
-          </div>
-        </div>
-        <div class="control-group">
           <label>Action keybinds</label>
           <div id="keybindStatus" class="small" aria-live="polite"></div>
           <div class="keybind-grid">
@@ -62,18 +49,18 @@
             </div>
             <div class="keybind-row">
               <span>Next level</span>
-              <button id="keybindStageNext" class="secondary keybind-btn" type="button">N</button>
+              <button id="keybindStageNext" class="secondary keybind-btn" type="button">Enter</button>
             </div>
             <div class="keybind-row">
               <span>Quit level to menu</span>
               <button id="keybindStageQuit" class="secondary keybind-btn" type="button">Q</button>
             </div>
             <div class="keybind-row">
-              <span>Practice home</span>
+              <span>Sandbox home</span>
               <button id="keybindPracticeHome" class="secondary keybind-btn" type="button">H</button>
             </div>
             <div class="keybind-row">
-              <span>Practice settings</span>
+              <span>Sandbox settings</span>
               <button id="keybindPracticeSettings" class="secondary keybind-btn" type="button">S</button>
             </div>
           </div>

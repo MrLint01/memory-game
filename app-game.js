@@ -309,10 +309,9 @@
           }
         });
         const stageNumber = Number.isFinite(stageState.index) ? stageState.index + 1 : 1;
-        console.log("enterToRetryEnabled:", window.enterToRetryEnabled);
         const retryActionKey =
           typeof window.getActionKeyLabel === "function" ? window.getActionKeyLabel("retry") : "R";
-        const retryKey = window.enterToRetryEnabled ? "Enter" : retryActionKey;
+        const retryKey = retryActionKey;
         const menuKey =
           typeof window.getActionKeyLabel === "function" ? window.getActionKeyLabel("stageQuit") : "Q";
         const practiceHomeKey =
@@ -449,7 +448,7 @@
           typeof window.getActionKeyLabel === "function" ? window.getActionKeyLabel("stageQuit") : "Q";
         const stageNextKey =
           typeof window.getActionKeyLabel === "function" ? window.getActionKeyLabel("stageNext") : "N";
-        const retryKey = window.enterToRetryEnabled ? "Enter" : retryActionKey;
+        const retryKey = retryActionKey;
 
         resultsPanel.innerHTML = `
           <div class="stage-complete">

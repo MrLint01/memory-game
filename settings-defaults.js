@@ -21,8 +21,7 @@
     controls: {
       successAnimation: true,
       flashCountdown: true,
-      enterToNext: false,
-      enterToRetry: false,
+      enterToNext: true,
       flashWarningEnabled: true
     },
     audio: {
@@ -32,7 +31,7 @@
     },
     keybinds: {
       retry: "r",
-      stageNext: "n",
+      stageNext: "enter",
       stageQuit: "q",
       practiceHome: "h",
       practiceSettings: "s"
