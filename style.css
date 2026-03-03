@@ -3426,10 +3426,15 @@ body.stage-fail .rotation-icon {
   white-space: normal;
 }
 .icon-choice input:checked + .icon-tile {
-  border-color: #0f172a;
-  background: #e2e8f0;
+  border-color: var(--border);
+  background: var(--panel-muted);
   box-shadow: none;
   transform: translateY(-2px);
+}
+@supports (color: color-mix(in srgb, #000 0%, #fff 100%)) {
+  .icon-choice input:checked + .icon-tile {
+    background: color-mix(in srgb, var(--panel-muted) 70%, var(--main-accent) 30%);
+  }
 }
 .icon-choice input:focus-visible + .icon-tile {
   outline: 2px solid #111827;
