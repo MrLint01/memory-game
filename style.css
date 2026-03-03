@@ -32,6 +32,26 @@ body[data-view="stages"] .stages-screen {
 body[data-view="stages"] header {
   display: none;
 }
+body[data-view="splash"] .layout,
+body[data-view="splash"] .stages-screen {
+  display: none;
+}
+body[data-view="splash"] header {
+  display: none;
+}
+body[data-view="splash"] .splash-screen {
+  display: flex;
+}
+body[data-view="loading"] .layout,
+body[data-view="loading"] .stages-screen {
+  display: none;
+}
+body[data-view="loading"] header {
+  display: none;
+}
+body[data-view="loading"] .splash-loading {
+  display: flex;
+}
 body[data-view="stages"] {
   overflow-x: hidden;
 }
@@ -66,6 +86,24 @@ body[data-state="idle"] main {
         width: min(560px, 92vw);
         padding: 1.6rem;
       }
+body[data-view="splash"] main {
+  width: min(560px, 92vw);
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+body[data-view="splash"] main::before {
+  display: none;
+}
+body[data-view="loading"] main {
+  width: min(560px, 92vw);
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+body[data-view="loading"] main::before {
+  display: none;
+}
 body[data-view="stages"][data-state="idle"] main {
   width: min(2200px, 96vw);
   padding: 2.6rem 2.8rem;
@@ -156,12 +194,15 @@ header {
   max-width: 100%;
   justify-content: center;
   width: 100%;
+  transform: translateX(8px);
 }
 h1 {
   margin: 0;
-  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-family: "Chakra Petch", "Courier New", "Lucida Console", monospace;
+  font-size: clamp(2.2rem, 4vw, 3.2rem);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 500;
 }
 .title {
   position: relative;
@@ -175,6 +216,40 @@ h1 {
   display: inline-block;
   padding: 0 0.08em;
   animation: none;
+  text-shadow: 1px 1px 0 var(--border);
+}
+.title::before,
+.title::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: currentColor;
+  opacity: 0.25;
+}
+.title::before {
+  transform: translate(1px, -1px);
+  animation: splashGlitchA 4.8s steps(2, end) infinite;
+}
+.title::after {
+  transform: translate(-1px, 1px);
+  animation: splashGlitchB 5.4s steps(2, end) infinite;
+}
+.title__text {
+  position: relative;
+  z-index: 2;
+}
+.title__shine {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.9) 45%, transparent 60%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  mix-blend-mode: screen;
+  animation: splashShine 2.8s ease-in-out 0.8s infinite;
+  pointer-events: none;
 }
 @keyframes flashPulse {
   0%,
@@ -226,6 +301,243 @@ h1 {
   position: absolute;
   inset: 8px;
   border: 2px dashed var(--border);
+}
+.splash-screen {
+  display: none;
+  min-height: 32vh;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.8rem 0 1.4rem;
+  margin-top: -1.2rem;
+  flex-direction: column;
+  gap: 1rem;
+  animation: splashFadeIn 520ms ease-out both;
+}
+.splash-title {
+  font-size: clamp(2.8rem, 7vw, 4.6rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  animation: splashTitleIn 520ms ease-out both;
+  position: relative;
+  text-shadow: 3px 3px 0 var(--border);
+  display: inline-block;
+}
+.splash-title::before,
+.splash-title::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: currentColor;
+  opacity: 0.25;
+}
+.splash-title::before {
+  transform: translate(1px, -1px);
+  animation: splashGlitchA 4.8s steps(2, end) infinite;
+}
+.splash-title::after {
+  transform: translate(-1px, 1px);
+  animation: splashGlitchB 5.4s steps(2, end) infinite;
+}
+.splash-title__text {
+  position: relative;
+  z-index: 2;
+}
+.splash-title__shine {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.9) 45%, transparent 60%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  mix-blend-mode: screen;
+  animation: splashShine 2.8s ease-in-out 0.8s infinite;
+  pointer-events: none;
+}
+.splash-message {
+  font-size: 1.05rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: splashPulse 1.8s ease-in-out infinite;
+}
+body[data-view="splash"] .splash-message {
+  animation: splashMessageIn 620ms ease-out 120ms both,
+    splashPulse 1.8s ease-in-out infinite,
+    splashFloat 5.2s ease-in-out 700ms infinite;
+}
+.splash-loading {
+  display: none;
+  min-height: 32vh;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.8rem 0 1.4rem;
+  margin-top: -1.2rem;
+  flex-direction: column;
+  gap: 0.8rem;
+  animation: splashFadeIn 360ms ease-out both;
+}
+.splash-loading__text {
+  font-size: 0.95rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.splash-loading__bar {
+  width: min(220px, 60vw);
+  height: 6px;
+  border: 2px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+}
+.splash-loading__bar span {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(17, 24, 39, 0.6) 50%, transparent 100%);
+  animation: loadingSweep 1.2s ease-in-out infinite;
+  transform: translateX(-100%);
+}
+@keyframes splashFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes splashTitleIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes splashMessageIn {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes loadingSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes titleGlitchA {
+  0%,
+  92%,
+  100% {
+    transform: translate(1px, -1px);
+    opacity: 0.18;
+  }
+  94% {
+    transform: translate(2px, -2px);
+    opacity: 0.35;
+  }
+  96% {
+    transform: translate(-2px, 2px);
+    opacity: 0.25;
+  }
+}
+@keyframes titleGlitchB {
+  0%,
+  90%,
+  100% {
+    transform: translate(-1px, 1px);
+    opacity: 0.18;
+  }
+  92% {
+    transform: translate(-2px, 2px);
+    opacity: 0.32;
+  }
+  95% {
+    transform: translate(2px, -1px);
+    opacity: 0.25;
+  }
+}
+@keyframes titleShine {
+  0%,
+  65% {
+    background-position: -120% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+@keyframes splashGlitchA {
+  0%,
+  92%,
+  100% {
+    transform: translate(1px, -1px);
+    opacity: 0.2;
+  }
+  94% {
+    transform: translate(3px, -2px);
+    opacity: 0.45;
+  }
+  96% {
+    transform: translate(-2px, 2px);
+    opacity: 0.3;
+  }
+}
+@keyframes splashGlitchB {
+  0%,
+  90%,
+  100% {
+    transform: translate(-1px, 1px);
+    opacity: 0.2;
+  }
+  92% {
+    transform: translate(-3px, 2px);
+    opacity: 0.4;
+  }
+  95% {
+    transform: translate(2px, -1px);
+    opacity: 0.3;
+  }
+}
+@keyframes splashShine {
+  0%,
+  65% {
+    background-position: -120% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+@keyframes splashFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes splashPulse {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.4;
+  }
 }
 .card-a {
   transform: translate(-12px, 6px) rotate(-6deg);
@@ -415,18 +727,18 @@ h1 {
         flex-wrap: wrap;
         gap: 0.7rem;
       }
-      button {
-        border: 2px solid var(--border);
-        background: #ffffff;
-        color: var(--ink);
-        padding: 0.45rem 1rem;
-        border-radius: 0;
-        font-size: 0.9rem;
-        cursor: pointer;
-        letter-spacing: 0.02em;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        box-shadow: none;
-      }
+button {
+  border: 2px solid var(--border);
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0.45rem 1rem;
+  border-radius: 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: none;
+}
       button.secondary {
         background: var(--panel-muted);
         color: var(--ink);
@@ -1477,6 +1789,7 @@ body[data-state="paused"] .hud-pause {
   color: var(--ink);
         padding: 1rem 1.2rem;
         border-radius: 0;
+  font-family: "Chakra Petch", "Courier New", "Lucida Console", monospace;
   display: grid;
   gap: 0.4rem;
   text-align: center;
@@ -2140,14 +2453,21 @@ body.pause-active .interrupt-close {
   gap: 0.4rem;
   font-size: 0.85rem;
   --lb-row-height: 1.2rem;
-  min-height: calc(7 * var(--lb-row-height) + 6 * 0.4rem);
+  min-height: calc(7 * var(--lb-row-height) + 6 * 0.4rem + 0.7rem + 1px);
   grid-auto-rows: minmax(var(--lb-row-height), auto);
 }
 .leaderboard-row {
   display: grid;
-  grid-template-columns: 1.2rem 1fr 3.2rem;
+  grid-template-columns: 1.2rem 16ch 3.2rem;
   gap: 0.4rem;
   align-items: center;
+  min-height: var(--lb-row-height);
+  line-height: var(--lb-row-height);
+}
+.leaderboard-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .leaderboard-row--me {
   margin-top: 0.35rem;
@@ -2940,6 +3260,7 @@ body.stage-fail .rotation-icon {
   margin-top: 0.6rem;
   font-size: 0.9rem;
   color: var(--ink);
+  font-family: "Courier New", "Lucida Console", monospace;
 }
 .confirm-row[hidden] {
   display: none !important;
