@@ -19,7 +19,7 @@ service cloud.firestore {
     match /leaderboards/{stageId}/versions/{versionId}/entries/{playerId} {
       allow read: if true;
       allow create, update: if request.auth != null
-        && request.resource.data.player_id == entryId;
+        && request.resource.data.player_id == playerId;
       allow delete: if false;
     }
   }
