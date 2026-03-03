@@ -67,6 +67,7 @@ async function fetchLeaderboardDoc(path, id) {
   if (!firebaseDb) return null;
   try {
     const docRef = firebaseDb.doc(`${path}/${id}`);
+    console.log(`Fetching leaderboard doc at ${path}/${id}`);
     const snap = await docRef.get();
     if (!snap.exists) return null;
     return { id: snap.id, ...snap.data() };
@@ -106,11 +107,42 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
   };
   try {
+    // Update player entry
     await firebaseDb.doc(`${path}/${entryId}`).set(payload, { merge: true });
+    console.log(`Updated leaderboard for stage ${stageId} v${stageVersion}:`, payload);
+    
+    // const stageMetaPath = `leaderboards/level_${stageId}/versions/v${stageVersion}/metadata`;
+    // const isNewPlayer = !existing;
+    
+    // if (isNewPlayer) {
+    //   await firebaseDb.doc(stageMetaPath).set({
+    //     total_unique_players: firebase.firestore.FieldValue.increment(1),
+    //     last_updated: firebase.firestore.FieldValue.serverTimestamp()
+    //   }, { merge: true });
+    // }
   } catch (error) {
     console.warn("Failed to update leaderboard", error);
   }
 }
+
+// async function getStasgeTotalPlayers(stageId, stageVersion) {
+//   if (!firebaseDb) return 0;
+  
+//   try {
+//     const stageMetaPath = `leaderboards/level_${stageId}/versions/v${stageVersion}/metadata`;
+//     const metaDoc = await firebaseDb.doc(stageMetaPath).get();
+    
+//     if (metaDoc.exists) {
+//       return metaDoc.data().total_unique_players || 0;
+//     }
+//     return 0;
+//   } catch (error) {
+//     console.warn("Failed to fetch stage total players", error);
+//     return 0;
+//   }
+// }
+
+// window.getStageTotalPlayers = getStageTotalPlayers;
 
 async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
   if (!firebaseDb) return { top: [], me: null, meRank: null };
@@ -169,6 +201,50 @@ async function syncLocalBestTimesOnce(force = false) {
     console.warn("Failed to sync leaderboard", error);
   }
 }
+
+async function getPlayerRankAndPercentile(stageId, stageVersion, playerTimeMs) {
+  if (!firebaseDb || !Number.isFinite(playerTimeMs)) {
+    return null;
+  }
+
+  try {
+    const path = getStageLeaderboardPath(stageId, stageVersion);
+    const entriesRef = firebaseDb.collection(path);
+    
+    // Count total active players
+    const totalSnapshot = await entriesRef
+      .where('active', '!=', false)
+      .get();
+    const totalPlayers = totalSnapshot.size;
+    
+    if (totalPlayers === 0) return null;
+    
+    // Count players faster than this player
+    const fasterSnapshot = await entriesRef
+      .where('active', '!=', false)
+      .where('best_time_ms', '<', playerTimeMs)
+      .get();
+    const fasterCount = fasterSnapshot.size;
+    
+    const rank = fasterCount + 1;
+    const percentBeaten = totalPlayers > 1 
+      ? Math.round(((totalPlayers - rank) / (totalPlayers - 1)) * 100)
+      : 0;
+    
+    return {
+      rank: rank,
+      totalPlayers: totalPlayers,
+      percentBeaten: percentBeaten,
+      playersFasterThan: fasterCount,
+      playersSlowerThan: totalPlayers - rank
+    };
+  } catch (error) {
+    console.error('Error calculating player rank:', error);
+    return null;
+  }
+}
+
+window.getPlayerRankAndPercentile = getPlayerRankAndPercentile;
 
 async function deactivateLocalLeaderboardEntries(bestTimesOverride = null) {
   if (!firebaseDb || !currentUserId) return;

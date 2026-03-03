@@ -17,10 +17,34 @@ service cloud.firestore {
     }
 
     match /leaderboards/{stageId}/versions/{versionId}/entries/{playerId} {
-      allow read: if true;
-      allow create, update: if request.auth != null
-        && request.resource.data.player_id == entryId;
+      allow read: if request.auth != null
+        && (request.query == null || request.query.limit == null || request.query.limit <= 250);
+      allow create: if request.auth != null
+        && request.resource.data.player_id == playerId
+        && request.resource.data.auth_uid == request.auth.uid;
+      allow update: if request.auth != null
+        && request.resource.data.player_id == playerId
+        && request.resource.data.auth_uid == request.auth.uid
+        && (resource.data.auth_uid == null || resource.data.auth_uid == request.auth.uid);
       allow delete: if false;
+    }
+
+    match /leaderboards_global/progress/entries/{playerId} {
+      allow read: if request.auth != null
+        && (request.query == null || request.query.limit == null || request.query.limit <= 250);
+      allow create: if request.auth != null
+        && request.resource.data.player_id == playerId
+        && request.resource.data.auth_uid == request.auth.uid;
+      allow update: if request.auth != null
+        && request.resource.data.player_id == playerId
+        && request.resource.data.auth_uid == request.auth.uid
+        && (resource.data.auth_uid == null || resource.data.auth_uid == request.auth.uid);
+      allow delete: if false;
+    }
+    
+    match /leaderboards/{stageId}/versions/{versionId}/metadata {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }
