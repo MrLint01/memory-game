@@ -30,6 +30,7 @@
       const AUDIO_MUSIC_KEY = "flashRecallAudioMusicVolume";
       const AUDIO_EFFECTS_KEY = "flashRecallAudioEffectsVolume";
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
+      const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
       const settingsDefaults = typeof window.getFlashRecallSettingsDefaults === "function"
         ? window.getFlashRecallSettingsDefaults()
         : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
@@ -315,7 +316,8 @@
           effects: audioSettings.effects / 100
         };
       };
-      const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
+      let splashReturnToHome = false;
+      let resetLoadingActive = false;
 
       function normalizePlayerName(raw) {
         if (raw === null || raw === undefined) return "";
@@ -461,6 +463,24 @@
           // ignore
         }
       }
+
+      let splashStartListener = null;
+      function attachSplashStartListeners() {
+        if (splashStartListener) {
+          return;
+        }
+        splashStartListener = (event) => {
+          if (document.body.dataset.view !== "splash") return;
+          window.removeEventListener("keydown", splashStartListener);
+          window.removeEventListener("pointerdown", splashStartListener);
+          splashStartListener = null;
+          startFromSplash();
+        };
+        window.addEventListener("keydown", splashStartListener);
+        window.addEventListener("pointerdown", splashStartListener);
+      }
+
+
 
       let playerNamePromptDelayActive = false;
       let playerNamePromptDelayTimer = null;
@@ -1351,8 +1371,15 @@ function runFlashCountdown(onComplete) {
         }
       }
 
-      function openSplashLoading() {
+      function openSplashLoading(message = null) {
+        document.body.classList.add("loading-overlay");
+        document.body.classList.remove("home-anim");
         if (splashLoading) {
+          const textEl = splashLoading.querySelector(".splash-loading__text");
+          if (textEl) {
+            const nextMessage = message || (resetLoadingActive ? "Resetting…" : "Loading…");
+            textEl.textContent = nextMessage;
+          }
           splashLoading.removeAttribute("aria-hidden");
         }
         if (mainHeader) {
@@ -1362,18 +1389,38 @@ function runFlashCountdown(onComplete) {
         document.body.dataset.view = "loading";
       }
 
-      function closeSplashLoading() {
+      function closeSplashLoading(skipViewReset = false, keepHeaderHidden = false) {
+        document.body.classList.remove("loading-overlay");
         if (splashLoading) {
           splashLoading.setAttribute("aria-hidden", "true");
         }
-        if (mainHeader) {
-          mainHeader.removeAttribute("aria-hidden");
+        if (!keepHeaderHidden && mainHeader) {
+          mainHeader.removeAttribute("aria-hidden", "true");
           mainHeader.style.display = "";
         }
-        if (document.body.dataset.view === "loading") {
+        if (!skipViewReset && document.body.dataset.view === "loading") {
           document.body.dataset.view = "home";
         }
       }
+
+      function triggerHomeFadeIn() {
+        document.body.classList.remove("home-anim");
+        void document.body.offsetWidth;
+        document.body.classList.add("home-anim");
+      }
+
+      function showSplashAfterLoading() {
+        openSplashScreen();
+        attachSplashStartListeners();
+        window.requestAnimationFrame(() => {
+          closeSplashLoading(true, true);
+          document.body.classList.remove("resetting");
+          resetConfirmYes.disabled = false;
+          resetLoadingActive = false;
+        });
+      }
+
+
 
       function startStage(index, options = {}) {
         const {
@@ -1423,6 +1470,18 @@ function runFlashCountdown(onComplete) {
       }
 
       async function startFromSplash() {
+        if (splashReturnToHome) {
+          splashReturnToHome = false;
+          closeSplashScreen();
+          markSplashSeen();
+          document.body.dataset.view = "home";
+          if (mainHeader) {
+            mainHeader.removeAttribute("aria-hidden");
+            mainHeader.style.display = "";
+          }
+          triggerHomeFadeIn();
+          return;
+        }
         closeSplashScreen();
         markSplashSeen();
         openSplashLoading();
@@ -1655,7 +1714,7 @@ function runFlashCountdown(onComplete) {
               return;
             }
             closeStageIntro();
-            openSplashLoading();
+            openSplashLoading("Loading…");
             const minimumDelay = new Promise((resolve) => {
               window.setTimeout(resolve, 750);
             });
@@ -1669,7 +1728,7 @@ function runFlashCountdown(onComplete) {
             return;
           }
           closeStageIntro();
-          openSplashLoading();
+          openSplashLoading("Loading…");
           const minimumDelay = new Promise((resolve) => {
             window.setTimeout(resolve, 750);
           });
@@ -1696,7 +1755,7 @@ function runFlashCountdown(onComplete) {
             closeStageIntro();
           }
           if (Number.isFinite(index)) {
-            openSplashLoading();
+            openSplashLoading("Loading…");
             const minimumDelay = new Promise((resolve) => {
               window.setTimeout(resolve, 750);
             });
@@ -1773,16 +1832,19 @@ function runFlashCountdown(onComplete) {
         });
       }
 
+      if (mainMenuTitle) {
+        mainMenuTitle.addEventListener("click", () => {
+          splashReturnToHome = !shouldShowSplashScreen();
+          openSplashScreen();
+          attachSplashStartListeners();
+        });
+      }
+
       if (shouldShowSplashScreen()) {
         openSplashScreen();
-        const handleSplashStart = () => {
-          if (document.body.dataset.view !== "splash") return;
-          window.removeEventListener("keydown", handleSplashStart);
-          window.removeEventListener("pointerdown", handleSplashStart);
-          startFromSplash();
-        };
-        window.addEventListener("keydown", handleSplashStart);
-        window.addEventListener("pointerdown", handleSplashStart);
+        attachSplashStartListeners();
+      } else {
+        closeSplashScreen();
       }
 
       if (stagesOpen) {
@@ -2089,8 +2151,35 @@ function runFlashCountdown(onComplete) {
         });
       }
       if (resetConfirmYes) {
-        resetConfirmYes.addEventListener("click", async () => {
-          const bestTimesSnapshot = window.stageBestTimes ? { ...window.stageBestTimes } : {};
+        resetConfirmYes.addEventListener("click", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          document.body.classList.add("loading-overlay");
+          if (splashLoading) {
+            splashLoading.removeAttribute("aria-hidden");
+          }
+          resetConfirmYes.disabled = true;
+          hideResetConfirmRow();
+          document.body.classList.add("resetting");
+          document.body.dataset.view = "loading";
+          resetLoadingActive = true;
+          if (settingsModal) {
+            setModalState(settingsModal, false);
+          }
+          openSplashLoading("Resetting…");
+          if (splashLoading) {
+            const textEl = splashLoading.querySelector(".splash-loading__text");
+            if (textEl) {
+              textEl.textContent = "Resetting…";
+            }
+          }
+          document.body.classList.remove("home-anim");
+          await new Promise((resolve) => window.requestAnimationFrame(resolve));
+          const fallbackTimer = window.setTimeout(() => {
+            showSplashAfterLoading();
+          }, 3000);
+          try {
+            const bestTimesSnapshot = window.stageBestTimes ? { ...window.stageBestTimes } : {};
           window.stageStars = {};
           window.stageBestTimes = {};
           window.stageCompleted = {};
@@ -2137,7 +2226,7 @@ function runFlashCountdown(onComplete) {
             window.saveStageProgress();
           }
           if (typeof window.deactivateLocalLeaderboardEntries === "function") {
-            await window.deactivateLocalLeaderboardEntries(bestTimesSnapshot);
+            window.deactivateLocalLeaderboardEntries(bestTimesSnapshot).catch(() => {});
           }
           if (typeof window.rotateLeaderboardPlayerId === "function") {
             window.rotateLeaderboardPlayerId();
@@ -2163,11 +2252,14 @@ function runFlashCountdown(onComplete) {
               }
             }
           }
-          if (settingsModal) {
-            setModalState(settingsModal, false);
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, 750);
+          });
+          showSplashAfterLoading();
+          resetLoadingActive = false;
+          } finally {
+            window.clearTimeout(fallbackTimer);
           }
-          openSplashScreen();
-          hideResetConfirmRow();
         });
         resetConfirmYes.addEventListener("keydown", (event) => {
           event.preventDefault();
