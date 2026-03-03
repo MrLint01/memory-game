@@ -4,6 +4,7 @@
     <div class="settings-tabs" role="tablist" aria-label="Settings tabs">
       <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-settings-tab="general">General</button>
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="controls">Controls</button>
+      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="audio">Audio</button>
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="appearance">Appearance</button>
     </div>
     <div class="controls">
@@ -11,6 +12,15 @@
         <div class="control-group" id="playerNameSettingRow">
           <label for="playerNameSetting">Player name</label>
           <input id="playerNameSetting" type="text" maxlength="16" autocomplete="nickname" />
+        </div>
+        <div class="control-group">
+          <label>Accessibility</label>
+          <div class="checkboxes">
+            <label>
+              <input id="photosensitivityWarningToggle" type="checkbox" checked />
+              Show photosensitivity warning before flash levels
+            </label>
+          </div>
         </div>
         <div class="control-group">
           <label>Progress</label>
@@ -91,31 +101,50 @@
             <option value="paper-night">Paper Night</option>
             <option value="pastel-dawn">Pastel Dawn</option>
             <option value="pastel-mint">Pastel Mint</option>
-            <option value="neon-arcade">Neon Arcade</option>
-            <option value="neon-cyber">Neon Cyber</option>
             <option value="sunset-pop">Sunset Pop</option>
             <option value="ocean-deep">Ocean Deep</option>
             <option value="forest-camp">Forest Camp</option>
-            <option value="retro-terminal">Retro Terminal</option>
             <option value="cherry-cream">Cherry Cream</option>
             <option value="steel-grid">Steel Grid</option>
           </select>
           <label for="appearanceFont">Font</label>
           <select id="appearanceFont">
+            <option value="original">Original (Chakra)</option>
             <option value="arcade">Arcade Bold</option>
             <option value="mono">Mono Classic</option>
             <option value="rounded">Rounded Friendly</option>
             <option value="space">Space Grotesk</option>
             <option value="poster">Poster Impact</option>
           </select>
-          <label for="appearanceLayout">Layout</label>
-          <select id="appearanceLayout">
-            <option value="classic">Classic Split</option>
-            <option value="focus">Focus Stack</option>
-            <option value="arcade">Arcade Rail</option>
-            <option value="wide">Wide Stage</option>
-          </select>
           <button id="appearanceShuffle" class="secondary" type="button">Shuffle style</button>
+        </div>
+      </div>
+      <div class="settings-pane" data-settings-pane="audio" hidden>
+        <div class="control-group">
+          <label>Volume</label>
+          <div class="audio-dial-grid">
+            <div class="audio-dial-row">
+              <label for="audioMasterVolume">
+                General
+                <span id="audioMasterValue" class="audio-dial-value">100%</span>
+              </label>
+              <input id="audioMasterVolume" type="range" min="0" max="100" step="1" value="100" />
+            </div>
+            <div class="audio-dial-row">
+              <label for="audioMusicVolume">
+                Music
+                <span id="audioMusicValue" class="audio-dial-value">80%</span>
+              </label>
+              <input id="audioMusicVolume" type="range" min="0" max="100" step="1" value="80" />
+            </div>
+            <div class="audio-dial-row">
+              <label for="audioEffectsVolume">
+                Effects
+                <span id="audioEffectsValue" class="audio-dial-value">80%</span>
+              </label>
+              <input id="audioEffectsVolume" type="range" min="0" max="100" step="1" value="80" />
+            </div>
+          </div>
         </div>
       </div>
     </div>

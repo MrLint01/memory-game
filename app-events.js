@@ -26,29 +26,30 @@
       const APPEARANCE_FONT_KEY = "flashRecallAppearanceFont";
       const APPEARANCE_LAYOUT_KEY = "flashRecallAppearanceLayout";
       const KEYBINDS_STORAGE_KEY = "flashRecallKeybinds";
+      const AUDIO_MASTER_KEY = "flashRecallAudioMasterVolume";
+      const AUDIO_MUSIC_KEY = "flashRecallAudioMusicVolume";
+      const AUDIO_EFFECTS_KEY = "flashRecallAudioEffectsVolume";
+      const FLASH_WARNING_KEY = "flashRecallFlashWarning";
       const settingsDefaults = typeof window.getFlashRecallSettingsDefaults === "function"
         ? window.getFlashRecallSettingsDefaults()
         : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
       const fallbackAppearance = {
         theme: "mono-ink",
-        font: "arcade",
+        font: "original",
         layout: "classic",
         themes: [
           "mono-ink",
           "paper-night",
           "pastel-dawn",
           "pastel-mint",
-          "neon-arcade",
-          "neon-cyber",
           "sunset-pop",
           "ocean-deep",
           "forest-camp",
-          "retro-terminal",
           "cherry-cream",
           "steel-grid"
         ],
-        fonts: ["arcade", "mono", "rounded", "space", "poster"],
-        layouts: ["classic", "focus", "arcade", "wide"]
+        fonts: ["original", "arcade", "rounded", "space", "mono", "poster"],
+        layouts: ["classic"]
       };
       const defaultAppearance = {
         ...fallbackAppearance,
@@ -81,6 +82,13 @@
         flashWarningEnabled: true,
         ...(settingsDefaults.controls || {})
       };
+      const defaultAudioSettings = {
+        master: 100,
+        music: 80,
+        effects: 80,
+        ...(settingsDefaults.audio || {})
+      };
+      let audioSettings = { ...defaultAudioSettings };
       let keybinds = { ...defaultKeybinds };
       let activeRebindAction = null;
       const keybindButtons = {
@@ -203,7 +211,7 @@
       function applyAppearance(theme, font, layout) {
         const nextTheme = appearanceOptions.themes.includes(theme) ? theme : appearanceOptions.themes[0];
         const nextFont = appearanceOptions.fonts.includes(font) ? font : appearanceOptions.fonts[0];
-        const nextLayout = appearanceOptions.layouts.includes(layout) ? layout : appearanceOptions.layouts[0];
+        const nextLayout = "classic";
         document.body.dataset.theme = nextTheme;
         document.body.dataset.font = nextFont;
         document.body.dataset.layout = nextLayout;
@@ -215,7 +223,7 @@
       function getStoredAppearance() {
         const savedTheme = window.localStorage.getItem(APPEARANCE_THEME_KEY);
         const savedFont = window.localStorage.getItem(APPEARANCE_FONT_KEY);
-        const savedLayout = window.localStorage.getItem(APPEARANCE_LAYOUT_KEY);
+        const savedLayout = "classic";
         const fallbackTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
           ? defaultAppearance.theme
           : appearanceOptions.themes[0];
@@ -231,6 +239,82 @@
           layout: appearanceOptions.layouts.includes(savedLayout) ? savedLayout : fallbackLayout
         };
       }
+
+      function normalizeAudioVolume(value, fallbackValue) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return fallbackValue;
+        return Math.max(0, Math.min(100, Math.round(numeric)));
+      }
+
+      function getStoredAudioSettings() {
+        let savedMaster = null;
+        let savedMusic = null;
+        let savedEffects = null;
+        try {
+          savedMaster = window.localStorage.getItem(AUDIO_MASTER_KEY);
+          savedMusic = window.localStorage.getItem(AUDIO_MUSIC_KEY);
+          savedEffects = window.localStorage.getItem(AUDIO_EFFECTS_KEY);
+        } catch {
+          // ignore storage errors
+        }
+        return {
+          master: normalizeAudioVolume(savedMaster, normalizeAudioVolume(defaultAudioSettings.master, 100)),
+          music: normalizeAudioVolume(savedMusic, normalizeAudioVolume(defaultAudioSettings.music, 80)),
+          effects: normalizeAudioVolume(savedEffects, normalizeAudioVolume(defaultAudioSettings.effects, 80))
+        };
+      }
+
+      function setAudioSliderValue(labelEl, value) {
+        if (!labelEl) return;
+        labelEl.textContent = `${value}%`;
+      }
+
+      function emitAudioSettingsChanged() {
+        const normalized = {
+          master: audioSettings.master / 100,
+          music: audioSettings.music / 100,
+          effects: audioSettings.effects / 100
+        };
+        window.flashRecallAudioSettings = { ...normalized };
+        window.dispatchEvent(
+          new CustomEvent("audio-settings-changed", {
+            detail: { ...normalized }
+          })
+        );
+      }
+
+      function applyAudioSettings(nextSettings, persist = false) {
+        audioSettings = {
+          master: normalizeAudioVolume(nextSettings.master, normalizeAudioVolume(defaultAudioSettings.master, 100)),
+          music: normalizeAudioVolume(nextSettings.music, normalizeAudioVolume(defaultAudioSettings.music, 80)),
+          effects: normalizeAudioVolume(nextSettings.effects, normalizeAudioVolume(defaultAudioSettings.effects, 80))
+        };
+        if (audioMasterVolume) audioMasterVolume.value = String(audioSettings.master);
+        if (audioMusicVolume) audioMusicVolume.value = String(audioSettings.music);
+        if (audioEffectsVolume) audioEffectsVolume.value = String(audioSettings.effects);
+        setAudioSliderValue(audioMasterValue, audioSettings.master);
+        setAudioSliderValue(audioMusicValue, audioSettings.music);
+        setAudioSliderValue(audioEffectsValue, audioSettings.effects);
+
+        if (persist) {
+          try {
+            window.localStorage.setItem(AUDIO_MASTER_KEY, String(audioSettings.master));
+            window.localStorage.setItem(AUDIO_MUSIC_KEY, String(audioSettings.music));
+            window.localStorage.setItem(AUDIO_EFFECTS_KEY, String(audioSettings.effects));
+          } catch {
+            // ignore storage errors
+          }
+        }
+        emitAudioSettingsChanged();
+      }
+
+      window.getAudioMix = function getAudioMix() {
+        return {
+          master: audioSettings.master / 100,
+          music: audioSettings.music / 100,
+          effects: audioSettings.effects / 100
+        };
+      };
       const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
 
       function normalizePlayerName(raw) {
@@ -1292,7 +1376,12 @@ function runFlashCountdown(onComplete) {
       }
 
       function startStage(index, options = {}) {
-        const { skipIntro = false, originEl = null, deferStartRound = false } = options;
+        const {
+          skipIntro = false,
+          originEl = null,
+          deferStartRound = false,
+          skipFlashWarningPrompt = false
+        } = options;
         tabTutorialShownRound = null;
         tabTutorialActive = false;
         firstLetterHintCooldown = 0;
@@ -1300,6 +1389,11 @@ function runFlashCountdown(onComplete) {
         clearFirstLetterHint();
         clearFlashCountdown();
         const stage = window.getStageConfig ? window.getStageConfig(index) : null;
+        const isFlashStage = stage && String(stage.stageType).toLowerCase() === "flash";
+        if (isFlashStage && flashWarningEnabled && !skipFlashWarningPrompt && skipIntro) {
+          openFlashStagePrompt(index);
+          return;
+        }
         if (!skipIntro && openStageIntro(index, originEl)) {
           return;
         }
@@ -1611,24 +1705,49 @@ function runFlashCountdown(onComplete) {
               : Promise.resolve();
             await Promise.all([minimumDelay, fontsReady]).catch(() => {});
             closeSplashLoading();
-            startStage(index, { skipIntro: true, deferStartRound: true });
+            startStage(index, {
+              skipIntro: true,
+              deferStartRound: true,
+              skipFlashWarningPrompt: true
+            });
             startFlashRound();
           }
         });
       }
-      if (flashStageSkip) {
-        const storageKey = "flashRecallFlashWarning";
-        const saved = window.localStorage.getItem(storageKey);
-        if (saved !== null) {
-          flashWarningEnabled = saved === "1";
-          flashStageSkip.checked = saved !== "1";
-        } else {
-          flashWarningEnabled = Boolean(defaultControlSettings.flashWarningEnabled);
+      function setFlashWarningEnabled(enabled, persist = true) {
+        flashWarningEnabled = Boolean(enabled);
+        if (flashStageSkip) {
           flashStageSkip.checked = !flashWarningEnabled;
         }
+        if (photosensitivityWarningToggle) {
+          photosensitivityWarningToggle.checked = flashWarningEnabled;
+        }
+        if (persist) {
+          try {
+            window.localStorage.setItem(FLASH_WARNING_KEY, flashWarningEnabled ? "1" : "0");
+          } catch {
+            // ignore storage errors
+          }
+        }
+      }
+
+      {
+        const saved = window.localStorage.getItem(FLASH_WARNING_KEY);
+        if (saved !== null) {
+          setFlashWarningEnabled(saved === "1", false);
+        } else {
+          setFlashWarningEnabled(Boolean(defaultControlSettings.flashWarningEnabled), false);
+        }
+      }
+
+      if (flashStageSkip) {
         flashStageSkip.addEventListener("change", () => {
-          flashWarningEnabled = !flashStageSkip.checked;
-          window.localStorage.setItem(storageKey, flashWarningEnabled ? "1" : "0");
+          setFlashWarningEnabled(!flashStageSkip.checked, true);
+        });
+      }
+      if (photosensitivityWarningToggle) {
+        photosensitivityWarningToggle.addEventListener("change", () => {
+          setFlashWarningEnabled(photosensitivityWarningToggle.checked, true);
         });
       }
       if (flashStageModal) {
@@ -1976,9 +2095,14 @@ function runFlashCountdown(onComplete) {
           window.stageBestTimes = {};
           window.stageCompleted = {};
           window.stageNewSeen = {};
-          window.flashRecallSessionStats = { totalSeconds: 0, totalCards: 0 };
+          window.flashRecallSessionStats = {
+            totalSeconds: 0,
+            totalCards: 0,
+            totalLevelAttempts: 0,
+            totalLevelSuccesses: 0
+          };
           window.localStorage.removeItem("flashRecallStats");
-          window.localStorage.removeItem("flashRecallFlashWarning");
+          window.localStorage.removeItem(FLASH_WARNING_KEY);
           window.localStorage.removeItem("flashRecallSandboxUnlocks");
           window.localStorage.removeItem("flashRecallPlayerName");
           window.localStorage.removeItem("flashRecallPlayerNamePrompted");
@@ -2134,18 +2258,21 @@ function runFlashCountdown(onComplete) {
           const meRank = result && Number.isFinite(result.meRank) ? result.meRank : null;
           const localName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
           const rows = [];
+          const mePlayerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
+          let meInTop = false;
           top.forEach((entry, idx) => {
             const row = document.createElement("div");
             row.className = "leaderboard-row leaderboard-row--data";
             const value = Number(entry[metric]) || 0;
-            const isMe = entry.player_id && window.getLeaderboardPlayerId && entry.player_id === window.getLeaderboardPlayerId();
+            const isMe = entry.player_id && mePlayerId && entry.player_id === mePlayerId;
             if (isMe) row.classList.add("leaderboard-row--me-top");
+            if (isMe) meInTop = true;
             const name = isMe && localName ? localName : (entry.player_name || `Player ${entry.player_id || "?"}`);
             row.dataset.playerId = entry.player_id || "";
             row.innerHTML = `<span>${idx + 1}</span><span class="leaderboard-name">${name}</span><span>${value}</span>`;
             rows.push(row);
           });
-          if (me) {
+          if (me && !meInTop) {
             const meRow = document.createElement("div");
             meRow.className = "leaderboard-row leaderboard-row--me";
             meRow.dataset.playerId = me.player_id || "";
@@ -2155,10 +2282,10 @@ function runFlashCountdown(onComplete) {
             const name = localName || me.player_name || `Player ${me.player_id || "?"}`;
             meRow.innerHTML = `<span>${rankText}</span><span class="leaderboard-name">${name}</span><span>${safeValue}</span>`;
             rows.push(meRow);
-          } else {
+          } else if (!me) {
             const meRow = document.createElement("div");
             meRow.className = "leaderboard-row leaderboard-row--me";
-            meRow.dataset.playerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
+            meRow.dataset.playerId = mePlayerId;
             const name = localName || "You";
             meRow.innerHTML = `<span>-</span><span class="leaderboard-name">${name}</span><span>${localValue}</span>`;
             rows.push(meRow);
@@ -2213,6 +2340,9 @@ function runFlashCountdown(onComplete) {
           const starsEarnedEl = document.getElementById("statsStarsEarned");
           const avgPerCardEl = document.getElementById("statsAvgPerCard");
           const avgBestPerCardEl = document.getElementById("statsAvgBestPerCard");
+          const totalTimeSpentEl = document.getElementById("statsTotalTimeSpent");
+          const levelAttemptsEl = document.getElementById("statsLevelAttempts");
+          const levelSuccessRateEl = document.getElementById("statsLevelSuccessRate");
           if (stagesClearedEl || stagesTotalEl || starsEarnedEl) {
             const totalStages = stages.length;
             const stagesCleared = stages.reduce((sum, stage, index) => {
@@ -2235,33 +2365,72 @@ function runFlashCountdown(onComplete) {
               window.updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, name);
             }
           }
-          if (avgPerCardEl) {
-            const key = "flashRecallStats";
-            let avgText = "—";
-            try {
-              const raw = window.localStorage.getItem(key);
-              if (raw) {
-                const parsed = JSON.parse(raw);
-                const totalSeconds = Number(parsed && parsed.totalSeconds) || 0;
-                const totalCards = Number(parsed && parsed.totalCards) || 0;
-                if (totalCards > 0) {
-                  const avg = totalSeconds / totalCards;
-                  avgText = `${avg.toFixed(2)}s`;
-                }
-              }
-            } catch (error) {
-              avgText = "—";
-            }
-            if (avgText === "—") {
-              const sessionStats = window.flashRecallSessionStats;
-              const totalSeconds = Number(sessionStats && sessionStats.totalSeconds) || 0;
-              const totalCards = Number(sessionStats && sessionStats.totalCards) || 0;
+
+          const key = "flashRecallStats";
+          let avgText = "-";
+          let trackedTotalSeconds = 0;
+          let totalLevelAttempts = 0;
+          let totalLevelSuccesses = 0;
+          const formatDuration = (seconds) => {
+            const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+            const hours = Math.floor(safeSeconds / 3600);
+            const minutes = Math.floor((safeSeconds % 3600) / 60);
+            const secs = safeSeconds % 60;
+            if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+            if (minutes > 0) return `${minutes}m ${secs}s`;
+            return `${secs}s`;
+          };
+          try {
+            const rawStats = window.localStorage.getItem(key);
+            if (rawStats) {
+              const parsed = JSON.parse(rawStats);
+              const totalSeconds = Number(parsed && parsed.totalSeconds) || 0;
+              const totalCards = Number(parsed && parsed.totalCards) || 0;
+              trackedTotalSeconds = totalSeconds;
+              totalLevelAttempts = Number(parsed && parsed.totalLevelAttempts) || 0;
+              totalLevelSuccesses = Number(parsed && parsed.totalLevelSuccesses) || 0;
               if (totalCards > 0) {
-                avgText = `${(totalSeconds / totalCards).toFixed(2)}s`;
+                const avg = totalSeconds / totalCards;
+                avgText = `${avg.toFixed(2)}s`;
               }
             }
+          } catch (error) {
+            avgText = "-";
+          }
+          if (avgText === "-" || totalLevelAttempts <= 0 || trackedTotalSeconds <= 0) {
+            const sessionStats = window.flashRecallSessionStats;
+            const totalSeconds = Number(sessionStats && sessionStats.totalSeconds) || 0;
+            const totalCards = Number(sessionStats && sessionStats.totalCards) || 0;
+            if (avgText === "-" && totalCards > 0) {
+              avgText = `${(totalSeconds / totalCards).toFixed(2)}s`;
+            }
+            if (trackedTotalSeconds <= 0 && totalSeconds > 0) {
+              trackedTotalSeconds = totalSeconds;
+            }
+            if (totalLevelAttempts <= 0) {
+              totalLevelAttempts = Number(sessionStats && sessionStats.totalLevelAttempts) || 0;
+              totalLevelSuccesses = Number(sessionStats && sessionStats.totalLevelSuccesses) || 0;
+            }
+          }
+          if (avgPerCardEl) {
             avgPerCardEl.textContent = avgText;
           }
+          if (totalTimeSpentEl) {
+            totalTimeSpentEl.textContent = trackedTotalSeconds > 0 ? formatDuration(trackedTotalSeconds) : "-";
+          }
+          if (levelAttemptsEl) {
+            levelAttemptsEl.textContent = String(Math.max(0, totalLevelAttempts));
+          }
+          if (levelSuccessRateEl) {
+            if (totalLevelAttempts > 0) {
+              const clampedSuccesses = Math.max(0, Math.min(totalLevelAttempts, totalLevelSuccesses));
+              const rate = (clampedSuccesses / totalLevelAttempts) * 100;
+              levelSuccessRateEl.textContent = `${rate.toFixed(1)}%`;
+            } else {
+              levelSuccessRateEl.textContent = "-";
+            }
+          }
+
           if (avgBestPerCardEl) {
             const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
             const totals = stages.reduce(
@@ -2284,7 +2453,7 @@ function runFlashCountdown(onComplete) {
             if (totals.cards > 0) {
               avgBestPerCardEl.textContent = `${(totals.seconds / totals.cards).toFixed(2)}s`;
             } else {
-              avgBestPerCardEl.textContent = "—";
+              avgBestPerCardEl.textContent = "�";
             }
           }
           setModalState(statsModal, true);
@@ -2645,6 +2814,9 @@ function runFlashCountdown(onComplete) {
               : null;
             if (typeof trackQuitReason === "function") {
               trackQuitReason("menu_quit", activeContext || {});
+            }
+            if (typeof window.recordLevelAttemptStats === "function") {
+              window.recordLevelAttemptStats(false);
             }
             if (typeof trackLevelSession === 'function') {
               trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries, "menu_quit", activeContext || {});
@@ -3052,6 +3224,26 @@ function runFlashCountdown(onComplete) {
         const storedAppearance = getStoredAppearance();
         applyAppearance(storedAppearance.theme, storedAppearance.font, storedAppearance.layout);
       }
+      {
+        const storedAudio = getStoredAudioSettings();
+        applyAudioSettings(storedAudio, false);
+      }
+
+      if (audioMasterVolume && audioMusicVolume && audioEffectsVolume) {
+        const syncAudioSettings = () => {
+          applyAudioSettings(
+            {
+              master: audioMasterVolume.value,
+              music: audioMusicVolume.value,
+              effects: audioEffectsVolume.value
+            },
+            true
+          );
+        };
+        audioMasterVolume.addEventListener("input", syncAudioSettings);
+        audioMusicVolume.addEventListener("input", syncAudioSettings);
+        audioEffectsVolume.addEventListener("input", syncAudioSettings);
+      }
 
       updateModeUI();
       updatePracticeLock();
@@ -3120,27 +3312,25 @@ function runFlashCountdown(onComplete) {
         });
       }
 
-      if (appearanceTheme && appearanceFont && appearanceLayout) {
+      if (appearanceTheme && appearanceFont) {
         const persistAndApplyAppearance = () => {
           const theme = appearanceTheme.value;
           const font = appearanceFont.value;
-          const layout = appearanceLayout.value;
-          applyAppearance(theme, font, layout);
+          applyAppearance(theme, font, "classic");
           window.localStorage.setItem(APPEARANCE_THEME_KEY, document.body.dataset.theme || appearanceOptions.themes[0]);
           window.localStorage.setItem(APPEARANCE_FONT_KEY, document.body.dataset.font || appearanceOptions.fonts[0]);
-          window.localStorage.setItem(APPEARANCE_LAYOUT_KEY, document.body.dataset.layout || appearanceOptions.layouts[0]);
+          window.localStorage.setItem(APPEARANCE_LAYOUT_KEY, "classic");
         };
         appearanceTheme.addEventListener("change", persistAndApplyAppearance);
         appearanceFont.addEventListener("change", persistAndApplyAppearance);
-        appearanceLayout.addEventListener("change", persistAndApplyAppearance);
+
       }
 
-      if (appearanceShuffle && appearanceTheme && appearanceFont && appearanceLayout) {
+      if (appearanceShuffle && appearanceTheme && appearanceFont) {
         appearanceShuffle.addEventListener("click", () => {
           const pick = (list) => list[Math.floor(Math.random() * list.length)];
           appearanceTheme.value = pick(appearanceOptions.themes);
           appearanceFont.value = pick(appearanceOptions.fonts);
-          appearanceLayout.value = pick(appearanceOptions.layouts);
           appearanceTheme.dispatchEvent(new Event("change"));
         });
       }
@@ -3169,4 +3359,29 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

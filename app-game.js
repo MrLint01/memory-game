@@ -556,35 +556,76 @@
         });
       }
 
-      function recordRoundStats(seconds, cardCount) {
-        if (!Number.isFinite(seconds) || !Number.isFinite(cardCount) || cardCount <= 0) return;
+      function getDefaultStatsPayload() {
+        return {
+          totalSeconds: 0,
+          totalCards: 0,
+          totalLevelAttempts: 0,
+          totalLevelSuccesses: 0
+        };
+      }
+
+      function ensureSessionStatsObject() {
         if (!window.flashRecallSessionStats || typeof window.flashRecallSessionStats !== "object") {
-          window.flashRecallSessionStats = { totalSeconds: 0, totalCards: 0 };
+          window.flashRecallSessionStats = getDefaultStatsPayload();
+          return;
         }
-        window.flashRecallSessionStats.totalSeconds += seconds;
-        window.flashRecallSessionStats.totalCards += cardCount;
-        const key = "flashRecallStats";
-        let payload = { totalSeconds: 0, totalCards: 0 };
+        window.flashRecallSessionStats.totalSeconds = Number(window.flashRecallSessionStats.totalSeconds) || 0;
+        window.flashRecallSessionStats.totalCards = Number(window.flashRecallSessionStats.totalCards) || 0;
+        window.flashRecallSessionStats.totalLevelAttempts = Number(window.flashRecallSessionStats.totalLevelAttempts) || 0;
+        window.flashRecallSessionStats.totalLevelSuccesses = Number(window.flashRecallSessionStats.totalLevelSuccesses) || 0;
+      }
+
+      function loadStoredStatsPayload() {
+        const payload = getDefaultStatsPayload();
         try {
-          const raw = window.localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === "object") {
-              payload.totalSeconds = Number(parsed.totalSeconds) || 0;
-              payload.totalCards = Number(parsed.totalCards) || 0;
-            }
-          }
+          const raw = window.localStorage.getItem("flashRecallStats");
+          if (!raw) return payload;
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object") return payload;
+          payload.totalSeconds = Number(parsed.totalSeconds) || 0;
+          payload.totalCards = Number(parsed.totalCards) || 0;
+          payload.totalLevelAttempts = Number(parsed.totalLevelAttempts) || 0;
+          payload.totalLevelSuccesses = Number(parsed.totalLevelSuccesses) || 0;
+          return payload;
         } catch (error) {
-          payload = { totalSeconds: 0, totalCards: 0 };
+          return getDefaultStatsPayload();
         }
-        payload.totalSeconds += seconds;
-        payload.totalCards += cardCount;
+      }
+
+      function saveStoredStatsPayload(payload) {
         try {
-          window.localStorage.setItem(key, JSON.stringify(payload));
+          window.localStorage.setItem("flashRecallStats", JSON.stringify(payload));
         } catch (error) {
           // ignore storage errors
         }
       }
+
+      function recordRoundStats(seconds, cardCount) {
+        if (!Number.isFinite(seconds) || !Number.isFinite(cardCount) || cardCount <= 0) return;
+        ensureSessionStatsObject();
+        window.flashRecallSessionStats.totalSeconds += seconds;
+        window.flashRecallSessionStats.totalCards += cardCount;
+        const payload = loadStoredStatsPayload();
+        payload.totalSeconds += seconds;
+        payload.totalCards += cardCount;
+        saveStoredStatsPayload(payload);
+      }
+
+      function recordLevelAttemptStats(success) {
+        ensureSessionStatsObject();
+        window.flashRecallSessionStats.totalLevelAttempts += 1;
+        if (success) {
+          window.flashRecallSessionStats.totalLevelSuccesses += 1;
+        }
+        const payload = loadStoredStatsPayload();
+        payload.totalLevelAttempts += 1;
+        if (success) {
+          payload.totalLevelSuccesses += 1;
+        }
+        saveStoredStatsPayload(payload);
+      }
+      window.recordLevelAttemptStats = recordLevelAttemptStats;
 
       async function checkAnswers() {
         if (phase !== "recall") return;
@@ -656,6 +697,7 @@
             }
           }
               // Analytics: Track level session
+              recordLevelAttemptStats(true);
               if (typeof trackLevelSession === 'function') {
                 const activeContext = typeof window.getActiveLevelContext === "function"
                   ? window.getActiveLevelContext()
@@ -736,6 +778,7 @@
           const failedElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
             ? stageState.elapsedSeconds
             : (performance.now() - (stageState.startTime || performance.now())) / 1000;
+          recordLevelAttemptStats(false);
           if (typeof trackLevelSession === 'function') {
             const activeContext = typeof window.getActiveLevelContext === "function"
               ? window.getActiveLevelContext()
@@ -851,6 +894,16 @@
             stageState.active = false;
             streak = 0;
             stopStageStopwatch();
+            const failedElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
+              ? stageState.elapsedSeconds
+              : (performance.now() - (stageState.startTime || performance.now())) / 1000;
+            recordLevelAttemptStats(false);
+            if (typeof trackLevelSession === "function") {
+              const activeContext = typeof window.getActiveLevelContext === "function"
+                ? window.getActiveLevelContext()
+                : null;
+              trackLevelSession(stageState.index, false, 0, failedElapsedSeconds, entries, "level_end", activeContext || {});
+            }
             showReviewFailure(entries, "stages");
           } else {
             const entries = roundItems.map((item) => ({

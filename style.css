@@ -11,8 +11,8 @@
         --main-bg: #ffffff;
         --main-accent: rgba(17, 24, 39, 0.05);
         --field-bg: #ffffff;
-        --font-base: "Bangers", "Trebuchet MS", sans-serif;
-        --font-display: "Anton", sans-serif;
+        --font-base: "Chakra Petch", "Trebuchet MS", sans-serif;
+        --font-display: "Chakra Petch", "Trebuchet MS", sans-serif;
         --stage-hud-offset: 1.2rem;
       }
       * {
@@ -35,6 +35,10 @@ body[data-font="mono"] {
   --font-base: "Courier New", "Lucida Console", monospace;
   --font-display: "Special Elite", "Courier New", monospace;
 }
+body[data-font="original"] {
+  --font-base: "Chakra Petch", "Trebuchet MS", sans-serif;
+  --font-display: "Chakra Petch", "Trebuchet MS", sans-serif;
+}
 body[data-font="rounded"] {
   --font-base: "Nunito", "Trebuchet MS", sans-serif;
   --font-display: "Nunito", "Trebuchet MS", sans-serif;
@@ -43,9 +47,13 @@ body[data-font="space"] {
   --font-base: "Space Grotesk", "Verdana", sans-serif;
   --font-display: "Space Grotesk", "Verdana", sans-serif;
 }
+body[data-font="arcade"] {
+  --font-base: "Chakra Petch", "Trebuchet MS", sans-serif;
+  --font-display: "Chakra Petch", "Trebuchet MS", sans-serif;
+}
 body[data-font="poster"] {
-  --font-base: "Anton", "Impact", sans-serif;
-  --font-display: "Monoton", "Anton", sans-serif;
+  --font-base: "Space Grotesk", "Verdana", sans-serif;
+  --font-display: "Space Grotesk", "Verdana", sans-serif;
 }
 
 body[data-theme="mono-ink"] {
@@ -98,30 +106,30 @@ body[data-theme="pastel-mint"] {
   --field-bg: #ecfff8;
 }
 body[data-theme="neon-arcade"] {
-  --ink: #f8f96f;
-  --muted: #a4fff4;
-  --border: #12f7ff;
-  --panel: #240b3b;
-  --panel-muted: #33114f;
-  --card: #3a165f;
-  --card-ink: #f8f96f;
-  --app-bg: #0e041f;
-  --main-bg: #1c0833;
-  --main-accent: rgba(255, 0, 122, 0.26);
-  --field-bg: #2d1250;
+  --ink: #dce9ff;
+  --muted: #9bb1d4;
+  --border: #7d96c2;
+  --panel: #18263f;
+  --panel-muted: #1f3150;
+  --card: #274064;
+  --card-ink: #e7f0ff;
+  --app-bg: #101a2a;
+  --main-bg: #172439;
+  --main-accent: rgba(129, 161, 218, 0.12);
+  --field-bg: #223554;
 }
 body[data-theme="neon-cyber"] {
-  --ink: #89ffd8;
-  --muted: #8dbac8;
-  --border: #00ffc3;
-  --panel: #0f2230;
-  --panel-muted: #143446;
-  --card: #1a4258;
-  --card-ink: #89ffd8;
-  --app-bg: #08131d;
-  --main-bg: #0e2535;
-  --main-accent: rgba(0, 255, 195, 0.2);
-  --field-bg: #16384c;
+  --ink: #d6f7f0;
+  --muted: #94bfb8;
+  --border: #6a9e98;
+  --panel: #173433;
+  --panel-muted: #1e4442;
+  --card: #275351;
+  --card-ink: #dffdf8;
+  --app-bg: #102726;
+  --main-bg: #163836;
+  --main-accent: rgba(116, 183, 174, 0.12);
+  --field-bg: #22504d;
 }
 body[data-theme="sunset-pop"] {
   --ink: #431f1f;
@@ -162,17 +170,17 @@ body[data-theme="forest-camp"] {
   --field-bg: #234737;
 }
 body[data-theme="retro-terminal"] {
-  --ink: #67ff88;
-  --muted: #63cb77;
-  --border: #67ff88;
-  --panel: #08240f;
-  --panel-muted: #0e3216;
-  --card: #10391c;
-  --card-ink: #67ff88;
-  --app-bg: #031107;
-  --main-bg: #072112;
-  --main-accent: rgba(103, 255, 136, 0.16);
-  --field-bg: #10311a;
+  --ink: #cde5cb;
+  --muted: #8dac8a;
+  --border: #7fa07d;
+  --panel: #213529;
+  --panel-muted: #2a4432;
+  --card: #33533b;
+  --card-ink: #dcefd9;
+  --app-bg: #17251d;
+  --main-bg: #1f3326;
+  --main-accent: rgba(127, 160, 125, 0.1);
+  --field-bg: #2c4734;
 }
 body[data-theme="cherry-cream"] {
   --ink: #4f2033;
@@ -202,13 +210,13 @@ body[data-theme="steel-grid"] {
 
 body[data-theme^="neon"] main,
 body[data-theme="retro-terminal"] main {
-  box-shadow: 0 0 0 2px var(--border), 0 0 24px rgba(0, 255, 220, 0.25);
+  box-shadow: none;
 }
 body[data-theme^="neon"] .mode-card.primary {
-  box-shadow: 0 0 0 2px var(--border), 0 0 18px rgba(255, 0, 122, 0.3);
+  box-shadow: none;
 }
 body[data-theme="retro-terminal"] {
-  text-shadow: 0 0 0.35px currentColor;
+  text-shadow: none;
 }
 
 body[data-layout="focus"] .layout {
@@ -2530,6 +2538,10 @@ body.pause-active .interrupt-close {
 }
 .modal-card--flash .modal-note {
   margin-top: 0.4rem;
+  max-width: 44ch;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.45;
 }
 .modal-card--flash .flash-optout {
   justify-content: center;
@@ -2686,7 +2698,7 @@ body.pause-active .interrupt-close {
 }
 .leaderboard-row {
   display: grid;
-  grid-template-columns: 1.2rem 16ch 3.2rem;
+  grid-template-columns: 1.2rem 1fr 3.2rem;
   gap: 0.4rem;
   align-items: center;
   min-height: var(--lb-row-height);
@@ -2696,6 +2708,10 @@ body.pause-active .interrupt-close {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.leaderboard-row > span:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .leaderboard-row--me {
   margin-top: 0.35rem;
@@ -3448,7 +3464,7 @@ body.stage-fail .rotation-icon {
 }
 .settings-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.45rem;
   margin-bottom: 0.85rem;
 }
@@ -3463,6 +3479,11 @@ body.stage-fail .rotation-icon {
 .settings-tab.is-active {
   background: var(--panel);
   box-shadow: inset 0 -2px 0 var(--border);
+}
+@media (max-width: 640px) {
+  .settings-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .settings-pane {
   display: grid;
@@ -3497,6 +3518,28 @@ body.stage-fail .rotation-icon {
 #keybindStatus {
   min-height: 1.1rem;
   color: var(--muted);
+}
+.audio-dial-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+.audio-dial-row {
+  display: grid;
+  gap: 0.35rem;
+}
+.audio-dial-row > label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.audio-dial-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.audio-dial-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--ink);
 }
 .modal-card--sandbox .controls {
   overflow-y: auto;
@@ -3563,6 +3606,12 @@ body.stage-fail .rotation-icon {
 .stats-leaderboard-tab.is-active {
   background: var(--panel);
   box-shadow: inset 0 -2px 0 var(--border);
+}
+#statsLeaderboardModal .modal-card {
+  width: min(560px, 92vw);
+}
+#statsLeaderboardModal .leaderboard-list {
+  min-height: calc(5 * var(--lb-row-height) + 4 * 0.4rem + 0.7rem + 1px);
 }
 .confirm-row {
   display: flex;
