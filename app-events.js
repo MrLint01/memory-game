@@ -231,6 +231,7 @@
           layout: appearanceOptions.layouts.includes(savedLayout) ? savedLayout : fallbackLayout
         };
       }
+      const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
 
       function normalizePlayerName(raw) {
         if (raw === null || raw === undefined) return "";
@@ -356,6 +357,22 @@
       function markPlayerNamePrompted() {
         try {
           window.localStorage.setItem(PLAYER_NAME_PROMPT_KEY, "1");
+        } catch {
+          // ignore
+        }
+      }
+
+      function shouldShowSplashScreen() {
+        try {
+          return window.localStorage.getItem(SPLASH_SEEN_KEY) !== "1";
+        } catch {
+          return true;
+        }
+      }
+
+      function markSplashSeen() {
+        try {
+          window.localStorage.setItem(SPLASH_SEEN_KEY, "1");
         } catch {
           // ignore
         }
@@ -1226,6 +1243,54 @@ function runFlashCountdown(onComplete) {
         updatePracticeLock();
       }
 
+      function openSplashScreen() {
+        if (splashScreen) {
+          splashScreen.removeAttribute("aria-hidden");
+        }
+        if (mainHeader) {
+          mainHeader.setAttribute("aria-hidden", "true");
+          mainHeader.style.display = "none";
+        }
+        document.body.dataset.view = "splash";
+      }
+
+      function closeSplashScreen() {
+        if (splashScreen) {
+          splashScreen.setAttribute("aria-hidden", "true");
+        }
+        if (mainHeader) {
+          mainHeader.removeAttribute("aria-hidden");
+          mainHeader.style.display = "";
+        }
+        if (document.body.dataset.view === "splash") {
+          document.body.dataset.view = "home";
+        }
+      }
+
+      function openSplashLoading() {
+        if (splashLoading) {
+          splashLoading.removeAttribute("aria-hidden");
+        }
+        if (mainHeader) {
+          mainHeader.setAttribute("aria-hidden", "true");
+          mainHeader.style.display = "none";
+        }
+        document.body.dataset.view = "loading";
+      }
+
+      function closeSplashLoading() {
+        if (splashLoading) {
+          splashLoading.setAttribute("aria-hidden", "true");
+        }
+        if (mainHeader) {
+          mainHeader.removeAttribute("aria-hidden");
+          mainHeader.style.display = "";
+        }
+        if (document.body.dataset.view === "loading") {
+          document.body.dataset.view = "home";
+        }
+      }
+
       function startStage(index, options = {}) {
         const { skipIntro = false, originEl = null, deferStartRound = false } = options;
         tabTutorialShownRound = null;
@@ -1261,6 +1326,21 @@ function runFlashCountdown(onComplete) {
           return;
         }
         startRound({ advanceRound: true });
+      }
+
+      async function startFromSplash() {
+        closeSplashScreen();
+        markSplashSeen();
+        openSplashLoading();
+        const minimumDelay = new Promise((resolve) => {
+          window.setTimeout(resolve, 750);
+        });
+        const fontsReady = document.fonts && document.fonts.ready
+          ? document.fonts.ready
+          : Promise.resolve();
+        await Promise.all([minimumDelay, fontsReady]).catch(() => {});
+        closeSplashLoading();
+        startStage(0, { skipIntro: true });
       }
 
       practiceStart.addEventListener("click", () => {
@@ -1328,6 +1408,10 @@ function runFlashCountdown(onComplete) {
         const listEl = document.getElementById(listId);
         const emptyEl = document.getElementById(emptyId);
         if (!listEl) return;
+        const truncateLeaderboardName = (value) => {
+          const text = value ? String(value) : "";
+          return text.length > 16 ? text.slice(0, 16) : text;
+        };
         const stageId = stage && stage.id ? String(stage.id) : String(index + 1);
         const stageVersion = window.getStageVersion ? window.getStageVersion(stage) : 1;
         listEl.dataset.stageId = stageId;
@@ -1379,9 +1463,10 @@ function runFlashCountdown(onComplete) {
             const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "—";
             const isMe =
               entry.player_id && window.getLeaderboardPlayerId && entry.player_id === window.getLeaderboardPlayerId();
-            const name = isMe && localName ? localName : (entry.player_name || `Player ${entry.player_id || "?"}`);
+            const rawName = isMe && localName ? localName : (entry.player_name || `Player ${entry.player_id || "?"}`);
+            const name = truncateLeaderboardName(rawName);
             row.dataset.playerId = entry.player_id || "";
-            row.innerHTML = `<span>${idx + 1}</span><span class="leaderboard-name">${name}</span><span>${timeText}</span>`;
+            row.innerHTML = `<span>${idx + 1}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
             rows.push(row);
           });
           if (meEntry || me) {
@@ -1390,10 +1475,11 @@ function runFlashCountdown(onComplete) {
             row.className = "leaderboard-row leaderboard-row--me";
             const time = Number(source.best_time_ms);
             const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "—";
-            const name = localName || source.player_name || `Player ${source.player_id || "?"}`;
+            const rawName = localName || source.player_name || `Player ${source.player_id || "?"}`;
+            const name = truncateLeaderboardName(rawName);
             row.dataset.playerId = source.player_id || "";
             const rankText = meRank ? String(meRank) : "—";
-            row.innerHTML = `<span>${rankText}</span><span class="leaderboard-name">${name}</span><span>${timeText}</span>`;
+            row.innerHTML = `<span>${rankText}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
             rows.push(row);
           } else {
             const row = document.createElement("div");
@@ -1462,7 +1548,7 @@ function runFlashCountdown(onComplete) {
         });
       };
       if (stageIntroStart && stageIntroModal) {
-        stageIntroStart.addEventListener("click", () => {
+        stageIntroStart.addEventListener("click", async () => {
           if (leaderboardModal) {
             setModalState(leaderboardModal, false);
           }
@@ -1475,11 +1561,29 @@ function runFlashCountdown(onComplete) {
               return;
             }
             closeStageIntro();
+            openSplashLoading();
+            const minimumDelay = new Promise((resolve) => {
+              window.setTimeout(resolve, 750);
+            });
+            const fontsReady = document.fonts && document.fonts.ready
+              ? document.fonts.ready
+              : Promise.resolve();
+            await Promise.all([minimumDelay, fontsReady]).catch(() => {});
+            closeSplashLoading();
             startStage(index, { skipIntro: true, deferStartRound: true });
             startFlashRound();
             return;
           }
           closeStageIntro();
+          openSplashLoading();
+          const minimumDelay = new Promise((resolve) => {
+            window.setTimeout(resolve, 750);
+          });
+          const fontsReady = document.fonts && document.fonts.ready
+            ? document.fonts.ready
+            : Promise.resolve();
+          await Promise.all([minimumDelay, fontsReady]).catch(() => {});
+          closeSplashLoading();
           startStage(index, { skipIntro: true });
         });
       }
@@ -1491,13 +1595,22 @@ function runFlashCountdown(onComplete) {
         });
       }
       if (flashStageStart) {
-        flashStageStart.addEventListener("click", () => {
+        flashStageStart.addEventListener("click", async () => {
           const index = flashStagePendingIndex;
           closeFlashStagePrompt();
           if (stageIntroModal && stageIntroModal.classList.contains("show")) {
             closeStageIntro();
           }
           if (Number.isFinite(index)) {
+            openSplashLoading();
+            const minimumDelay = new Promise((resolve) => {
+              window.setTimeout(resolve, 750);
+            });
+            const fontsReady = document.fonts && document.fonts.ready
+              ? document.fonts.ready
+              : Promise.resolve();
+            await Promise.all([minimumDelay, fontsReady]).catch(() => {});
+            closeSplashLoading();
             startStage(index, { skipIntro: true, deferStartRound: true });
             startFlashRound();
           }
@@ -1539,6 +1652,18 @@ function runFlashCountdown(onComplete) {
         playStart.addEventListener("click", () => {
           openStagesScreen(true);
         });
+      }
+
+      if (shouldShowSplashScreen()) {
+        openSplashScreen();
+        const handleSplashStart = () => {
+          if (document.body.dataset.view !== "splash") return;
+          window.removeEventListener("keydown", handleSplashStart);
+          window.removeEventListener("pointerdown", handleSplashStart);
+          startFromSplash();
+        };
+        window.addEventListener("keydown", handleSplashStart);
+        window.addEventListener("pointerdown", handleSplashStart);
       }
 
       if (stagesOpen) {
@@ -1879,6 +2004,7 @@ function runFlashCountdown(onComplete) {
           activeRebindAction = null;
           refreshKeybindButtons();
           refreshActionKeyHints();
+          window.localStorage.removeItem(SPLASH_SEEN_KEY);
           if (playerNameSetting) {
             playerNameSetting.value = "";
           }
@@ -1913,6 +2039,10 @@ function runFlashCountdown(onComplete) {
               }
             }
           }
+          if (settingsModal) {
+            setModalState(settingsModal, false);
+          }
+          openSplashScreen();
           hideResetConfirmRow();
         });
         resetConfirmYes.addEventListener("keydown", (event) => {

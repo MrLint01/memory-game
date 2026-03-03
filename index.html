@@ -63,7 +63,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Monoton&family=Nunito:wght@400;600;800&family=Space+Grotesk:wght@400;600;700&family=Special+Elite&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Chakra+Petch:wght@400;500;600;700&family=Monoton&family=Nunito:wght@400;600;800&family=Space+Grotesk:wght@400;600;700&family=Special+Elite&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -80,9 +80,23 @@
             <span class="title-card card-b"></span>
             <span class="title-card card-c"></span>
           </div>
-          <h1 class="title">Flash Recall</h1>
+          <h1 class="title" data-text="Flash Recall">
+            <span class="title__text">Flash Recall</span>
+            <span class="title__shine" aria-hidden="true">Flash Recall</span>
+          </h1>
         </div>
       </header>
+      <section class="splash-screen" id="splashScreen" aria-hidden="true">
+        <h1 class="splash-title" data-text="Flash Recall">
+          <span class="splash-title__text">Flash Recall</span>
+          <span class="splash-title__shine" aria-hidden="true">Flash Recall</span>
+        </h1>
+        <div class="splash-message" role="status">Press Any Key to Start</div>
+      </section>
+      <section class="splash-loading" id="splashLoading" aria-hidden="true">
+        <div class="splash-loading__text">Loading…</div>
+        <div class="splash-loading__bar" aria-hidden="true"><span></span></div>
+      </section>
       <section class="layout">
         <aside class="panel">
           <div class="controls">
