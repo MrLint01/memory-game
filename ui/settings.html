@@ -1,47 +1,157 @@
 <div class="modal" id="settingsModal" aria-hidden="true">
   <div class="modal-card modal-card--muted">
     <h3>Settings</h3>
+    <div class="settings-tabs" role="tablist" aria-label="Settings tabs">
+      <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-settings-tab="general">General</button>
+      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="controls">Controls</button>
+      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="audio">Audio</button>
+      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="appearance">Appearance</button>
+    </div>
+    <hr class="settings-divider" />
     <div class="controls">
-      <div class="control-group" id="playerNameSettingRow" hidden>
-        <label for="playerNameSetting">Player name</label>
-        <input id="playerNameSetting" type="text" maxlength="16" autocomplete="nickname" />
-      </div>
-      <div class="control-group">
-        <label>Animations</label>
-        <div class="checkboxes">
-          <label>
-            <input id="successAnimationToggle" type="checkbox" checked />
-            Show success animation
-          </label>
-          <label>
-            <input id="flashCountdownToggle" type="checkbox" checked />
-            Show flash countdown
-          </label>
+      <div class="settings-pane is-active" data-settings-pane="general">
+        <div class="control-group" id="playerNameSettingRow">
+          <label for="playerNameSetting">Player name</label>
+          <input id="playerNameSetting" type="text" maxlength="16" autocomplete="nickname" />
         </div>
-        <label>Controls</label>
-        <div class="checkboxes">
-          <label>
-            <input id="enterToNextToggle" type="checkbox"/>
-            Press Enter to move to next card input
-          </label>
-          <label>
-            <input id="enterToRetryToggle" type="checkbox"/>
-            Press Enter to retry stage on result screen
-          </label>
-      </div>
-      
-      </div>
-      <div class="control-group">
-        <label>Progress</label>
-        <div class="confirm-anchor">
+        <div class="control-group control-group--keybinds">
+          <label>Accessibility</label>
           <div class="checkboxes">
-            <button id="debugResetProgress" class="secondary" type="button">Reset Progress</button>
+            <label>
+              <input id="photosensitivityWarningToggle" type="checkbox" checked />
+              Show photosensitivity warning before flash levels
+            </label>
           </div>
-          <div class="confirm-row confirm-popover" id="resetConfirmRow" hidden>
-            <span>Reset all progress?</span>
-            <div class="confirm-actions">
-              <button id="resetConfirmYes" class="secondary" type="button" tabindex="-1">Yes</button>
-              <button id="resetConfirmNo" class="secondary" type="button" tabindex="-1">No</button>
+        </div>
+        <div class="control-group">
+          <label>Progress</label>
+          <div class="confirm-anchor">
+            <div class="checkboxes">
+              <button id="debugResetProgress" class="secondary" type="button">Reset Progress</button>
+            </div>
+            <div class="confirm-row confirm-popover" id="resetConfirmRow" hidden>
+              <span>Reset all progress?</span>
+              <div class="confirm-actions">
+                <button id="resetConfirmYes" class="secondary" type="button" tabindex="-1">Yes</button>
+                <button id="resetConfirmNo" class="secondary" type="button" tabindex="-1">No</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-pane" data-settings-pane="controls" hidden>
+        <div class="control-group">
+          <label>Keyboard controls</label>
+          <div class="checkboxes">
+            <label>
+              <input id="enterToNextToggle" type="checkbox"/>
+              Press Enter to move to next card input
+            </label>
+            <label>
+              <input id="enterToRetryToggle" type="checkbox"/>
+              Press Enter to retry stage on result screen
+            </label>
+          </div>
+        </div>
+        <hr class="settings-divider settings-divider--section" />
+        <div class="control-group control-group--keybinds">
+          <label>Action keybinds</label>
+          <div class="keybind-grid">
+            <div class="keybind-row">
+              <span>Retry level</span>
+              <button id="keybindRetry" class="secondary keybind-btn" type="button">R</button>
+            </div>
+            <div class="keybind-row">
+              <span>Next level</span>
+              <button id="keybindStageNext" class="secondary keybind-btn" type="button">N</button>
+            </div>
+            <div class="keybind-row">
+              <span>Quit level to menu</span>
+              <button id="keybindStageQuit" class="secondary keybind-btn" type="button">Q</button>
+            </div>
+            <div class="keybind-row">
+              <span>Practice home</span>
+              <button id="keybindPracticeHome" class="secondary keybind-btn" type="button">H</button>
+            </div>
+            <div class="keybind-row">
+              <span>Practice settings</span>
+              <button id="keybindPracticeSettings" class="secondary keybind-btn" type="button">S</button>
+            </div>
+          </div>
+          <div id="keybindStatus" class="small" aria-live="polite"></div>
+          <div class="keybind-reset-row">
+            <button id="keybindResetDefaults" class="secondary" type="button">Reset keybinds</button>
+          </div>
+        </div>
+      </div>
+      <div class="settings-pane" data-settings-pane="appearance" hidden>
+        <div class="control-group">
+          <label>Animations</label>
+          <div class="checkboxes">
+            <label>
+              <input id="successAnimationToggle" type="checkbox" checked />
+              Show success animation
+            </label>
+            <label>
+              <input id="flashCountdownToggle" type="checkbox" checked />
+              Show flash countdown
+            </label>
+          </div>
+        </div>
+        <hr class="settings-divider settings-divider--section" />
+        <div class="appearance-row">
+          <div class="control-group">
+            <label for="appearanceTheme">Theme</label>
+            <select id="appearanceTheme">
+              <option value="mono-ink">Monochrome Ink</option>
+              <option value="paper-night">Paper Night</option>
+              <option value="pastel-dawn">Pastel Dawn</option>
+              <option value="pastel-mint">Pastel Mint</option>
+              <option value="sunset-pop">Sunset Pop</option>
+              <option value="ocean-deep">Ocean Deep</option>
+              <option value="forest-camp">Forest Camp</option>
+              <option value="cherry-cream">Cherry Cream</option>
+              <option value="steel-grid">Steel Grid</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="appearanceFont">Font</label>
+            <select id="appearanceFont">
+              <option value="original">Original (Chakra)</option>
+              <option value="arcade">Arcade Bold</option>
+              <option value="mono">Mono Classic</option>
+              <option value="rounded">Rounded Friendly</option>
+              <option value="space">Space Grotesk</option>
+              <option value="poster">Poster Impact</option>
+            </select>
+          </div>
+        </div>
+        <button id="appearanceShuffle" class="secondary" type="button">Shuffle style</button>
+      </div>
+      <div class="settings-pane" data-settings-pane="audio" hidden>
+        <div class="control-group">
+          <label>Volume</label>
+          <div class="audio-dial-grid">
+            <div class="audio-dial-row">
+              <label for="audioMasterVolume">
+                General
+                <span id="audioMasterValue" class="audio-dial-value">100%</span>
+              </label>
+              <input id="audioMasterVolume" type="range" min="0" max="100" step="1" value="100" />
+            </div>
+            <div class="audio-dial-row">
+              <label for="audioMusicVolume">
+                Music
+                <span id="audioMusicValue" class="audio-dial-value">80%</span>
+              </label>
+              <input id="audioMusicVolume" type="range" min="0" max="100" step="1" value="80" />
+            </div>
+            <div class="audio-dial-row">
+              <label for="audioEffectsVolume">
+                Effects
+                <span id="audioEffectsValue" class="audio-dial-value">80%</span>
+              </label>
+              <input id="audioEffectsVolume" type="range" min="0" max="100" step="1" value="80" />
             </div>
           </div>
         </div>
