@@ -449,6 +449,8 @@
         const stageNextKey =
           typeof window.getActionKeyLabel === "function" ? window.getActionKeyLabel("stageNext") : "N";
         const retryKey = window.enterToRetryEnabled ? "Enter" : retryActionKey;
+        
+        starGap = stars < 4 ? "1rem" : "0.65rem"
 
         resultsPanel.innerHTML = `
           <div class="stage-complete">
@@ -457,7 +459,7 @@
                 <strong>${stageName} complete!</strong>
                 <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s <span class="stage-meta--best" id="stageCompleteBestTime"></span></div>
               </div>
-              <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}">
+              <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}" style="gap: ${starGap};">
                 <div class="star-column">
                   <span class="stage-star${stars >= 1 ? " is-filled" : ""}">✦</span>
                   ${bronzeLabel}
@@ -516,12 +518,52 @@
 
         barFills.forEach(barFill => {
           const stars = parseInt(barFill.dataset.stars, 10) || 0;
-
+          
           // set the final width based on stars
+          // Set final width based on stars and how close to the next star threshold the time was
           let targetWidth = 0;
-          if (stars === 1) targetWidth = 33.33;
-          else if (stars === 2) targetWidth = 55;
-          else if (stars >= 3) targetWidth = 100;
+          let bronzeFill = 30;
+          let silverFill = 50;
+          let goldFill = 71;
+
+          let nextTargetFill = bronzeFill;
+          let timeDiffBetweenTargets = null;
+          let timeFromPreviousTarget = null;
+
+          if (stars === 1) {
+            targetWidth = bronzeFill;
+            nextTargetFill = silverFill;
+            timeDiffBetweenTargets = bronzeTime - silverTime;
+            timeFromPreviousTarget = bronzeTime - elapsedSeconds;
+          }
+          else if (stars === 2) {
+            targetWidth = silverFill;
+            nextTargetFill = goldFill;
+            timeDiffBetweenTargets = silverTime - goldTime;
+            timeFromPreviousTarget = silverTime - elapsedSeconds;
+          }
+          else if (stars >= 3) {
+            targetWidth = 100;
+          }
+
+          if (timeDiffBetweenTargets && timeFromPreviousTarget && Number.isFinite(elapsedSeconds)) {
+            const fillPercentDiff = nextTargetFill - targetWidth;
+            // Make the fill difference between current and target into a percentage, add this to targetWidth
+            const fillAdditionalPercent = timeFromPreviousTarget / timeDiffBetweenTargets * fillPercentDiff;
+            console.log({ timeFromPreviousTarget, timeDiffBetweenTargets, fillPercentDiff, fillAdditionalPercent });
+            targetWidth += fillAdditionalPercent;
+          }
+
+          if (stars === 0) {
+            targetWidth = 5;
+            distanceToBronze = elapsedSeconds - bronzeTime;
+            if (distanceToBronze < 10) {
+              // For times close to bronze, show a hint of the bronze fill
+              targetWidth += bronzeFill / 10 * (10 - distanceToBronze);
+              targetWidth = Math.min(targetWidth, bronzeFill - 0.5);
+            }
+          }
+          
           barFill.style.width = "0";
           barFill.offsetWidth; // force browser to register width:0
             // Trigger transition

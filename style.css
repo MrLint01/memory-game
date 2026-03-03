@@ -1446,13 +1446,13 @@ body[data-state="result"] #resultsPanel .star-column {
 }
 
 body[data-state="result"] #resultsPanel .star-time {
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   color: #6b7280;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 body[data-state="result"] #resultsPanel .stage-complete__stars .stage-star {
-  font-size: 2.9rem;
+  font-size: 3.5rem;
   opacity: 0;
   transform: translateY(10px) scale(0.6) rotate(-8deg);
   animation: stageStarPop 420ms ease-out forwards;
@@ -1574,11 +1574,11 @@ body[data-state="result"] #resultsPanel .stage-complete__actions .action-key {
 body[data-state="result"] #resultsPanel .stage-complete__bar-track {
   position: relative;
   width: 55%;
-  height: 20px;
+  height: 25px;
   background: #E5E7EB;
   border-radius: 999px;
   overflow: hidden;
-  margin-top: -4rem;
+  margin-top: -4.5rem;
   /* Vertically center behind the stars */
   /* top: calc(var(--stars-top, 0px)); */
  /* left: 50%; */
@@ -3866,6 +3866,7 @@ body[data-state="result"] #resultsPanel .stage-complete {
 body[data-state="result"] #resultsPanel .stage-complete__left-column {
   flex: 1;
   min-width: 300px;
+  max-width: 550px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -3876,11 +3877,12 @@ body[data-state="result"] #resultsPanel .stage-complete__left-column {
 
 /* Right side: leaderboard */
 body[data-state="result"] #resultsPanel .leaderboard-panel {
-  flex: 0 0 calc(50% - 1rem);
+  flex: 0 0 calc(25% - 1rem);
   width: calc(50% - 1rem);
   align-self: flex-start;
   margin-top: 0;
   margin-bottom: 0;
+  width: 50%;
 }
 
 body[data-state="result"] #resultsPanel .stage-complete__actions {
@@ -3892,10 +3894,17 @@ body[data-state="result"] #resultsPanel .stage-complete__actions {
 @media (max-width: 768px) {
   body[data-state="result"] #resultsPanel .stage-complete__header,
   body[data-state="result"] #resultsPanel .stage-complete__stars,
-  body[data-state="result"] #resultsPanel .stage-complete__bar-track,
   body[data-state="result"] #resultsPanel .leaderboard-panel {
     flex: 0 0 100%;
     width: 100%;
+  }
+  body[data-state="result"] #resultsPanel .stage-complete__bar-track {
+    flex: 1 0 25%;
+    width: 80%;
+  }
+
+  body[data-state="result"] #resultsPanel .leaderboard-panel {
+    margin-top: 1.9rem;
   }
 }
 
