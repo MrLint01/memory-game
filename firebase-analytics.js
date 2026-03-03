@@ -48,6 +48,182 @@ const gameVersion = window.FLASH_RECALL_VERSION || "dev";
 const releaseChannel = window.FLASH_RECALL_RELEASE_CHANNEL || deriveReleaseChannel();
 
 const leaderboardSyncKey = `flashRecallLeaderboardSynced_${gameVersion}`;
+const LEADERBOARD_READ_LIMIT = 5000;
+const leaderboardReadBudgetKey = `flashRecallLeaderboardReadBudget_${playerId}`;
+const leaderboardSessionCache = new Map();
+const statsLeaderboardSessionCache = new Map();
+const STATS_LEADERBOARD_CACHE_TTL_MS = 60 * 1000;
+const PROGRESS_LEADERBOARD_PATH = "leaderboards_global/progress/entries";
+let leaderboardReadBudget = { totalReads: 0, blocked: false };
+
+function loadLeaderboardReadBudget() {
+  try {
+    const raw = window.localStorage.getItem(leaderboardReadBudgetKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const totalReads = Number(parsed && parsed.totalReads);
+    leaderboardReadBudget.totalReads = Number.isFinite(totalReads) && totalReads > 0 ? Math.floor(totalReads) : 0;
+    leaderboardReadBudget.blocked =
+      Boolean(parsed && parsed.blocked) || leaderboardReadBudget.totalReads >= LEADERBOARD_READ_LIMIT;
+  } catch (error) {
+    leaderboardReadBudget = { totalReads: 0, blocked: false };
+  }
+}
+
+function saveLeaderboardReadBudget() {
+  try {
+    window.localStorage.setItem(leaderboardReadBudgetKey, JSON.stringify(leaderboardReadBudget));
+  } catch (error) {
+    // ignore storage failures
+  }
+}
+
+function remainingLeaderboardReads() {
+  return Math.max(0, LEADERBOARD_READ_LIMIT - (Number(leaderboardReadBudget.totalReads) || 0));
+}
+
+function incrementLeaderboardReads(count) {
+  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  if (!safeCount) return;
+  leaderboardReadBudget.totalReads = (Number(leaderboardReadBudget.totalReads) || 0) + safeCount;
+  if (leaderboardReadBudget.totalReads >= LEADERBOARD_READ_LIMIT) {
+    leaderboardReadBudget.blocked = true;
+  }
+  saveLeaderboardReadBudget();
+}
+
+function getLeaderboardCacheKey(stageId, stageVersion) {
+  return `${String(stageId)}_v${Number(stageVersion) || 1}`;
+}
+
+function getDefaultLeaderboardResult(overrides = {}) {
+  return {
+    top: [],
+    me: null,
+    meRank: null,
+    fromCache: false,
+    stale: false,
+    errorCode: null,
+    errorMessage: "",
+    ...overrides
+  };
+}
+
+function getDefaultStatsLeaderboardResult(overrides = {}) {
+  return {
+    top: [],
+    me: null,
+    meRank: null,
+    fromCache: false,
+    stale: false,
+    errorCode: null,
+    errorMessage: "",
+    ...overrides
+  };
+}
+
+function computeLeaderboardViewFromEntries(entries, limit = 5) {
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  const active = safeEntries
+    .filter((entry) => entry && entry.active !== false)
+    .filter((entry) => Number.isFinite(Number(entry.best_time_ms)))
+    .sort((a, b) => Number(a.best_time_ms) - Number(b.best_time_ms));
+  const top = active.slice(0, Math.max(1, Number(limit) || 5));
+  const meIndex = active.findIndex((entry) => entry && entry.player_id === playerId);
+  const me = meIndex >= 0 ? active[meIndex] : null;
+  const meRank = meIndex >= 0 ? meIndex + 1 : null;
+  return { top, me, meRank };
+}
+
+function getCachedLeaderboard(stageId, stageVersion, limit = 5) {
+  const key = getLeaderboardCacheKey(stageId, stageVersion);
+  const cached = leaderboardSessionCache.get(key);
+  if (!cached) return null;
+  const view = computeLeaderboardViewFromEntries(cached.entries, limit);
+  return getDefaultLeaderboardResult({ ...view, fromCache: true, stale: true });
+}
+
+function setCachedLeaderboard(stageId, stageVersion, entries) {
+  const key = getLeaderboardCacheKey(stageId, stageVersion);
+  leaderboardSessionCache.set(key, {
+    stageId: String(stageId),
+    stageVersion: Number(stageVersion) || 1,
+    entries: Array.isArray(entries) ? entries : [],
+    loadedAtMs: Date.now()
+  });
+}
+
+function upsertCachedLeaderboardEntry(stageId, stageVersion, entry) {
+  if (!entry || !entry.player_id) return;
+  const key = getLeaderboardCacheKey(stageId, stageVersion);
+  const cached = leaderboardSessionCache.get(key);
+  if (!cached || !Array.isArray(cached.entries)) return;
+  const nextEntries = cached.entries.slice();
+  const idx = nextEntries.findIndex((item) => item && item.player_id === entry.player_id);
+  if (idx >= 0) {
+    nextEntries[idx] = { ...nextEntries[idx], ...entry };
+  } else {
+    nextEntries.push({ ...entry });
+  }
+  setCachedLeaderboard(stageId, stageVersion, nextEntries);
+}
+
+function isValidStatsMetric(metric) {
+  return metric === "stars_earned" || metric === "stages_cleared";
+}
+
+function computeStatsLeaderboardView(entries, metric, limit = 5) {
+  if (!isValidStatsMetric(metric)) {
+    return { top: [], me: null, meRank: null };
+  }
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  const active = safeEntries
+    .filter((entry) => entry && entry.active !== false)
+    .map((entry) => ({ ...entry, metricValue: Number(entry[metric]) || 0 }))
+    .sort((a, b) => b.metricValue - a.metricValue);
+  const top = active.slice(0, Math.max(1, Number(limit) || 5));
+  const meIndex = active.findIndex((entry) => entry && entry.player_id === playerId);
+  const me = meIndex >= 0 ? active[meIndex] : null;
+  const meRank = meIndex >= 0 ? meIndex + 1 : null;
+  return { top, me, meRank };
+}
+
+function getCachedStatsLeaderboard(metric, limit = 5) {
+  const cached = statsLeaderboardSessionCache.get(metric);
+  if (!cached) return null;
+  const view = computeStatsLeaderboardView(cached.entries, metric, limit);
+  const ageMs = Date.now() - cached.loadedAtMs;
+  return getDefaultStatsLeaderboardResult({
+    ...view,
+    fromCache: true,
+    stale: ageMs > STATS_LEADERBOARD_CACHE_TTL_MS
+  });
+}
+
+function setCachedStatsLeaderboard(metric, entries) {
+  if (!isValidStatsMetric(metric)) return;
+  statsLeaderboardSessionCache.set(metric, {
+    metric,
+    entries: Array.isArray(entries) ? entries : [],
+    loadedAtMs: Date.now()
+  });
+}
+
+function upsertCachedStatsEntry(entry) {
+  if (!entry || !entry.player_id) return;
+  ["stars_earned", "stages_cleared"].forEach((metric) => {
+    const cached = statsLeaderboardSessionCache.get(metric);
+    if (!cached || !Array.isArray(cached.entries)) return;
+    const nextEntries = cached.entries.slice();
+    const idx = nextEntries.findIndex((item) => item && item.player_id === entry.player_id);
+    if (idx >= 0) {
+      nextEntries[idx] = { ...nextEntries[idx], ...entry };
+    } else {
+      nextEntries.push({ ...entry });
+    }
+    setCachedStatsLeaderboard(metric, nextEntries);
+  });
+}
 
 function getDisplayNameFallback() {
   if (typeof window.getPlayerName === "function") {
@@ -57,6 +233,8 @@ function getDisplayNameFallback() {
   return `Player ${playerId}`;
 }
 
+loadLeaderboardReadBudget();
+
 function getStageLeaderboardPath(stageId, stageVersion) {
   const safeStageId = String(stageId);
   const safeVersion = Number(stageVersion) || 1;
@@ -65,9 +243,15 @@ function getStageLeaderboardPath(stageId, stageVersion) {
 
 async function fetchLeaderboardDoc(path, id) {
   if (!firebaseDb) return null;
+  if (leaderboardReadBudget.blocked || remainingLeaderboardReads() < 1) {
+    leaderboardReadBudget.blocked = true;
+    saveLeaderboardReadBudget();
+    return null;
+  }
   try {
     const docRef = firebaseDb.doc(`${path}/${id}`);
     const snap = await docRef.get();
+    incrementLeaderboardReads(1);
     if (!snap.exists) return null;
     return { id: snap.id, ...snap.data() };
   } catch (error) {
@@ -82,7 +266,9 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
   if (!Number.isFinite(bestTimeMs)) return;
   const path = getStageLeaderboardPath(stageId, stageVersion);
   const entryId = playerId;
-  const existing = await fetchLeaderboardDoc(path, entryId);
+  const cachedView = getCachedLeaderboard(stageId, stageVersion, 5);
+  const cachedMe = cachedView && cachedView.me ? cachedView.me : null;
+  const existing = cachedMe || (await fetchLeaderboardDoc(path, entryId));
   const resolvedBest =
     existing && Number.isFinite(existing.best_time_ms)
       ? Math.min(existing.best_time_ms, bestTimeMs)
@@ -99,6 +285,7 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
   const payload = {
     player_id: playerId,
     player_name: resolvedName,
+    auth_uid: currentUserId,
     best_time_ms: resolvedBest,
     active: true,
     game_version: gameVersion,
@@ -107,44 +294,192 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
   };
   try {
     await firebaseDb.doc(`${path}/${entryId}`).set(payload, { merge: true });
+    upsertCachedLeaderboardEntry(stageId, stageVersion, payload);
   } catch (error) {
     console.warn("Failed to update leaderboard", error);
   }
 }
 
 async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
-  if (!firebaseDb) return { top: [], me: null, meRank: null };
+  if (!firebaseDb) {
+    return getDefaultLeaderboardResult({
+      errorCode: "not_ready",
+      errorMessage: "Leaderboard service is not ready yet."
+    });
+  }
+  const cached = getCachedLeaderboard(stageId, stageVersion, limit);
+  if (cached) return cached;
+  if (leaderboardReadBudget.blocked || remainingLeaderboardReads() < 1) {
+    leaderboardReadBudget.blocked = true;
+    saveLeaderboardReadBudget();
+    return getDefaultLeaderboardResult({
+      errorCode: "read_budget_exceeded",
+      errorMessage: "Leaderboard read limit reached for this player."
+    });
+  }
   const path = getStageLeaderboardPath(stageId, stageVersion);
   try {
-    const fetchLimit = Math.max(limit * 3, 10);
-    const querySnap = await firebaseDb
-      .collection(path)
-      .orderBy("best_time_ms", "asc")
-      .limit(fetchLimit)
-      .get();
-    const top = querySnap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .filter((entry) => entry.active !== false)
-      .slice(0, limit);
-    const me = await fetchLeaderboardDoc(path, playerId);
-    const safeMe = me && me.active === false ? null : me;
-    let meRank = null;
-    if (safeMe && Number.isFinite(safeMe.best_time_ms)) {
-      try {
-        const rankSnap = await firebaseDb
-          .collection(path)
-          .where("best_time_ms", "<", safeMe.best_time_ms)
-          .get();
-        const activeAhead = rankSnap.docs.filter((doc) => doc.data().active !== false).length;
-        meRank = activeAhead + 1;
-      } catch (error) {
-        console.warn("Failed to fetch leaderboard rank", error);
+    const pageBase = 250;
+    const allEntries = [];
+    let lastDoc = null;
+    while (true) {
+      const remaining = remainingLeaderboardReads();
+      if (remaining < 1) {
+        leaderboardReadBudget.blocked = true;
+        saveLeaderboardReadBudget();
+        break;
       }
+      const pageSize = Math.max(1, Math.min(pageBase, remaining));
+      let queryRef = firebaseDb.collection(path).orderBy("best_time_ms", "asc").limit(pageSize);
+      if (lastDoc) {
+        queryRef = queryRef.startAfter(lastDoc);
+      }
+      const pageSnap = await queryRef.get();
+      incrementLeaderboardReads(pageSnap.size);
+      if (pageSnap.empty) break;
+      pageSnap.docs.forEach((doc) => {
+        allEntries.push({ id: doc.id, ...doc.data() });
+      });
+      lastDoc = pageSnap.docs[pageSnap.docs.length - 1];
+      if (pageSnap.size < pageSize) break;
     }
-    return { top, me: safeMe, meRank };
+    setCachedLeaderboard(stageId, stageVersion, allEntries);
+    const view = computeLeaderboardViewFromEntries(allEntries, limit);
+    return getDefaultLeaderboardResult({
+      ...view,
+      fromCache: false,
+      stale: false,
+      errorCode: leaderboardReadBudget.blocked ? "read_budget_exceeded" : null,
+      errorMessage: leaderboardReadBudget.blocked
+        ? "Leaderboard read limit reached for this player. Showing cached or partial data."
+        : ""
+    });
   } catch (error) {
     console.warn("Failed to fetch leaderboard", error);
-    return { top: [], me: null, meRank: null };
+    return getDefaultLeaderboardResult({
+      errorCode: "fetch_failed",
+      errorMessage: "Could not load leaderboard data right now."
+    });
+  }
+}
+
+async function ensureStageLeaderboardSessionCache(stageId, stageVersion) {
+  const key = getLeaderboardCacheKey(stageId, stageVersion);
+  if (leaderboardSessionCache.has(key)) {
+    return getDefaultLeaderboardResult({ fromCache: true, stale: true });
+  }
+  return fetchStageLeaderboard(stageId, stageVersion, 5);
+}
+
+async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, playerName) {
+  if (!firebaseDb || !currentUserId) return;
+  const safeStagesCleared = Math.max(0, Number(stagesCleared) || 0);
+  const safeStarsEarned = Math.max(0, Number(starsEarned) || 0);
+  const payload = {
+    player_id: playerId,
+    auth_uid: currentUserId,
+    player_name: playerName || getDisplayNameFallback(),
+    stages_cleared: safeStagesCleared,
+    stars_earned: safeStarsEarned,
+    active: true,
+    game_version: gameVersion,
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try {
+    await firebaseDb.doc(`${PROGRESS_LEADERBOARD_PATH}/${playerId}`).set(payload, { merge: true });
+    upsertCachedStatsEntry(payload);
+  } catch (error) {
+    console.warn("Failed to update progress leaderboard snapshot", error);
+  }
+}
+
+async function fetchProgressLeaderboard(metric, limit = 5, options = {}) {
+  if (!isValidStatsMetric(metric)) {
+    return getDefaultStatsLeaderboardResult({
+      errorCode: "invalid_metric",
+      errorMessage: "Invalid leaderboard metric."
+    });
+  }
+  if (!firebaseDb) {
+    return getDefaultStatsLeaderboardResult({
+      errorCode: "not_ready",
+      errorMessage: "Leaderboard service is not ready yet."
+    });
+  }
+  const cached = getCachedStatsLeaderboard(metric, limit);
+  const shouldRefresh = Boolean(options && options.refresh) ||
+    Boolean(options && options.refreshIfStale && cached && cached.stale);
+  if (cached && !shouldRefresh) {
+    return cached;
+  }
+  if (leaderboardReadBudget.blocked || remainingLeaderboardReads() < 1) {
+    leaderboardReadBudget.blocked = true;
+    saveLeaderboardReadBudget();
+    return getDefaultStatsLeaderboardResult({
+      ...(cached || {}),
+      errorCode: "read_budget_exceeded",
+      errorMessage: "Leaderboard read limit reached for this player."
+    });
+  }
+  try {
+    const pageBase = 250;
+    const allEntries = [];
+    let lastDoc = null;
+    while (true) {
+      const remaining = remainingLeaderboardReads();
+      if (remaining < 1) {
+        leaderboardReadBudget.blocked = true;
+        saveLeaderboardReadBudget();
+        break;
+      }
+      const pageSize = Math.max(1, Math.min(pageBase, remaining));
+      let queryRef = firebaseDb.collection(PROGRESS_LEADERBOARD_PATH).orderBy(metric, "desc").limit(pageSize);
+      if (lastDoc) {
+        queryRef = queryRef.startAfter(lastDoc);
+      }
+      const pageSnap = await queryRef.get();
+      incrementLeaderboardReads(pageSnap.size);
+      if (pageSnap.empty) break;
+      pageSnap.docs.forEach((doc) => {
+        allEntries.push({ id: doc.id, ...doc.data() });
+      });
+      lastDoc = pageSnap.docs[pageSnap.docs.length - 1];
+      if (pageSnap.size < pageSize) break;
+    }
+    setCachedStatsLeaderboard(metric, allEntries);
+    const view = computeStatsLeaderboardView(allEntries, metric, limit);
+    return getDefaultStatsLeaderboardResult({
+      ...view,
+      fromCache: false,
+      stale: false,
+      errorCode: leaderboardReadBudget.blocked ? "read_budget_exceeded" : null,
+      errorMessage: leaderboardReadBudget.blocked
+        ? "Leaderboard read limit reached for this player."
+        : ""
+    });
+  } catch (error) {
+    console.warn("Failed to fetch progress leaderboard", error);
+    let errorCode = "fetch_failed";
+    let errorMessage = "Could not load leaderboard data right now.";
+    const rawCode = error && (error.code || error.name) ? String(error.code || error.name).toLowerCase() : "";
+    if (rawCode.includes("permission-denied")) {
+      errorCode = "permission_denied";
+      errorMessage = "Permission denied. Check deployed Firestore rules.";
+    } else if (rawCode.includes("unauthenticated")) {
+      errorCode = "unauthenticated";
+      errorMessage = "Auth not ready. Try reopening in a moment.";
+    } else if (rawCode.includes("failed-precondition")) {
+      errorCode = "failed_precondition";
+      errorMessage = "Firestore index/rules precondition failed.";
+    } else if (rawCode.includes("unavailable")) {
+      errorCode = "service_unavailable";
+      errorMessage = "Firestore temporarily unavailable.";
+    }
+    return getDefaultStatsLeaderboardResult({
+      ...(cached || {}),
+      errorCode,
+      errorMessage
+    });
   }
 }
 
@@ -182,7 +517,7 @@ async function deactivateLocalLeaderboardEntries(bestTimesOverride = null) {
       const stageVersion = Number(match[2]) || 1;
       const path = getStageLeaderboardPath(stageId, stageVersion);
       const docRef = firebaseDb.doc(`${path}/${playerId}`);
-      writes.push(docRef.set({ active: false }, { merge: true }));
+      writes.push(docRef.set({ active: false, auth_uid: currentUserId }, { merge: true }));
     });
     await Promise.all(writes);
   } catch (error) {
@@ -374,14 +709,28 @@ function startHeartbeat() {
     const sessionRef = getSessionRef();
     if (!sessionRef) return;
 
-    try {
-      await sessionRef.update({
-        updated_at: firebase.firestore.FieldValue.serverTimestamp(),
-        total_playtime_seconds: parseFloat(getActivePlaytimeSeconds().toFixed(2))
-      });
-    } catch (error) {
-      console.error("Failed heartbeat update:", error);
+  try {
+    await sessionRef.update({
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+      total_playtime_seconds: parseFloat(getActivePlaytimeSeconds().toFixed(2))
+    });
+    if (typeof window.updateProgressLeaderboardSnapshot === "function") {
+      const completed = window.stageCompleted || {};
+      const starMap = window.stageStars || {};
+      const stagesCleared = Object.keys(completed).reduce(
+        (sum, key) => sum + (completed[key] ? 1 : 0),
+        0
+      );
+      const starsEarned = Object.keys(starMap).reduce(
+        (sum, key) => sum + (Number(starMap[key]) || 0),
+        0
+      );
+      const displayName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+      window.updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, displayName);
     }
+  } catch (error) {
+    console.error("Failed heartbeat update:", error);
+  }
   }, HEARTBEAT_INTERVAL_MS);
 }
 
@@ -607,6 +956,7 @@ async function createNewSession() {
     startHeartbeat();
     resetActiveInactivityTimer();
     resetInactivityTimer();
+    await updateProgressLeaderboardSnapshot(0, 0, getDisplayNameFallback());
 
     console.log("New session created:", currentSessionDocId);
   } catch (error) {
@@ -737,6 +1087,21 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
 
     await sessionRef.update(sessionUpdate);
 
+    if (typeof window.updateProgressLeaderboardSnapshot === "function") {
+      const completed = window.stageCompleted || {};
+      const starMap = window.stageStars || {};
+      const stagesCleared = Object.keys(completed).reduce(
+        (sum, key) => sum + (completed[key] ? 1 : 0),
+        0
+      );
+      const starsEarned = Object.keys(starMap).reduce(
+        (sum, key) => sum + (Number(starMap[key]) || 0),
+        0
+      );
+      const displayName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+      window.updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, displayName);
+    }
+
     roundsForCurrentLevel = [];
   } catch (error) {
     console.error("Failed to track level session:", error);
@@ -830,12 +1195,22 @@ window.trackQuitReason = trackQuitReason;
 window.getLoggingDebugSnapshot = getLoggingDebugSnapshot;
 window.updateStageLeaderboard = updateStageLeaderboard;
 window.fetchStageLeaderboard = fetchStageLeaderboard;
+window.ensureStageLeaderboardSessionCache = ensureStageLeaderboardSessionCache;
+window.fetchProgressLeaderboard = fetchProgressLeaderboard;
+window.updateProgressLeaderboardSnapshot = updateProgressLeaderboardSnapshot;
 window.getLeaderboardReady = () => Boolean(firebaseDb && currentUserId);
 window.getLeaderboardPlayerId = () => playerId;
+window.getLeaderboardReadBudgetStatus = () => ({
+  totalReads: Number(leaderboardReadBudget.totalReads) || 0,
+  limit: LEADERBOARD_READ_LIMIT,
+  remaining: remainingLeaderboardReads(),
+  blocked: Boolean(leaderboardReadBudget.blocked)
+});
 window.rotateLeaderboardPlayerId = () => {
   try {
     window.localStorage.removeItem(PLAYER_ID_STORAGE_KEY);
     window.localStorage.removeItem(leaderboardSyncKey);
+    window.localStorage.removeItem(leaderboardReadBudgetKey);
   } catch (error) {
     console.warn("Failed to rotate player id", error);
   }

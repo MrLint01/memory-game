@@ -22,6 +22,215 @@
 
       const PLAYER_NAME_KEY = "flashRecallPlayerName";
       const PLAYER_NAME_PROMPT_KEY = "flashRecallPlayerNamePrompted";
+      const APPEARANCE_THEME_KEY = "flashRecallAppearanceTheme";
+      const APPEARANCE_FONT_KEY = "flashRecallAppearanceFont";
+      const APPEARANCE_LAYOUT_KEY = "flashRecallAppearanceLayout";
+      const KEYBINDS_STORAGE_KEY = "flashRecallKeybinds";
+      const settingsDefaults = typeof window.getFlashRecallSettingsDefaults === "function"
+        ? window.getFlashRecallSettingsDefaults()
+        : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
+      const fallbackAppearance = {
+        theme: "mono-ink",
+        font: "arcade",
+        layout: "classic",
+        themes: [
+          "mono-ink",
+          "paper-night",
+          "pastel-dawn",
+          "pastel-mint",
+          "neon-arcade",
+          "neon-cyber",
+          "sunset-pop",
+          "ocean-deep",
+          "forest-camp",
+          "retro-terminal",
+          "cherry-cream",
+          "steel-grid"
+        ],
+        fonts: ["arcade", "mono", "rounded", "space", "poster"],
+        layouts: ["classic", "focus", "arcade", "wide"]
+      };
+      const defaultAppearance = {
+        ...fallbackAppearance,
+        ...(settingsDefaults.appearance || {})
+      };
+      const appearanceOptions = {
+        themes: Array.isArray(defaultAppearance.themes) && defaultAppearance.themes.length
+          ? defaultAppearance.themes
+          : fallbackAppearance.themes,
+        fonts: Array.isArray(defaultAppearance.fonts) && defaultAppearance.fonts.length
+          ? defaultAppearance.fonts
+          : fallbackAppearance.fonts,
+        layouts: Array.isArray(defaultAppearance.layouts) && defaultAppearance.layouts.length
+          ? defaultAppearance.layouts
+          : fallbackAppearance.layouts
+      };
+      const defaultKeybinds = {
+        retry: "r",
+        stageNext: "n",
+        stageQuit: "q",
+        practiceHome: "h",
+        practiceSettings: "s",
+        ...(settingsDefaults.keybinds || {})
+      };
+      const defaultControlSettings = {
+        successAnimation: true,
+        flashCountdown: true,
+        enterToNext: false,
+        enterToRetry: false,
+        flashWarningEnabled: true,
+        ...(settingsDefaults.controls || {})
+      };
+      let keybinds = { ...defaultKeybinds };
+      let activeRebindAction = null;
+      const keybindButtons = {
+        retry: keybindRetry,
+        stageNext: keybindStageNext,
+        stageQuit: keybindStageQuit,
+        practiceHome: keybindPracticeHome,
+        practiceSettings: keybindPracticeSettings
+      };
+
+      function normalizeKey(rawKey) {
+        if (!rawKey) return "";
+        const key = String(rawKey);
+        if (key === " ") return "space";
+        if (key.length === 1) return key.toLowerCase();
+        return key.toLowerCase();
+      }
+
+      function getKeyLabel(key) {
+        const value = normalizeKey(key);
+        if (!value) return "";
+        const map = {
+          escape: "Esc",
+          enter: "Enter",
+          tab: "Tab",
+          "arrowleft": "Left",
+          "arrowright": "Right",
+          "arrowup": "Up",
+          "arrowdown": "Down",
+          space: "Space"
+        };
+        return map[value] || value.toUpperCase();
+      }
+
+      function isBindableKey(key) {
+        const value = normalizeKey(key);
+        if (!value) return false;
+        if (value.length === 1) return /[a-z0-9]/.test(value);
+        return [
+          "enter",
+          "space",
+          "arrowleft",
+          "arrowright",
+          "arrowup",
+          "arrowdown"
+        ].includes(value);
+      }
+
+      function loadKeybinds() {
+        try {
+          const raw = window.localStorage.getItem(KEYBINDS_STORAGE_KEY);
+          if (!raw) {
+            keybinds = { ...defaultKeybinds };
+            return;
+          }
+          const parsed = JSON.parse(raw);
+          const next = { ...defaultKeybinds };
+          Object.keys(defaultKeybinds).forEach((action) => {
+            const candidate = normalizeKey(parsed && parsed[action]);
+            if (candidate) {
+              next[action] = candidate;
+            }
+          });
+          keybinds = next;
+        } catch {
+          keybinds = { ...defaultKeybinds };
+        }
+      }
+
+      function saveKeybinds() {
+        try {
+          window.localStorage.setItem(KEYBINDS_STORAGE_KEY, JSON.stringify(keybinds));
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      function setKeybindStatus(message) {
+        if (!keybindStatus) return;
+        keybindStatus.textContent = message || "";
+      }
+
+      function refreshKeybindButtons() {
+        Object.entries(keybindButtons).forEach(([action, button]) => {
+          if (!button) return;
+          const isEditing = activeRebindAction === action;
+          button.textContent = isEditing ? "Press key..." : getKeyLabel(keybinds[action]);
+          button.classList.toggle("is-listening", isEditing);
+        });
+      }
+
+      function refreshActionKeyHints() {
+        const get = (action, fallback) => getKeyLabel(keybinds[action] || fallback);
+        const setHint = (selector, action, fallback) => {
+          const button = document.querySelector(selector);
+          if (!button) return;
+          const label = get(action, fallback);
+          const hint = button.querySelector(".action-key-hint");
+          if (hint) hint.textContent = `(${label})`;
+        };
+        setHint("#stageMenuButton", "stageQuit", "q");
+        setHint("#stageNextButton", "stageNext", "n");
+        setHint("#stageRetryButton", "retry", "r");
+        setHint("#practiceRetryButton", "retry", "r");
+        setHint("#practiceBackButton", "practiceHome", "h");
+        setHint("#practiceSettingsButton", "practiceSettings", "s");
+      }
+
+      function keybindMatches(event, action) {
+        const pressed = normalizeKey(event.key);
+        const expected = normalizeKey(keybinds[action] || defaultKeybinds[action]);
+        return pressed && expected && pressed === expected;
+      }
+
+      window.getActionKeyLabel = function getActionKeyLabel(action) {
+        if (!action) return "";
+        return getKeyLabel(keybinds[action] || defaultKeybinds[action] || "");
+      };
+
+      function applyAppearance(theme, font, layout) {
+        const nextTheme = appearanceOptions.themes.includes(theme) ? theme : appearanceOptions.themes[0];
+        const nextFont = appearanceOptions.fonts.includes(font) ? font : appearanceOptions.fonts[0];
+        const nextLayout = appearanceOptions.layouts.includes(layout) ? layout : appearanceOptions.layouts[0];
+        document.body.dataset.theme = nextTheme;
+        document.body.dataset.font = nextFont;
+        document.body.dataset.layout = nextLayout;
+        if (appearanceTheme) appearanceTheme.value = nextTheme;
+        if (appearanceFont) appearanceFont.value = nextFont;
+        if (appearanceLayout) appearanceLayout.value = nextLayout;
+      }
+
+      function getStoredAppearance() {
+        const savedTheme = window.localStorage.getItem(APPEARANCE_THEME_KEY);
+        const savedFont = window.localStorage.getItem(APPEARANCE_FONT_KEY);
+        const savedLayout = window.localStorage.getItem(APPEARANCE_LAYOUT_KEY);
+        const fallbackTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
+          ? defaultAppearance.theme
+          : appearanceOptions.themes[0];
+        const fallbackFont = appearanceOptions.fonts.includes(defaultAppearance.font)
+          ? defaultAppearance.font
+          : appearanceOptions.fonts[0];
+        const fallbackLayout = appearanceOptions.layouts.includes(defaultAppearance.layout)
+          ? defaultAppearance.layout
+          : appearanceOptions.layouts[0];
+        return {
+          theme: appearanceOptions.themes.includes(savedTheme) ? savedTheme : fallbackTheme,
+          font: appearanceOptions.fonts.includes(savedFont) ? savedFont : fallbackFont,
+          layout: appearanceOptions.layouts.includes(savedLayout) ? savedLayout : fallbackLayout
+        };
+      }
 
       function normalizePlayerName(raw) {
         if (raw === null || raw === undefined) return "";
@@ -115,22 +324,33 @@
       }
 
       function shouldShowPlayerNameSetting() {
-        if (getPlayerName()) return true;
-        try {
-          return window.localStorage.getItem(PLAYER_NAME_PROMPT_KEY) === "1";
-        } catch {
-          return false;
-        }
+        return true;
       }
 
       function updatePlayerNameSettingVisibility() {
         const row = document.getElementById("playerNameSettingRow");
         if (!row) return;
-        if (shouldShowPlayerNameSetting()) {
-          row.removeAttribute("hidden");
-        } else {
-          row.setAttribute("hidden", "");
-        }
+        if (shouldShowPlayerNameSetting()) row.removeAttribute("hidden");
+      }
+
+      function setSettingsTab(tabName) {
+        if (!settingsModal) return;
+        const tabButtons = settingsModal.querySelectorAll("[data-settings-tab]");
+        const tabPanes = settingsModal.querySelectorAll("[data-settings-pane]");
+        tabButtons.forEach((button) => {
+          const isActive = button.getAttribute("data-settings-tab") === tabName;
+          button.classList.toggle("is-active", isActive);
+          button.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+        tabPanes.forEach((pane) => {
+          const isActive = pane.getAttribute("data-settings-pane") === tabName;
+          pane.classList.toggle("is-active", isActive);
+          if (isActive) {
+            pane.removeAttribute("hidden");
+          } else {
+            pane.setAttribute("hidden", "");
+          }
+        });
       }
 
       function markPlayerNamePrompted() {
@@ -1018,6 +1238,13 @@ function runFlashCountdown(onComplete) {
         if (!skipIntro && openStageIntro(index, originEl)) {
           return;
         }
+        if (stage && typeof window.ensureStageLeaderboardSessionCache === "function") {
+          const stageId = stage.id ? String(stage.id) : String(index + 1);
+          const stageVersion = window.getStageVersion ? window.getStageVersion(stage) : 1;
+          window.ensureStageLeaderboardSessionCache(stageId, stageVersion).catch((error) => {
+            console.warn("Stage leaderboard prefetch failed", error);
+          });
+        }
         stageState.active = false;
         stageState.index = index;
         stageState.startTime = performance.now();
@@ -1070,7 +1297,7 @@ function runFlashCountdown(onComplete) {
           setModalState(leaderboardModal, true);
           if (typeof window.syncLocalBestTimesOnce === "function") {
             try {
-              await window.syncLocalBestTimesOnce(true);
+              await window.syncLocalBestTimesOnce(false);
             } catch (error) {
               console.warn("Leaderboard sync failed", error);
             }
@@ -1132,7 +1359,10 @@ function runFlashCountdown(onComplete) {
         }
         listEl.dataset.lbRetryCount = "0";
         try {
-          const { top, me, meRank: fetchedMeRank } = await window.fetchStageLeaderboard(stageId, stageVersion, 5);
+          const result = await window.fetchStageLeaderboard(stageId, stageVersion, 5);
+          const top = result && Array.isArray(result.top) ? result.top : [];
+          const me = result ? result.me : null;
+          const fetchedMeRank = result ? result.meRank : null;
           const rows = [];
           const localName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
           let meEntry = null;
@@ -1165,16 +1395,38 @@ function runFlashCountdown(onComplete) {
             const rankText = meRank ? String(meRank) : "—";
             row.innerHTML = `<span>${rankText}</span><span class="leaderboard-name">${name}</span><span>${timeText}</span>`;
             rows.push(row);
+          } else {
+            const row = document.createElement("div");
+            row.className = "leaderboard-row leaderboard-row--me";
+            row.dataset.playerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
+            const name = localName || "You";
+            row.innerHTML = `<span>-</span><span class="leaderboard-name">${name}</span><span>-</span>`;
+            rows.push(row);
           }
           if (rows.length) {
             listEl.replaceChildren(headerRow, ...rows);
           } else {
-            loadingRow.textContent = "No data yet";
+            const baseMessage = result && result.errorMessage ? result.errorMessage : "No data yet";
+            loadingRow.textContent = baseMessage;
             listEl.replaceChildren(headerRow, loadingRow);
+          }
+          if (result && result.errorCode) {
+            const statusRow = document.createElement("div");
+            statusRow.className = "leaderboard-row leaderboard-row--empty";
+            const budgetStatus =
+              typeof window.getLeaderboardReadBudgetStatus === "function"
+                ? window.getLeaderboardReadBudgetStatus()
+                : null;
+            if (result.errorCode === "read_budget_exceeded" && budgetStatus) {
+              statusRow.textContent = `Leaderboard reads capped (${budgetStatus.totalReads}/${budgetStatus.limit}).`;
+            } else {
+              statusRow.textContent = result.errorMessage || "Leaderboard unavailable.";
+            }
+            listEl.appendChild(statusRow);
           }
         } catch (error) {
           console.warn("Failed to render leaderboard", error);
-          loadingRow.textContent = "No data yet";
+          loadingRow.textContent = "Leaderboard failed to load. Please try again later.";
           listEl.replaceChildren(headerRow, loadingRow);
         }
       };
@@ -1257,6 +1509,9 @@ function runFlashCountdown(onComplete) {
         if (saved !== null) {
           flashWarningEnabled = saved === "1";
           flashStageSkip.checked = saved !== "1";
+        } else {
+          flashWarningEnabled = Boolean(defaultControlSettings.flashWarningEnabled);
+          flashStageSkip.checked = !flashWarningEnabled;
         }
         flashStageSkip.addEventListener("change", () => {
           flashWarningEnabled = !flashStageSkip.checked;
@@ -1453,17 +1708,34 @@ function runFlashCountdown(onComplete) {
       if (settingsOpen && settingsModal) {
         settingsOpen.addEventListener("click", () => {
           updatePlayerNameSettingVisibility();
+          activeRebindAction = null;
+          refreshKeybindButtons();
+          setKeybindStatus("");
+          setSettingsTab("general");
           setModalState(settingsModal, true);
         });
       }
       if (settingsClose && settingsModal) {
         settingsClose.addEventListener("click", () => {
+          activeRebindAction = null;
+          refreshKeybindButtons();
+          setKeybindStatus("");
           setModalState(settingsModal, false);
         });
       }
       if (settingsModal) {
+        settingsModal.querySelectorAll("[data-settings-tab]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const tabName = button.getAttribute("data-settings-tab");
+            if (!tabName) return;
+            setSettingsTab(tabName);
+          });
+        });
         settingsModal.addEventListener("click", (event) => {
           if (event.target === settingsModal) {
+            activeRebindAction = null;
+            refreshKeybindButtons();
+            setKeybindStatus("");
             setModalState(settingsModal, false);
           }
         });
@@ -1585,12 +1857,30 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallSandboxUnlocks");
           window.localStorage.removeItem("flashRecallPlayerName");
           window.localStorage.removeItem("flashRecallPlayerNamePrompted");
+          window.localStorage.removeItem(APPEARANCE_THEME_KEY);
+          window.localStorage.removeItem(APPEARANCE_FONT_KEY);
+          window.localStorage.removeItem(APPEARANCE_LAYOUT_KEY);
+          window.localStorage.removeItem(KEYBINDS_STORAGE_KEY);
+          const resetTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
+            ? defaultAppearance.theme
+            : appearanceOptions.themes[0];
+          const resetFont = appearanceOptions.fonts.includes(defaultAppearance.font)
+            ? defaultAppearance.font
+            : appearanceOptions.fonts[0];
+          const resetLayout = appearanceOptions.layouts.includes(defaultAppearance.layout)
+            ? defaultAppearance.layout
+            : appearanceOptions.layouts[0];
+          applyAppearance(
+            resetTheme,
+            resetFont,
+            resetLayout
+          );
+          keybinds = { ...defaultKeybinds };
+          activeRebindAction = null;
+          refreshKeybindButtons();
+          refreshActionKeyHints();
           if (playerNameSetting) {
             playerNameSetting.value = "";
-          }
-          const nameRow = document.getElementById("playerNameSettingRow");
-          if (nameRow) {
-            nameRow.setAttribute("hidden", "");
           }
           updatePlayerNameSettingVisibility();
           if (typeof window.saveStageProgress === "function") {
@@ -1659,8 +1949,134 @@ function runFlashCountdown(onComplete) {
         if (resetConfirmAnchor && resetConfirmAnchor.contains(event.target)) return;
         hideResetConfirmRow();
       });
+      async function renderStatsMetricLeaderboard(metric, listId, emptyId, valueLabel) {
+        const listEl = document.getElementById(listId);
+        const emptyEl = document.getElementById(emptyId);
+        if (!listEl) return;
+        const getLocalProgress = () => {
+          const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+          const stagesCleared = stages.reduce((sum, stage, index) => {
+            const stageKey = window.getStageStarsKey
+              ? window.getStageStarsKey(stage, index)
+              : (stage && stage.id ? String(stage.id) : String(index + 1));
+            return sum + (window.stageCompleted && window.stageCompleted[stageKey] ? 1 : 0);
+          }, 0);
+          const starsEarned = stages.reduce((sum, stage, index) => {
+            const stageKey = window.getStageStarsKey
+              ? window.getStageStarsKey(stage, index)
+              : (stage && stage.id ? String(stage.id) : String(index + 1));
+            return sum + (window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0);
+          }, 0);
+          return { stagesCleared, starsEarned };
+        };
+        const headerRow = document.createElement("div");
+        headerRow.className = "leaderboard-row";
+        headerRow.innerHTML = `<span>#</span><span>Player</span><span>${valueLabel}</span>`;
+        const loadingRow = document.createElement("div");
+        loadingRow.className = "leaderboard-row leaderboard-row--empty";
+        loadingRow.textContent = "Loading...";
+        listEl.replaceChildren(headerRow, loadingRow);
+
+        if (typeof window.fetchProgressLeaderboard !== "function") {
+          loadingRow.textContent = "Leaderboard unavailable.";
+          listEl.replaceChildren(headerRow, loadingRow);
+          return;
+        }
+        const localProgress = getLocalProgress();
+        if (typeof window.updateProgressLeaderboardSnapshot === "function") {
+          const name = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+          window.updateProgressLeaderboardSnapshot(localProgress.stagesCleared, localProgress.starsEarned, name);
+        }
+        const localValue = metric === "stages_cleared" ? localProgress.stagesCleared : localProgress.starsEarned;
+        try {
+          let result = null;
+          let attempts = 0;
+          do {
+            result = await window.fetchProgressLeaderboard(metric, 5, { refreshIfStale: true });
+            if (result && result.errorCode !== "not_ready") break;
+            attempts += 1;
+            if (attempts <= 5) {
+              await new Promise((resolve) => window.setTimeout(resolve, 350));
+            }
+          } while (attempts <= 5);
+          const top = result && Array.isArray(result.top) ? result.top : [];
+          const me = result ? result.me : null;
+          const meRank = result && Number.isFinite(result.meRank) ? result.meRank : null;
+          const localName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+          const rows = [];
+          top.forEach((entry, idx) => {
+            const row = document.createElement("div");
+            row.className = "leaderboard-row leaderboard-row--data";
+            const value = Number(entry[metric]) || 0;
+            const isMe = entry.player_id && window.getLeaderboardPlayerId && entry.player_id === window.getLeaderboardPlayerId();
+            if (isMe) row.classList.add("leaderboard-row--me-top");
+            const name = isMe && localName ? localName : (entry.player_name || `Player ${entry.player_id || "?"}`);
+            row.dataset.playerId = entry.player_id || "";
+            row.innerHTML = `<span>${idx + 1}</span><span class="leaderboard-name">${name}</span><span>${value}</span>`;
+            rows.push(row);
+          });
+          if (me) {
+            const meRow = document.createElement("div");
+            meRow.className = "leaderboard-row leaderboard-row--me";
+            meRow.dataset.playerId = me.player_id || "";
+            const value = Number(me[metric]);
+            const safeValue = Number.isFinite(value) ? value : localValue;
+            const rankText = meRank ? String(meRank) : "—";
+            const name = localName || me.player_name || `Player ${me.player_id || "?"}`;
+            meRow.innerHTML = `<span>${rankText}</span><span class="leaderboard-name">${name}</span><span>${safeValue}</span>`;
+            rows.push(meRow);
+          } else {
+            const meRow = document.createElement("div");
+            meRow.className = "leaderboard-row leaderboard-row--me";
+            meRow.dataset.playerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
+            const name = localName || "You";
+            meRow.innerHTML = `<span>-</span><span class="leaderboard-name">${name}</span><span>${localValue}</span>`;
+            rows.push(meRow);
+          }
+          listEl.replaceChildren(headerRow, ...rows);
+          if (result && result.errorCode) {
+            const statusRow = document.createElement("div");
+            statusRow.className = "leaderboard-row leaderboard-row--empty";
+            statusRow.textContent = result.errorMessage || "Leaderboard unavailable.";
+            listEl.appendChild(statusRow);
+          }
+        } catch (error) {
+          console.warn("Failed to render stats leaderboard", error);
+          const detail =
+            error && error.message ? String(error.message) : "";
+          loadingRow.textContent = detail || (emptyEl ? emptyEl.textContent || "Leaderboard unavailable." : "Leaderboard unavailable.");
+          listEl.replaceChildren(headerRow, loadingRow);
+        }
+      }
+      const statsLeaderboardTabs = {
+        stars_earned: { title: "Stars leaderboard", valueLabel: "Stars" },
+        stages_cleared: { title: "Stages cleared leaderboard", valueLabel: "Stages" }
+      };
+      let activeStatsLeaderboardTab = "stars_earned";
+
+      async function openStatsLeaderboard(metric = activeStatsLeaderboardTab) {
+        if (!statsLeaderboardModal) return;
+        const nextTab = statsLeaderboardTabs[metric] ? metric : "stars_earned";
+        activeStatsLeaderboardTab = nextTab;
+        if (statsLeaderboardTitle) {
+          statsLeaderboardTitle.textContent = statsLeaderboardTabs[nextTab].title;
+        }
+        [statsLeaderboardTabStars, statsLeaderboardTabStages].forEach((button) => {
+          if (!button) return;
+          const isActive = button.getAttribute("data-stats-leaderboard-tab") === nextTab;
+          button.classList.toggle("is-active", isActive);
+          button.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+        setModalState(statsLeaderboardModal, true);
+        await renderStatsMetricLeaderboard(
+          nextTab,
+          "statsLeaderboardModalList",
+          "statsLeaderboardModalEmpty",
+          statsLeaderboardTabs[nextTab].valueLabel
+        );
+      }
       if (statsOpen && statsModal) {
-        statsOpen.addEventListener("click", () => {
+        statsOpen.addEventListener("click", async () => {
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const stagesClearedEl = document.getElementById("statsStagesCleared");
           const stagesTotalEl = document.getElementById("statsStagesTotal");
@@ -1684,6 +2100,10 @@ function runFlashCountdown(onComplete) {
             if (stagesClearedEl) stagesClearedEl.textContent = String(stagesCleared);
             if (stagesTotalEl) stagesTotalEl.textContent = String(totalStages);
             if (starsEarnedEl) starsEarnedEl.textContent = String(starsEarned);
+            if (typeof window.updateProgressLeaderboardSnapshot === "function") {
+              const name = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+              window.updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, name);
+            }
           }
           if (avgPerCardEl) {
             const key = "flashRecallStats";
@@ -1740,6 +2160,31 @@ function runFlashCountdown(onComplete) {
           setModalState(statsModal, true);
         });
       }
+      if (statsLeaderboardOpen) {
+        statsLeaderboardOpen.addEventListener("click", () => {
+          openStatsLeaderboard(activeStatsLeaderboardTab);
+        });
+      }
+      [statsLeaderboardTabStars, statsLeaderboardTabStages].forEach((button) => {
+        if (!button) return;
+        button.addEventListener("click", () => {
+          const tab = button.getAttribute("data-stats-leaderboard-tab");
+          if (!tab) return;
+          openStatsLeaderboard(tab);
+        });
+      });
+      if (statsLeaderboardModal) {
+        statsLeaderboardModal.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          const order = ["stars_earned", "stages_cleared"];
+          const idx = order.indexOf(activeStatsLeaderboardTab);
+          const nextIdx = event.key === "ArrowRight"
+            ? (idx + 1) % order.length
+            : (idx - 1 + order.length) % order.length;
+          event.preventDefault();
+          openStatsLeaderboard(order[nextIdx]);
+        });
+      }
       if (statsClose && statsModal) {
         statsClose.addEventListener("click", () => {
           setModalState(statsModal, false);
@@ -1749,6 +2194,18 @@ function runFlashCountdown(onComplete) {
         statsModal.addEventListener("click", (event) => {
           if (event.target === statsModal) {
             setModalState(statsModal, false);
+          }
+        });
+      }
+      if (statsLeaderboardClose && statsLeaderboardModal) {
+        statsLeaderboardClose.addEventListener("click", () => {
+          setModalState(statsLeaderboardModal, false);
+        });
+      }
+      if (statsLeaderboardModal) {
+        statsLeaderboardModal.addEventListener("click", (event) => {
+          if (event.target === statsLeaderboardModal) {
+            setModalState(statsLeaderboardModal, false);
           }
         });
       }
@@ -2133,7 +2590,41 @@ function runFlashCountdown(onComplete) {
       });
 
       document.addEventListener("keydown", (event) => {
-        const keyLower = event.key.toLowerCase();
+        if (activeRebindAction) {
+          const key = normalizeKey(event.key);
+          if (!key) {
+            event.preventDefault();
+            return;
+          }
+          if (key === "escape") {
+            event.preventDefault();
+            activeRebindAction = null;
+            setKeybindStatus("Keybind update cancelled.");
+            refreshKeybindButtons();
+            return;
+          }
+          if (!isBindableKey(key)) {
+            event.preventDefault();
+            setKeybindStatus("Use letters, numbers, arrows, Enter, or Space.");
+            return;
+          }
+          const conflict = Object.keys(keybinds).find(
+            (action) => action !== activeRebindAction && normalizeKey(keybinds[action]) === key
+          );
+          if (conflict) {
+            event.preventDefault();
+            setKeybindStatus(`"${getKeyLabel(key)}" is already used. Choose another key.`);
+            return;
+          }
+          keybinds[activeRebindAction] = key;
+          event.preventDefault();
+          activeRebindAction = null;
+          saveKeybinds();
+          refreshKeybindButtons();
+          refreshActionKeyHints();
+          setKeybindStatus("Keybind saved.");
+          return;
+        }
         if (playerNamePromptDelayActive && phase === "result" && gameMode === "stages") {
           event.preventDefault();
           return;
@@ -2233,21 +2724,21 @@ function runFlashCountdown(onComplete) {
           return;
         }
         if (phase === "result" && gameMode === "stages") {
-          if (keyLower === "q") {
+          if (keybindMatches(event, "stageQuit")) {
             event.preventDefault();
             const menuBtn =
               document.getElementById("stageMenuButton") || document.getElementById("stageBackButton");
             if (menuBtn) menuBtn.click();
             return;
           }
-          if (keyLower === "n") {
+          if (keybindMatches(event, "stageNext")) {
             event.preventDefault();
             const nextBtn = document.getElementById("stageNextButton");
             if (nextBtn) nextBtn.click();
             return;
           }
           if (!enterToRetryEnabled) { 
-            if (keyLower === "r") {
+            if (keybindMatches(event, "retry")) {
               event.preventDefault();
               const retryBtn = document.getElementById("stageRetryButton");
               if (retryBtn) retryBtn.click();
@@ -2257,14 +2748,14 @@ function runFlashCountdown(onComplete) {
           
         }
         if (phase === "result" && gameMode === "practice") {
-          if (keyLower === "h") {
+          if (keybindMatches(event, "practiceHome")) {
             event.preventDefault();
             const backBtn = document.getElementById("practiceBackButton");
             if (backBtn) backBtn.click();
             return;
           }
           if (!enterToRetryEnabled) {
-            if (keyLower === "r") {
+            if (keybindMatches(event, "retry")) {
               event.preventDefault();
               const retryBtn = document.getElementById("practiceRetryButton");
               if (retryBtn) retryBtn.click();
@@ -2272,7 +2763,7 @@ function runFlashCountdown(onComplete) {
             }
           }
           
-          if (keyLower === "s") {
+          if (keybindMatches(event, "practiceSettings")) {
             event.preventDefault();
             const settingsBtn = document.getElementById("practiceSettingsButton");
             if (settingsBtn) settingsBtn.click();
@@ -2401,6 +2892,37 @@ function runFlashCountdown(onComplete) {
         showTabKeyHint();
       }, { capture: true });
 
+      loadKeybinds();
+      refreshKeybindButtons();
+      refreshActionKeyHints();
+      if (keybindResetDefaults) {
+        keybindResetDefaults.addEventListener("click", () => {
+          keybinds = { ...defaultKeybinds };
+          activeRebindAction = null;
+          saveKeybinds();
+          refreshKeybindButtons();
+          refreshActionKeyHints();
+          setKeybindStatus("Keybinds reset.");
+        });
+      }
+      Object.entries(keybindButtons).forEach(([action, button]) => {
+        if (!button) return;
+        button.addEventListener("click", () => {
+          activeRebindAction = activeRebindAction === action ? null : action;
+          setKeybindStatus(
+            activeRebindAction
+              ? `Press a key for ${button.parentElement ? button.parentElement.firstElementChild.textContent.toLowerCase() : "selected action"}.`
+              : ""
+          );
+          refreshKeybindButtons();
+        });
+      });
+
+      {
+        const storedAppearance = getStoredAppearance();
+        applyAppearance(storedAppearance.theme, storedAppearance.font, storedAppearance.layout);
+      }
+
       updateModeUI();
       updatePracticeLock();
       resetGame();
@@ -2411,6 +2933,8 @@ function runFlashCountdown(onComplete) {
         const saved = window.localStorage.getItem(storageKey);
         if (saved !== null) {
           successAnimationToggle.checked = saved === "1";
+        } else {
+          successAnimationToggle.checked = Boolean(defaultControlSettings.successAnimation);
         }
         setSuccessAnimationEnabled(successAnimationToggle.checked);
         successAnimationToggle.addEventListener("change", () => {
@@ -2424,6 +2948,8 @@ function runFlashCountdown(onComplete) {
         const saved = window.localStorage.getItem(storageKey);
         if (saved !== null) {
           enterToNextToggle.checked = saved === "1";
+        } else {
+          enterToNextToggle.checked = Boolean(defaultControlSettings.enterToNext);
         }
 
         enterToNextEnabled = enterToNextToggle.checked;
@@ -2438,6 +2964,8 @@ function runFlashCountdown(onComplete) {
         const saved = window.localStorage.getItem(storageKey);
         if (saved !== null) {
           enterToRetryToggle.checked = saved === "1";
+        } else {
+          enterToRetryToggle.checked = Boolean(defaultControlSettings.enterToRetry);
         }
 
         enterToRetryEnabled = enterToRetryToggle.checked;
@@ -2452,11 +2980,38 @@ function runFlashCountdown(onComplete) {
         const saved = window.localStorage.getItem(storageKey);
         if (saved !== null) {
           flashCountdownToggle.checked = saved === "1";
+        } else {
+          flashCountdownToggle.checked = Boolean(defaultControlSettings.flashCountdown);
         }
         flashCountdownEnabled = flashCountdownToggle.checked;
         flashCountdownToggle.addEventListener("change", () => {
           flashCountdownEnabled = flashCountdownToggle.checked;
           window.localStorage.setItem(storageKey, flashCountdownToggle.checked ? "1" : "0");
+        });
+      }
+
+      if (appearanceTheme && appearanceFont && appearanceLayout) {
+        const persistAndApplyAppearance = () => {
+          const theme = appearanceTheme.value;
+          const font = appearanceFont.value;
+          const layout = appearanceLayout.value;
+          applyAppearance(theme, font, layout);
+          window.localStorage.setItem(APPEARANCE_THEME_KEY, document.body.dataset.theme || appearanceOptions.themes[0]);
+          window.localStorage.setItem(APPEARANCE_FONT_KEY, document.body.dataset.font || appearanceOptions.fonts[0]);
+          window.localStorage.setItem(APPEARANCE_LAYOUT_KEY, document.body.dataset.layout || appearanceOptions.layouts[0]);
+        };
+        appearanceTheme.addEventListener("change", persistAndApplyAppearance);
+        appearanceFont.addEventListener("change", persistAndApplyAppearance);
+        appearanceLayout.addEventListener("change", persistAndApplyAppearance);
+      }
+
+      if (appearanceShuffle && appearanceTheme && appearanceFont && appearanceLayout) {
+        appearanceShuffle.addEventListener("click", () => {
+          const pick = (list) => list[Math.floor(Math.random() * list.length)];
+          appearanceTheme.value = pick(appearanceOptions.themes);
+          appearanceFont.value = pick(appearanceOptions.fonts);
+          appearanceLayout.value = pick(appearanceOptions.layouts);
+          appearanceTheme.dispatchEvent(new Event("change"));
         });
       }
 
@@ -2484,3 +3039,4 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
+

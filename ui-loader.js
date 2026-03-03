@@ -28,6 +28,7 @@
     });
 
   const scriptList = [
+    'settings-defaults.js',
     'data.js',
     'sandbox-unlocks.js',
     'stages-instructions.js',
