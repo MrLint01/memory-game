@@ -47,6 +47,7 @@
           modal.classList.add("show");
           modal.removeAttribute("aria-hidden");
           modal.removeAttribute("inert");
+          modal.removeAttribute("hidden");
         } else {
           if (document.activeElement && modal.contains(document.activeElement)) {
             document.activeElement.blur();
@@ -54,6 +55,7 @@
           modal.classList.remove("show");
           modal.setAttribute("aria-hidden", "true");
           modal.setAttribute("inert", "");
+          modal.setAttribute("hidden", "");
         }
       }
 
