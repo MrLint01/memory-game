@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Prepare Firestore log exports into analyzer-ready CSVs.
 
 Supported input styles:
@@ -156,11 +156,60 @@ def ensure_session_link(df: pd.DataFrame, sessions: pd.DataFrame) -> pd.DataFram
     return out
 
 
+def hydrate_from_sessions(df: pd.DataFrame, sessions: pd.DataFrame) -> pd.DataFrame:
+    """Fill missing release/host/referrer info on child rows from session rows."""
+    if df.empty or sessions.empty:
+        return df
+
+    out = normalize_columns(df).copy()
+    s = normalize_columns(sessions).copy()
+
+    if "session_id" in out.columns and "session_id" in s.columns:
+        session_meta = (
+            s.dropna(subset=["session_id"])
+            .drop_duplicates(subset=["session_id"])
+            .set_index("session_id")
+        )
+        for col in ("release_channel", "site_host", "referrer", "game_version"):
+            if col in session_meta.columns:
+                if col not in out.columns:
+                    out[col] = out["session_id"].map(session_meta[col])
+                else:
+                    fill_mask = out[col].isna() | (out[col].astype(str).str.strip() == "")
+                    out.loc[fill_mask, col] = out.loc[fill_mask, "session_id"].map(session_meta[col])
+    return out
+
+
 def write_csv(df: pd.DataFrame, path: Path) -> None:
     if df.empty:
         pd.DataFrame().to_csv(path, index=False)
         return
-    filtered_df = df[(df["release_channel"] == "github-pages")].copy()
+
+    release = (
+        df["release_channel"].astype(str).str.strip().str.lower()
+        if "release_channel" in df.columns
+        else pd.Series("", index=df.index, dtype="object")
+    )
+    site_host = (
+        df["site_host"].astype(str).str.strip().str.lower()
+        if "site_host" in df.columns
+        else pd.Series("", index=df.index, dtype="object")
+    )
+    referrer = (
+        df["referrer"].astype(str).str.strip().str.lower()
+        if "referrer" in df.columns
+        else pd.Series("", index=df.index, dtype="object")
+    )
+
+    is_gamejolt_channel = release == "gamejolt"
+    # Current Game Jolt embeds often report release_channel as "custom".
+    is_custom_channel = release == "custom"
+    is_custom_gamejolt = (release == "custom") & (
+        site_host.str.contains("gamejolt", na=False)
+        | referrer.str.contains("gamejolt", na=False)
+    )
+    filtered_df = df[is_gamejolt_channel | is_custom_gamejolt | is_custom_channel].copy()
+
     if "user_agent" in filtered_df.columns:
         filtered_df = filtered_df[~filtered_df["user_agent"].str.contains("IPhone|Android", case=False)]
     
@@ -206,6 +255,8 @@ def main() -> None:
 
     attempts = ensure_session_link(attempts, sessions)
     events = ensure_session_link(events, sessions)
+    attempts = hydrate_from_sessions(attempts, sessions)
+    events = hydrate_from_sessions(events, sessions)
 
     sessions_csv = args.outdir / "sessions.csv"
     attempts_csv = args.outdir / "attempts.csv"

@@ -1,0 +1,7 @@
+Flash Recall Logging Analysis
+================================
+retention_metric: attempts.time_seconds sum per player (strict gameplay-only)
+players_currently_playing_inferred: 0
+players_settled_for_quit_metrics: 0
+sandbox_players_percent: n/a
+sandbox_time_seconds_observed: n/a

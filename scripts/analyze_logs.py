@@ -742,9 +742,96 @@ def main() -> None:
         player_highest_completed = completed_levels
     if all_players:
         player_highest_completed = player_highest_completed.reindex(sorted(all_players)).fillna(0.0)
+
+    # Real-time adoption curve: cumulative unique players by first-seen timestamp.
+    # Uses the earliest available timestamp per player across sessions/attempts/events.
+    first_seen_parts: list[pd.DataFrame] = []
+    if sessions_player_col is not None and not sessions.empty:
+        s_ts = pd.Series(pd.NaT, index=sessions.index, dtype="datetime64[ns, UTC]")
+        for col in ["started_at", "created_at", "last_activity_at", "updated_at"]:
+            if col in sessions.columns:
+                s_ts = s_ts.combine_first(pd.to_datetime(sessions[col], utc=True, errors="coerce"))
+        s_part = pd.DataFrame(
+            {
+                "player_id_norm": sessions[sessions_player_col].astype(str),
+                "first_seen_ts": s_ts,
+            }
+        ).dropna(subset=["player_id_norm", "first_seen_ts"])
+        if not s_part.empty:
+            first_seen_parts.append(s_part)
+
+    if {"player_id_norm", "created_at"} <= set(attempts_with_player.columns):
+        a_part = pd.DataFrame(
+            {
+                "player_id_norm": attempts_with_player["player_id_norm"].astype(str),
+                "first_seen_ts": pd.to_datetime(attempts_with_player["created_at"], utc=True, errors="coerce"),
+            }
+        ).dropna(subset=["player_id_norm", "first_seen_ts"])
+        if not a_part.empty:
+            first_seen_parts.append(a_part)
+
+    events_player_col = pick_player_column(events) if not events.empty else None
+    if events_player_col is not None and not events.empty:
+        e_ts = pd.Series(pd.NaT, index=events.index, dtype="datetime64[ns, UTC]")
+        if "event_timestamp" in events.columns:
+            e_ts = e_ts.combine_first(pd.to_datetime(events["event_timestamp"], utc=True, errors="coerce"))
+        if "client_iso" in events.columns:
+            e_ts = e_ts.combine_first(pd.to_datetime(events["client_iso"], utc=True, errors="coerce"))
+        if "client_timestamp_ms" in events.columns:
+            e_ts = e_ts.combine_first(pd.to_datetime(pd.to_numeric(events["client_timestamp_ms"], errors="coerce"), unit="ms", utc=True, errors="coerce"))
+        e_part = pd.DataFrame(
+            {
+                "player_id_norm": events[events_player_col].astype(str),
+                "first_seen_ts": e_ts,
+            }
+        ).dropna(subset=["player_id_norm", "first_seen_ts"])
+        if not e_part.empty:
+            first_seen_parts.append(e_part)
+
+    if first_seen_parts:
+        first_seen = pd.concat(first_seen_parts, ignore_index=True)
+        first_seen["player_id_norm"] = first_seen["player_id_norm"].replace({"nan": pd.NA, "none": pd.NA, "null": pd.NA, "": pd.NA})
+        first_seen = first_seen.dropna(subset=["player_id_norm", "first_seen_ts"])
+        if not first_seen.empty:
+            player_first_seen = first_seen.groupby("player_id_norm")["first_seen_ts"].min().sort_values()
+            if not player_first_seen.empty:
+                cum_counts = pd.Series(
+                    np.arange(1, len(player_first_seen) + 1, dtype=int),
+                    index=player_first_seen.values,
+                )
+                plt.figure(figsize=(10, 5))
+                plt.step(cum_counts.index, cum_counts.values, where="post", color="#4e79a7")
+                plt.scatter(cum_counts.index, cum_counts.values, s=10, color="#4e79a7", alpha=0.7)
+                plt.title("Cumulative Unique Players Over Real Time")
+                plt.xlabel("Real Time (UTC)")
+                plt.ylabel("Total Unique Players")
+                plt.grid(True, alpha=0.25)
+                plt.tight_layout()
+                plt.savefig(args.outdir / "cumulative_unique_players_over_time.png", dpi=120)
+                plt.close()
+                summary.append(f"cumulative_players_points: {int(cum_counts.shape[0])}")
+                summary.append(f"cumulative_players_first_seen_utc: {player_first_seen.min().isoformat()}")
+                summary.append(f"cumulative_players_last_seen_utc: {player_first_seen.max().isoformat()}")
+
     currently_playing = infer_currently_playing_players(sessions)
     currently_playing = currently_playing.reindex(player_highest_completed.index).fillna(False).astype(bool)
     settled_players = player_highest_completed[~currently_playing]
+    player_levels_completed_count = pd.Series(dtype=float)
+    if {"player_id_norm", "level_number", "passed"} <= set(attempts_with_player.columns):
+        attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
+        completed_counts = (
+            attempts_with_player[
+                attempts_with_player["passed_flag"]
+                & attempts_with_player["player_id_norm"].notna()
+                & attempts_with_player["level_number"].notna()
+            ]
+            .groupby("player_id_norm")["level_number"]
+            .nunique()
+            .astype(float)
+        )
+        player_levels_completed_count = completed_counts
+    if not player_highest_completed.empty:
+        player_levels_completed_count = player_levels_completed_count.reindex(player_highest_completed.index).fillna(0.0)
 
     max_completed_level = int(player_highest_completed.max()) if not player_highest_completed.empty else 0
     level_index = pd.Index(range(1, max(1, max_completed_level) + 1), dtype=int)
@@ -769,6 +856,28 @@ def main() -> None:
         summary.append("retention_by_level_percent_player_completed:")
         for level, rate in retention_by_level_percent.items():
             summary.append(f"  level_{int(level)}: {rate:.2f}")
+
+    # Retention by number of levels completed (distinct passed levels per player).
+    if not player_levels_completed_count.empty:
+        max_completed_count = int(player_levels_completed_count.max()) if pd.notna(player_levels_completed_count.max()) else 0
+        completed_count_index = pd.Index(range(0, max(1, max_completed_count) + 1), dtype=int)
+        retention_by_completed_count_percent = pd.Series(
+            {
+                k: (player_levels_completed_count >= k).mean() * 100.0
+                for k in completed_count_index
+            },
+            index=completed_count_index,
+        )
+        save_line(
+            retention_by_completed_count_percent,
+            args.outdir / "retention_percent_by_levels_completed_count.png",
+            "Player Retention by Number of Levels Completed",
+            "Levels Completed (count)",
+            "Retention (%)",
+            (0, 100),
+        )
+        summary.append("retention_by_levels_completed_count_percent_player:")
+        summary.append(f"  max_levels_completed_count: {max_completed_count}")
 
     # New retention by time: player-based denominator.
     player_retention_seconds = pd.Series(dtype=float)
@@ -829,6 +938,16 @@ def main() -> None:
             bins=max(10, max_level + 1),
         )
         summary.append(f"unique_players_for_level_hist: {int(player_highest_completed.shape[0])}")
+    if not player_levels_completed_count.empty:
+        max_count = int(player_levels_completed_count.max()) if pd.notna(player_levels_completed_count.max()) else 10
+        save_hist_values(
+            player_levels_completed_count,
+            args.outdir / "levels_completed_count_hist.png",
+            "Number of Levels Completed Per Unique Player",
+            "Levels Completed (count)",
+            bins=max(10, max_count + 1),
+        )
+        summary.append(f"unique_players_for_levels_completed_count_hist: {int(player_levels_completed_count.shape[0])}")
 
     # Standardized quit distribution:
     # For settled players, not reaching L+1 is treated as quitting at L+1.
@@ -1143,6 +1262,134 @@ def main() -> None:
                 feat[acol] = pd.to_numeric(feat[acol], errors="coerce").fillna(0.0)
 
         feat.reset_index().to_csv(corr_dir / "early_retention_features.csv", index=False)
+
+        def save_two_group_retention_curve(
+            group_a_seconds: pd.Series,
+            group_b_seconds: pd.Series,
+            label_a: str,
+            label_b: str,
+            title: str,
+            filename: str,
+        ) -> None:
+            if group_a_seconds.empty or group_b_seconds.empty:
+                return
+            max_minutes = int(np.ceil(max(group_a_seconds.max(), group_b_seconds.max()) / 60.0))
+            minute_idx = pd.Index(range(0, max(1, max_minutes) + 1), dtype=int)
+            curve_a = pd.Series(
+                {m: (group_a_seconds >= (m * 60.0)).mean() * 100.0 for m in minute_idx},
+                index=minute_idx,
+            )
+            curve_b = pd.Series(
+                {m: (group_b_seconds >= (m * 60.0)).mean() * 100.0 for m in minute_idx},
+                index=minute_idx,
+            )
+            plt.figure(figsize=(10, 5))
+            plt.plot(curve_a.index, curve_a.values, marker="o", color="#e15759", label=label_a)
+            plt.plot(curve_b.index, curve_b.values, marker="o", color="#4e79a7", label=label_b)
+            plt.ylim(0, 100)
+            plt.xlabel("Gameplay time (minutes threshold)")
+            plt.ylabel("Retention (%)")
+            plt.title(title)
+            plt.legend()
+            plt.grid(True, alpha=0.25)
+            plt.tight_layout()
+            plt.savefig(corr_dir / filename, dpi=120)
+            plt.close()
+
+        # Baseline cohort comparison requested previously:
+        # Group A: failed level 1 on first try
+        # Group B: passed level 1 on first try
+        if "l1_failed_first_attempt" in feat.columns and "l1_first_attempt_succeeded" in feat.columns:
+            failed_l1_first_try = feat["l1_failed_first_attempt"] == True
+            passed_l1_first_try = feat["l1_first_attempt_succeeded"] == True
+            grp_failed = feat.loc[failed_l1_first_try, "retention_seconds"].dropna().astype(float)
+            grp_passed = feat.loc[passed_l1_first_try, "retention_seconds"].dropna().astype(float)
+
+            summary.append(f"cohort_l1_failed_first_try_players: {int(grp_failed.shape[0])}")
+            summary.append(f"cohort_l1_passed_first_try_players: {int(grp_passed.shape[0])}")
+
+            save_two_group_retention_curve(
+                grp_failed,
+                grp_passed,
+                "Failed L1 first try",
+                "Passed L1 first try",
+                "Retention by Time: L1 First-Try Outcome Cohorts",
+                "l1_first_try_retention_by_time_comparison.png",
+            )
+
+        # Generate cohort retention-by-time comparisons for all early-correlation features.
+        # For numeric factors (attempt counts/time), use explicit cutoffs and include them in titles.
+        feature_curve_dir = corr_dir / "feature_group_retention_curves"
+        feature_curve_dir.mkdir(parents=True, exist_ok=True)
+        generated_feature_curves = 0
+        for col in feat.columns:
+            if col == "retention_seconds":
+                continue
+            s_raw = feat[col]
+            s_num = pd.to_numeric(s_raw, errors="coerce")
+            if s_raw.dropna().empty:
+                continue
+
+            valid_bool_like = s_raw.dropna().map(
+                lambda v: str(v).strip().lower() in {"true", "false", "1", "0", "yes", "no", "y", "n", "t", "f"}
+            )
+            is_bool_like = (len(valid_bool_like) > 0) and bool(valid_bool_like.all())
+
+            group_a_mask: pd.Series | None = None
+            group_b_mask: pd.Series | None = None
+            label_a = ""
+            label_b = ""
+            title = ""
+
+            if is_bool_like:
+                b = s_raw.map(
+                    lambda v: True if str(v).strip().lower() in {"true", "1", "yes", "y", "t"} else (
+                        False if str(v).strip().lower() in {"false", "0", "no", "n", "f"} else np.nan
+                    )
+                )
+                group_a_mask = b == True
+                group_b_mask = b == False
+                label_a = f"{col}=true"
+                label_b = f"{col}=false"
+                title = f"Retention by Time: {col} (true vs false)"
+            elif s_num.notna().sum() >= 8:
+                if col.endswith("_attempts_before_first_completion"):
+                    cutoff = 1.0
+                    threshold_text = ">= 1"
+                elif col.endswith("_first_attempt_time"):
+                    cutoff = float(np.nanmedian(s_num.to_numpy(dtype=float)))
+                    threshold_text = f">= {cutoff:.1f}s"
+                else:
+                    cutoff = float(np.nanmedian(s_num.to_numpy(dtype=float)))
+                    threshold_text = f">= {cutoff:.2f}"
+
+                if not np.isfinite(cutoff):
+                    continue
+                group_a_mask = s_num >= cutoff
+                group_b_mask = s_num < cutoff
+                label_a = f"{col} {threshold_text}"
+                label_b = f"{col} < {threshold_text.replace('>= ', '')}"
+                title = f"Retention by Time: {col} cutoff {threshold_text}"
+            else:
+                continue
+
+            grp_a = feat.loc[group_a_mask.fillna(False), "retention_seconds"].dropna().astype(float)
+            grp_b = feat.loc[group_b_mask.fillna(False), "retention_seconds"].dropna().astype(float)
+            if grp_a.empty or grp_b.empty:
+                continue
+
+            filename_safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", col)
+            save_two_group_retention_curve(
+                grp_a,
+                grp_b,
+                f"{label_a} (n={len(grp_a)})",
+                f"{label_b} (n={len(grp_b)})",
+                title,
+                f"feature_group_retention_curves/{filename_safe}_retention_by_time.png",
+            )
+            generated_feature_curves += 1
+
+        summary.append(f"early_feature_group_retention_curves_generated: {generated_feature_curves}")
 
         corr_rows = []
         f2 = feat.copy()
