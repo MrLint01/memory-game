@@ -1208,7 +1208,9 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function buildItemKey(category, label) {
-        return `${String(category)}-${String(label)}`.toLowerCase();
+        const value = String(label || "").trim();
+        if (!value) return String(category || "").toLowerCase();
+        return value[0].toLowerCase();
       }
 
       function pickItems() {
