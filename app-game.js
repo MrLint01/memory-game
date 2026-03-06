@@ -504,14 +504,119 @@
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
               </button>
-              <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (${stageNextKey})">
-                <img class="action-icon" src="imgs/next_button.png" alt="" />
-                <span class="action-key-hint" aria-hidden="true">(${stageNextKey})</span>
-              </button>
+              <div class="stage-next-wrap">
+                <div class="stage-next-timer" aria-hidden="true">
+                  <span class="stage-next-timer__fill"></span>
+                </div>
+                <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (${stageNextKey})">
+                  <img class="action-icon" src="imgs/next_button.png" alt="" />
+                  <span class="action-key-hint" aria-hidden="true">(${stageNextKey})</span>
+                </button>
+              </div>
             </div>
           </div>
         `;
         resultsPanel.classList.add("show");
+
+        if (typeof window.maybePromptPlayerName === "function") {
+          window.maybePromptPlayerName();
+        }
+
+        const autoAdvanceDelayMs = 3000;
+        if (autoAdvanceNextTimerId) {
+          clearTimeout(autoAdvanceNextTimerId);
+          autoAdvanceNextTimerId = null;
+        }
+        const nextTimer = document.querySelector("#resultsPanel .stage-next-timer");
+        const nextTimerFill = nextTimer
+          ? nextTimer.querySelector(".stage-next-timer__fill")
+          : null;
+        const startAutoAdvanceNext = () => {
+          const autoAdvanceEnabledNow = typeof autoAdvanceNextEnabled === "undefined"
+            ? true
+            : autoAdvanceNextEnabled;
+          if (!autoAdvanceEnabledNow) {
+            if (nextTimer) {
+              nextTimer.classList.add("is-disabled");
+            }
+            return;
+          }
+          if (nextTimer) {
+            nextTimer.classList.remove("is-running");
+            nextTimer.classList.remove("is-canceled");
+            nextTimer.classList.remove("is-disabled");
+            nextTimer.classList.remove("is-waiting");
+          }
+          if (nextTimerFill) {
+            nextTimerFill.style.removeProperty("transition");
+            nextTimerFill.style.removeProperty("transition-duration");
+            nextTimerFill.style.removeProperty("transform");
+            nextTimerFill.style.transitionDuration = `${autoAdvanceDelayMs}ms`;
+          }
+          requestAnimationFrame(() => {
+            if (nextTimer) {
+              nextTimer.classList.add("is-running");
+            }
+          });
+          autoAdvanceNextTimerId = window.setTimeout(() => {
+            autoAdvanceNextTimerId = null;
+            const nextBtn = document.getElementById("stageNextButton");
+            const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+            if (nextBtn && stages[stageState.index + 1]) {
+              if (typeof window.setStageIntroAnimationMode === "function") {
+                window.setStageIntroAnimationMode("auto");
+              }
+              startStage(stageState.index + 1, { skipIntro: false, originEl: null });
+            }
+          }, autoAdvanceDelayMs);
+        };
+        const cancelAutoAdvanceNextFromResults = () => {
+          if (autoAdvanceNextTimerId) {
+            clearTimeout(autoAdvanceNextTimerId);
+            autoAdvanceNextTimerId = null;
+          }
+          if (nextTimer) {
+            nextTimer.classList.remove("is-running");
+            nextTimer.classList.remove("is-canceled");
+            nextTimer.classList.add("is-waiting");
+          }
+          if (nextTimerFill) {
+            nextTimerFill.style.removeProperty("transition");
+            nextTimerFill.style.removeProperty("transition-duration");
+            nextTimerFill.style.removeProperty("transform");
+          }
+        };
+        window.startAutoAdvanceNextFromResults = startAutoAdvanceNext;
+        window.cancelAutoAdvanceNextFromResults = cancelAutoAdvanceNextFromResults;
+        const autoAdvanceEnabled = typeof autoAdvanceNextEnabled === "undefined"
+          ? true
+          : autoAdvanceNextEnabled;
+        if (nextTimer) {
+          nextTimer.classList.toggle("is-disabled", !autoAdvanceEnabled);
+          if (!autoAdvanceEnabled) {
+            nextTimer.classList.remove("is-waiting");
+          }
+        }
+        if (autoAdvanceEnabled) {
+          const shouldDeferForName = typeof window.shouldPromptForPlayerName === "function"
+            ? window.shouldPromptForPlayerName()
+            : false;
+          const deferred = typeof window.deferAutoAdvanceNext === "function"
+            ? window.deferAutoAdvanceNext(startAutoAdvanceNext, shouldDeferForName)
+            : false;
+          if (deferred) {
+            if (nextTimer) {
+              nextTimer.classList.add("is-waiting");
+            }
+            if (nextTimerFill) {
+              nextTimerFill.style.removeProperty("transition");
+              nextTimerFill.style.removeProperty("transition-duration");
+              nextTimerFill.style.removeProperty("transform");
+            }
+          } else {
+            startAutoAdvanceNext();
+          }
+        }
 
         // Trigger bar fill animation after a short delay so the browser paints width:0 first
 
@@ -642,9 +747,6 @@
         //     });
         // }
 
-        if (typeof window.maybePromptPlayerName === "function") {
-          window.maybePromptPlayerName();
-        }
       }
 
       function lockInputs(locked) {
@@ -1133,6 +1235,19 @@
           roundItemsBase = roundItems.map((item) => ({ ...item }));
         } else {
           roundItems = roundItemsBase.map((item) => ({ ...item }));
+        }
+        if (advanceRound && gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (stage && stage.noRepeatAcrossRounds) {
+            lastRoundItems = roundItems.map((item) => ({
+              category: item.category,
+              label: item.label
+            }));
+            lastRoundStageId = stage.id;
+          } else {
+            lastRoundItems = null;
+            lastRoundStageId = null;
+          }
         }
         renderCards(true);
         renderInputs();

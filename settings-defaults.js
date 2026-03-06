@@ -21,6 +21,7 @@
     controls: {
       successAnimation: true,
       flashCountdown: true,
+      autoAdvanceNext: true,
       enterToNext: true,
       flashWarningEnabled: true
     },
@@ -34,7 +35,8 @@
       stageNext: "enter",
       stageQuit: "q",
       practiceHome: "h",
-      practiceSettings: "s"
+      practiceSettings: "s",
+      fullscreen: "f"
     },
     playerName: {
       value: ""
