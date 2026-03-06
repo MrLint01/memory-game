@@ -2472,6 +2472,7 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallSuccessAnimation");
           window.localStorage.removeItem("flashRecallFlashCountdown");
           window.localStorage.removeItem("flashRecallAutoAdvanceNext");
+          window.localStorage.removeItem("flashRecallEnterToNext");
           window.localStorage.removeItem(AUDIO_MASTER_KEY);
           window.localStorage.removeItem(AUDIO_MUSIC_KEY);
           window.localStorage.removeItem(AUDIO_EFFECTS_KEY);
@@ -2511,6 +2512,10 @@ function runFlashCountdown(onComplete) {
               autoAdvanceNextTimerId = null;
               cancelStageNextAutoAdvanceBar();
             }
+          }
+          if (enterToNextToggle) {
+            enterToNextToggle.checked = Boolean(defaultControlSettings.enterToNext);
+            enterToNextEnabled = enterToNextToggle.checked;
           }
           if (photosensitivityWarningToggle) {
             setFlashWarningEnabled(Boolean(defaultControlSettings.flashWarningEnabled), false);
@@ -3537,7 +3542,7 @@ function runFlashCountdown(onComplete) {
         } else if (phase === "recall") {
           const inputs = Array.from(inputGrid.querySelectorAll('input[data-index]'));
           const activeIndex = inputs.indexOf(document.activeElement);
-          if (activeIndex !== -1 && activeIndex < inputs.length - 1) {
+          if (enterToNextEnabled && activeIndex !== -1 && activeIndex < inputs.length - 1) {
             event.preventDefault();
             inputs[activeIndex + 1].focus();
             return;
@@ -3703,8 +3708,22 @@ function runFlashCountdown(onComplete) {
           setSuccessAnimationEnabled(successAnimationToggle.checked);
         });
       }
-      enterToNextEnabled = true;
-
+      if (enterToNextToggle) {
+        const storageKey = "flashRecallEnterToNext";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          enterToNextToggle.checked = saved === "1";
+        } else {
+          enterToNextToggle.checked = Boolean(defaultControlSettings.enterToNext);
+        }
+        enterToNextEnabled = enterToNextToggle.checked;
+        enterToNextToggle.addEventListener("change", () => {
+          enterToNextEnabled = enterToNextToggle.checked;
+          window.localStorage.setItem(storageKey, enterToNextEnabled ? "1" : "0");
+        });
+      } else {
+        enterToNextEnabled = Boolean(defaultControlSettings.enterToNext);
+      }
 
       if (flashCountdownToggle) {
         const storageKey = "flashRecallFlashCountdown";

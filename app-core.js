@@ -90,6 +90,7 @@ const revealInput = document.getElementById("revealTime");
       const keybindFullscreen = document.getElementById("keybindFullscreen");
       const keybindResetDefaults = document.getElementById("keybindResetDefaults");
       const flashCountdownToggle = document.getElementById("flashCountdownToggle");
+      const enterToNextToggle = document.getElementById("enterToNextToggle");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
       const flashStageModal = document.getElementById("flashStageModal");
