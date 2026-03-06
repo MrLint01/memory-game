@@ -44,18 +44,54 @@
       function setModalState(modal, open) {
         if (!modal) return;
         if (open) {
-          modal.classList.add("show");
           modal.removeAttribute("aria-hidden");
           modal.removeAttribute("inert");
           modal.removeAttribute("hidden");
+          if (modal.__closeTimer) {
+            clearTimeout(modal.__closeTimer);
+            modal.__closeTimer = null;
+          }
+          if (modal.dataset.closing === "true") {
+            delete modal.dataset.closing;
+          }
+          if (modal.classList.contains("closing")) {
+            modal.classList.remove("closing");
+          }
+          if (!modal.classList.contains("show")) {
+            // Ensure transitions fire after un-hiding.
+            modal.classList.remove("show");
+            void modal.offsetWidth;
+            modal.classList.add("show");
+          }
         } else {
           if (document.activeElement && modal.contains(document.activeElement)) {
             document.activeElement.blur();
           }
-          modal.classList.remove("show");
           modal.setAttribute("aria-hidden", "true");
           modal.setAttribute("inert", "");
-          modal.setAttribute("hidden", "");
+          if (modal.hasAttribute("hidden") || modal.dataset.closing === "true") {
+            return;
+          }
+          modal.dataset.closing = "true";
+          modal.classList.add("closing");
+          const finishClose = () => {
+            if (modal.dataset.closing !== "true") return;
+            delete modal.dataset.closing;
+            modal.classList.remove("closing");
+            modal.classList.remove("show");
+            modal.setAttribute("hidden", "");
+            modal.removeEventListener("transitionend", onCloseEnd);
+            if (modal.__closeTimer) {
+              clearTimeout(modal.__closeTimer);
+              modal.__closeTimer = null;
+            }
+          };
+          const onCloseEnd = (event) => {
+            if (event.target !== modal) return;
+            finishClose();
+          };
+          modal.addEventListener("transitionend", onCloseEnd);
+          modal.__closeTimer = setTimeout(finishClose, 260);
         }
       }
 

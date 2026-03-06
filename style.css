@@ -2634,10 +2634,18 @@ body.pause-active .interrupt-card,
 body.pause-active .interrupt-close {
   border-width: 1px;
 }
+      .modal.closing {
+        visibility: visible;
+        pointer-events: none;
+      }
       .modal.show {
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
+      }
+      .modal.show.closing {
+        opacity: 0;
+        pointer-events: none;
       }
 #stageIntroModal {
   transition: opacity 320ms ease;
