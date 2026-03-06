@@ -98,6 +98,7 @@ const revealInput = document.getElementById("revealTime");
       const flashCountdown = document.getElementById("flashCountdown");
       const flashStageSkip = document.getElementById("flashStageSkip");
       const autoAdvanceNextToggle = document.getElementById("autoAdvanceNextToggle");
+      const leaderboardsEnabledToggle = document.getElementById("leaderboardsEnabledToggle");
       const stageIntroModal = document.getElementById("stageIntroModal");
       const stageIntroTitle = document.getElementById("stageIntroTitle");
       const stageIntroSubtitle = document.getElementById("stageIntroSubtitle");
@@ -1223,6 +1224,8 @@ const revealInput = document.getElementById("revealTime");
           gameMode === "stages" && window.getStageCardCounts
             ? window.getStageCardCounts(stage)
             : null;
+        const uniqueCardTypesPerRound =
+          gameMode === "stages" && stage && stage.uniqueCardTypesPerRound === true;
         let categories = getActiveCategories(round);
         let forcedCategory = null;
         if (gameMode === "stages" && stage && Number(stage.rounds) > 1) {
@@ -1290,6 +1293,12 @@ const revealInput = document.getElementById("revealTime");
             : null;
         const chosen = [];
         const used = new Set();
+        const usedCategories = new Set();
+        const noteCategoryUsed = (category) => {
+          if (uniqueCardTypesPerRound) {
+            usedCategories.add(category);
+          }
+        };
         const findFixedItem = (category, label) => {
           const list = dataSets[category];
           if (!Array.isArray(list) || !list.length) {
@@ -1309,24 +1318,32 @@ const revealInput = document.getElementById("revealTime");
         const pickFromCategory = (category) => {
           const list = dataSets[category];
           if (!Array.isArray(list) || !list.length) return false;
-          const rawItem = list[Math.floor(Math.random() * list.length)];
-          const item = typeof rawItem === "string" ? { label: rawItem } : rawItem;
-          const key = `${category}-${item.label}`.toLowerCase();
-          if (!allowDuplicates) {
-            if (used.has(key)) return false;
-            used.add(key);
+          if (uniqueCardTypesPerRound && usedCategories.has(category)) return false;
+          const maxAttempts = Math.min(10, list.length);
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const rawItem = list[Math.floor(Math.random() * list.length)];
+            const item = typeof rawItem === "string" ? { label: rawItem } : rawItem;
+            const key = `${category}-${item.label}`.toLowerCase();
+            if (!allowDuplicates && used.has(key)) continue;
+            if (!allowDuplicates) {
+              used.add(key);
+            }
+            chosen.push({ ...item, category });
+            noteCategoryUsed(category);
+            return true;
           }
-          chosen.push({ ...item, category });
-          return true;
+          return false;
         };
         if (fixedCards && fixedCards.length) {
           fixedCards.slice(0, targetCount).forEach((entry) => {
             if (!entry || typeof entry.category !== "string" || typeof entry.label !== "string") return;
             const item = findFixedItem(entry.category, entry.label);
             const key = `${entry.category}-${item.label}`.toLowerCase();
+            if (uniqueCardTypesPerRound && usedCategories.has(entry.category)) return;
             if (!allowDuplicates && used.has(key)) return;
             used.add(key);
             chosen.push({ ...item, category: entry.category });
+            noteCategoryUsed(entry.category);
           });
         }
         if (cardCounts && typeof cardCounts === "object") {
@@ -1341,9 +1358,27 @@ const revealInput = document.getElementById("revealTime");
             }
           });
         }
+        let remainingUniqueCategories = null;
+        if (uniqueCardTypesPerRound) {
+          remainingUniqueCategories = shuffleArray(
+            categories.filter((category) => !usedCategories.has(category))
+          );
+        }
+        let fillGuard = 0;
+        const maxFillGuard = 200;
         while (chosen.length < targetCount) {
-          const category = categories[Math.floor(Math.random() * categories.length)];
-          pickFromCategory(category);
+          if (fillGuard >= maxFillGuard) break;
+          const category = uniqueCardTypesPerRound &&
+            remainingUniqueCategories &&
+            remainingUniqueCategories.length
+            ? remainingUniqueCategories.pop()
+            : categories[Math.floor(Math.random() * categories.length)];
+          const picked = pickFromCategory(category);
+          if (!picked) {
+            fillGuard += 1;
+            continue;
+          }
+          fillGuard = 0;
         }
         const canShuffle = !fixedCards || !fixedCards.length;
         if (canShuffle) {

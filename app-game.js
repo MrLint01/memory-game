@@ -558,7 +558,7 @@
           window.maybePromptPlayerName();
         }
 
-        const autoAdvanceDelayMs = 3000;
+        const autoAdvanceDelayMs = 4500;
         if (autoAdvanceNextTimerId) {
           clearTimeout(autoAdvanceNextTimerId);
           autoAdvanceNextTimerId = null;

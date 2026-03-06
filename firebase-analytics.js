@@ -50,6 +50,7 @@ const releaseChannel = window.FLASH_RECALL_RELEASE_CHANNEL || deriveReleaseChann
 const leaderboardSyncKey = `flashRecallLeaderboardSynced_${gameVersion}`;
 const LEADERBOARD_READ_LIMIT = 5000;
 const leaderboardReadBudgetKey = `flashRecallLeaderboardReadBudget_${playerId}`;
+const LEADERBOARDS_ENABLED_KEY = "flashRecallLeaderboardsEnabled";
 const leaderboardSessionCache = new Map();
 const statsLeaderboardSessionCache = new Map();
 const STATS_LEADERBOARD_CACHE_TTL_MS = 60 * 1000;
@@ -90,6 +91,16 @@ function incrementLeaderboardReads(count) {
     leaderboardReadBudget.blocked = true;
   }
   saveLeaderboardReadBudget();
+}
+
+function areLeaderboardsEnabled() {
+  try {
+    const raw = window.localStorage.getItem(LEADERBOARDS_ENABLED_KEY);
+    if (raw === null) return true;
+    return raw === "1";
+  } catch (error) {
+    return true;
+  }
 }
 
 function getLeaderboardCacheKey(stageId, stageVersion) {
@@ -243,6 +254,7 @@ function getStageLeaderboardPath(stageId, stageVersion) {
 
 async function fetchLeaderboardDoc(path, id) {
   if (!firebaseDb) return null;
+  if (!areLeaderboardsEnabled()) return null;
   if (leaderboardReadBudget.blocked || remainingLeaderboardReads() < 1) {
     leaderboardReadBudget.blocked = true;
     saveLeaderboardReadBudget();
@@ -263,6 +275,7 @@ async function fetchLeaderboardDoc(path, id) {
 
 async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, playerName) {
   if (!firebaseDb || !currentUserId) return;
+  if (!areLeaderboardsEnabled()) return;
   const bestTimeMs = Number.isFinite(timeSeconds) ? Math.round(timeSeconds * 1000) : null;
   if (!Number.isFinite(bestTimeMs)) return;
   const path = getStageLeaderboardPath(stageId, stageVersion);
@@ -333,6 +346,12 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
 // window.getStageTotalPlayers = getStageTotalPlayers;
 
 async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
+  if (!areLeaderboardsEnabled()) {
+    return getDefaultLeaderboardResult({
+      errorCode: "disabled",
+      errorMessage: "Leaderboards disabled in settings."
+    });
+  }
   if (!firebaseDb) {
     return getDefaultLeaderboardResult({
       errorCode: "not_ready",
@@ -405,6 +424,7 @@ async function ensureStageLeaderboardSessionCache(stageId, stageVersion) {
 
 async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, playerName) {
   if (!firebaseDb || !currentUserId) return;
+  if (!areLeaderboardsEnabled()) return;
   const safeStagesCleared = Math.max(0, Number(stagesCleared) || 0);
   const safeStarsEarned = Math.max(0, Number(starsEarned) || 0);
   const payload = {
@@ -430,6 +450,12 @@ async function fetchProgressLeaderboard(metric, limit = 5, options = {}) {
     return getDefaultStatsLeaderboardResult({
       errorCode: "invalid_metric",
       errorMessage: "Invalid leaderboard metric."
+    });
+  }
+  if (!areLeaderboardsEnabled()) {
+    return getDefaultStatsLeaderboardResult({
+      errorCode: "disabled",
+      errorMessage: "Leaderboards disabled in settings."
     });
   }
   if (!firebaseDb) {
@@ -511,6 +537,7 @@ async function fetchProgressLeaderboard(metric, limit = 5, options = {}) {
 
 async function syncLocalBestTimesOnce(force = false) {
   if (!firebaseDb || !currentUserId) return;
+  if (!areLeaderboardsEnabled()) return;
   try {
     if (!force && window.localStorage.getItem(leaderboardSyncKey) === "1") return;
     const bestTimes = window.stageBestTimes || {};
@@ -533,6 +560,9 @@ async function syncLocalBestTimesOnce(force = false) {
 
 async function getPlayerRankAndPercentile(stageId, stageVersion, playerTimeMs) {
   if (!firebaseDb || !Number.isFinite(playerTimeMs)) {
+    return null;
+  }
+  if (!areLeaderboardsEnabled()) {
     return null;
   }
 
@@ -577,6 +607,7 @@ window.getPlayerRankAndPercentile = getPlayerRankAndPercentile;
 
 async function deactivateLocalLeaderboardEntries(bestTimesOverride = null) {
   if (!firebaseDb || !currentUserId) return;
+  if (!areLeaderboardsEnabled()) return;
   try {
     const bestTimes = bestTimesOverride || window.stageBestTimes || {};
     const writes = [];

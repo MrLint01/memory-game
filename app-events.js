@@ -30,6 +30,7 @@
       const AUDIO_MUSIC_KEY = "flashRecallAudioMusicVolume";
       const AUDIO_EFFECTS_KEY = "flashRecallAudioEffectsVolume";
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
+      const LEADERBOARDS_ENABLED_STORAGE_KEY = "flashRecallLeaderboardsEnabled";
       const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
       const settingsDefaults = typeof window.getFlashRecallSettingsDefaults === "function"
         ? window.getFlashRecallSettingsDefaults()
@@ -500,6 +501,7 @@
           return;
         }
         splashStartListener = (event) => {
+          if (document.body.classList.contains("loading-overlay") || document.body.dataset.view === "loading") return;
           if (document.body.dataset.view !== "splash") return;
           window.removeEventListener("keydown", splashStartListener);
           window.removeEventListener("pointerdown", splashStartListener);
@@ -776,14 +778,22 @@
       let tabTutorialDisabledInputs = [];
       let tabTutorialHintEl = null;
       let tabTutorialHintTimeout = null;
-      const tabTutorialStageIds = new Set([2, 3]);
+      const isTabTutorialEnabledForStage = (stage) => stage && stage.tabTutorialEnabled === true;
       let firstLetterHintCooldown = 0;
       let firstLetterHintEl = null;
       let firstLetterHintTimeout = null;
-      const firstLetterHintStageMessages = {
+      const legacyFirstLetterHintMessages = {
         5: "FIRST LETTER\n(Triangle -> T, Circle -> C, Square -> S)",
         6: "FIRST LETTER\n(Right -> R, Left -> L, Up -> U, ...)",
         7: "FIRST LETTER\n(White -> W, Red -> R, Blue -> B, ...)"
+      };
+      const getFirstLetterHintMessage = (stage) => {
+        if (!stage) return "";
+        if (stage.firstLetterHintEnabled === false) return "";
+        if (typeof stage.firstLetterHintMessage === "string" && stage.firstLetterHintMessage.trim()) {
+          return stage.firstLetterHintMessage;
+        }
+        return legacyFirstLetterHintMessages[stage.id] || "";
       };
       let stageListAnimTimeout = null;
       let stageListStarTimeout = null;
@@ -792,6 +802,7 @@
       let stageListSkipListener = null;
       let flashCountdownEnabled = true;
       let enterToNextEnabled = true;
+      let leaderboardsEnabled = true;
       let stageStarShineInterval = null;
       
 
@@ -2180,29 +2191,28 @@ function runFlashCountdown(onComplete) {
           inputs[nextIndex].focus();
         });
         inputGrid.addEventListener("input", (event) => {
-          if (tabTutorialActive) return;
           if (gameMode !== "stages" || phase !== "recall") return;
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (!stage) return;
-          if (tabTutorialStageIds.has(stage.id)) {
-            if (tabTutorialShownRound === round) return;
-            const input = event.target && event.target.closest('input[data-index="0"]');
-            if (!input || !input.value) return;
-            tabTutorialShownRound = round;
-            tabTutorialActive = enterToNextEnabled ? false : true;
-            if (!enterToNextEnabled) { 
-              tabTutorialDisabledInputs = [];
-              inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
-                const idx = Number(field.dataset.index);
-                if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
-                  field.disabled = true;
-                  tabTutorialDisabledInputs.push(field);
-                }
-              });
+          const hintMessage = getFirstLetterHintMessage(stage);
+          if (tabTutorialActive && !hintMessage) return;
+          if (isTabTutorialEnabledForStage(stage) && !enterToNextEnabled) {
+            if (tabTutorialShownRound !== round) {
+              const input = event.target && event.target.closest('input[data-index="0"]');
+              if (input && input.value) {
+                tabTutorialShownRound = round;
+                tabTutorialActive = true;
+                tabTutorialDisabledInputs = [];
+                inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
+                  const idx = Number(field.dataset.index);
+                  if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
+                    field.disabled = true;
+                    tabTutorialDisabledInputs.push(field);
+                  }
+                });
+              }
             }
-            return;
           }
-          const hintMessage = firstLetterHintStageMessages[stage.id];
           if (!hintMessage) return;
           const targetInput = event.target && event.target.closest('input[data-index]');
           if (!targetInput) return;
@@ -2473,6 +2483,7 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallFlashCountdown");
           window.localStorage.removeItem("flashRecallAutoAdvanceNext");
           window.localStorage.removeItem("flashRecallEnterToNext");
+          window.localStorage.removeItem(LEADERBOARDS_ENABLED_STORAGE_KEY);
           window.localStorage.removeItem(AUDIO_MASTER_KEY);
           window.localStorage.removeItem(AUDIO_MUSIC_KEY);
           window.localStorage.removeItem(AUDIO_EFFECTS_KEY);
@@ -2519,6 +2530,10 @@ function runFlashCountdown(onComplete) {
           }
           if (photosensitivityWarningToggle) {
             setFlashWarningEnabled(Boolean(defaultControlSettings.flashWarningEnabled), false);
+          }
+          if (leaderboardsEnabledToggle) {
+            leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
+            leaderboardsEnabled = leaderboardsEnabledToggle.checked;
           }
           applyAudioSettings(defaultAudioSettings, false);
           keybinds = { ...defaultKeybinds };
@@ -3764,6 +3779,26 @@ function runFlashCountdown(onComplete) {
         });
       } else {
         autoAdvanceNextEnabled = Boolean(defaultControlSettings.autoAdvanceNext);
+      }
+
+      if (leaderboardsEnabledToggle) {
+        const storageKey = LEADERBOARDS_ENABLED_STORAGE_KEY;
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          leaderboardsEnabledToggle.checked = saved === "1";
+        } else {
+          leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
+        }
+        leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+        leaderboardsEnabledToggle.addEventListener("change", () => {
+          leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+          window.localStorage.setItem(storageKey, leaderboardsEnabled ? "1" : "0");
+          if (typeof window.refreshVisibleLeaderboards === "function") {
+            window.refreshVisibleLeaderboards();
+          }
+        });
+      } else {
+        leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
       }
 
       if (appearanceTheme && appearanceFont) {

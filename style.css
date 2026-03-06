@@ -1733,7 +1733,7 @@ body.pause-active .card * {
         text-transform: uppercase;
         opacity: 0;
         pointer-events: none;
-        z-index: 5;
+        z-index: 12;
       }
       .success-toast.show {
         animation: success-pop 0.9s ease;

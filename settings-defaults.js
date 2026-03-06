@@ -22,8 +22,9 @@
       successAnimation: true,
       flashCountdown: true,
       autoAdvanceNext: true,
-      enterToNext: true,
-      flashWarningEnabled: true
+      enterToNext: false,
+      flashWarningEnabled: true,
+      leaderboardsEnabled: true
     },
     audio: {
       master: 100,
