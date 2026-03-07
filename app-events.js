@@ -383,9 +383,11 @@
         setModalState(playerNameModal, false);
         clearPlayerNameDelay();
         playerNameModalOpening = false;
+        refreshResultAutoActionCountdown();
       }
 
       function openPlayerNameModal() {
+        clearResultAutoActionCountdown();
         playerNameModalOpening = true;
         window.setTimeout(() => {
           playerNameModalOpening = false;
@@ -527,6 +529,7 @@
           cancelSuccessAnimation();
         }
         clearFlashCountdown();
+        clearResultAutoActionCountdown();
         if (typeof window.clearPreviousRoundItems === "function") {
           window.clearPreviousRoundItems();
         }
@@ -580,6 +583,7 @@
           cancelSuccessAnimation();
         }
         clearFlashCountdown();
+        clearResultAutoActionCountdown();
         if (typeof window.clearPreviousRoundItems === "function") {
           window.clearPreviousRoundItems();
         }
@@ -711,6 +715,8 @@
       let flashCountdownEnabled = true;
       let enterToNextEnabled = true;
       let stageStarShineInterval = null;
+      let resultAutoActionTimers = [];
+      const RESULT_AUTO_ACTION_SECONDS = 3;
       
 
       function applyStageIntroOrigin(originEl) {
@@ -820,6 +826,91 @@ function runFlashCountdown(onComplete) {
       }
 
       window.startFlashRound = startFlashRound;
+
+      function clearResultAutoActionCountdown() {
+        resultAutoActionTimers.forEach((timerId) => clearTimeout(timerId));
+        resultAutoActionTimers = [];
+        document
+          .querySelectorAll("#stageRetryButton, #stageNextButton")
+          .forEach((button) => {
+            if (!button) return;
+            button.classList.remove("is-auto-target");
+            const badge = button.querySelector(".action-countdown");
+            if (badge) {
+              badge.textContent = "";
+            }
+          });
+      }
+
+      function getResultAutoActionButton(kind) {
+        if (kind === "retry") {
+          return document.getElementById("stageRetryButton");
+        }
+        if (kind === "next") {
+          return document.getElementById("stageNextButton");
+        }
+        return null;
+      }
+
+      function setResultAutoActionBadge(kind, remainingSeconds) {
+        const button = getResultAutoActionButton(kind);
+        if (!button) return;
+        const badge = button.querySelector(".action-countdown");
+        if (!badge) return;
+        const actionLabel = kind === "retry" ? "Retry" : "Next";
+        button.classList.add("is-auto-target");
+        badge.textContent = `${actionLabel} in ${remainingSeconds}`;
+      }
+
+      function runResultAutoAction(kind) {
+        clearResultAutoActionCountdown();
+        if (phase !== "result" || gameMode !== "stages") return;
+        if (kind === "retry") {
+          startStage(stageState.index, { skipIntro: true });
+          return;
+        }
+        if (kind === "next") {
+          const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+          const nextIndex = stageState.index + 1;
+          if (!stages[nextIndex]) return;
+          startStage(nextIndex, { skipIntro: false });
+        }
+      }
+
+      function startResultAutoActionCountdown(kind, seconds = RESULT_AUTO_ACTION_SECONDS) {
+        const button = getResultAutoActionButton(kind);
+        if (!button) return;
+        clearResultAutoActionCountdown();
+        for (let remaining = seconds; remaining >= 1; remaining -= 1) {
+          const timerId = window.setTimeout(() => {
+            setResultAutoActionBadge(kind, remaining);
+          }, (seconds - remaining) * 1000);
+          resultAutoActionTimers.push(timerId);
+        }
+        const finishId = window.setTimeout(() => {
+          runResultAutoAction(kind);
+        }, seconds * 1000);
+        resultAutoActionTimers.push(finishId);
+      }
+
+      function refreshResultAutoActionCountdown() {
+        clearResultAutoActionCountdown();
+        if (phase !== "result" || gameMode !== "stages") return;
+        if (playerNamePromptDelayActive || playerNameModalOpening) return;
+        if (playerNameModal && playerNameModal.classList.contains("show")) return;
+        if (stageState.failed) {
+          startResultAutoActionCountdown("retry");
+          return;
+        }
+        if (!stageState.completed) return;
+        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        if (stages[stageState.index + 1]) {
+          startResultAutoActionCountdown("next");
+        }
+      }
+
+      window.clearResultAutoActionCountdown = clearResultAutoActionCountdown;
+      window.refreshResultAutoActionCountdown = refreshResultAutoActionCountdown;
 
       function openFlashStagePrompt(index) {
         if (!flashWarningEnabled) {
@@ -1309,6 +1400,7 @@ function runFlashCountdown(onComplete) {
       }
 
       function openStagesScreen(animate = false) {
+        clearResultAutoActionCountdown();
         if (stagesScreen) {
           stagesScreen.classList.remove("stages-anim");
           if (animate) {
@@ -1329,6 +1421,7 @@ function runFlashCountdown(onComplete) {
           clearInterval(stageStarShineInterval);
           stageStarShineInterval = null;
         }
+        clearResultAutoActionCountdown();
         if (stagesScreen) {
           stagesScreen.setAttribute("aria-hidden", "true");
         }
@@ -1433,6 +1526,7 @@ function runFlashCountdown(onComplete) {
         clearTabKeyHint();
         clearFirstLetterHint();
         clearFlashCountdown();
+        clearResultAutoActionCountdown();
         const stage = window.getStageConfig ? window.getStageConfig(index) : null;
         const isFlashStage = stage && String(stage.stageType).toLowerCase() === "flash";
         if (isFlashStage && flashWarningEnabled && !skipFlashWarningPrompt && skipIntro) {
@@ -1491,7 +1585,9 @@ function runFlashCountdown(onComplete) {
           : Promise.resolve();
         await Promise.all([minimumDelay, fontsReady]).catch(() => {});
         closeSplashLoading();
-        startStage(0, { skipIntro: true });
+        runFlashCountdown(() => {
+          startStage(0, { skipIntro: true });
+        });
       }
 
       practiceStart.addEventListener("click", () => {
@@ -2893,6 +2989,7 @@ function runFlashCountdown(onComplete) {
       }
 
       function handleResultActionClick(event) {
+        clearResultAutoActionCountdown();
         const menuButton = event.target.closest("#stageMenuButton, #stageBackButton");
         if (menuButton) {
           // Analytics: Track level quit via back button

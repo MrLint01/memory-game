@@ -328,8 +328,9 @@
                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(${menuKey})</span>
                </button>
-               <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
+               <button id="stageRetryButton" class="secondary icon-button button-entice" type="button" aria-label="Retry (${retryKey})">
                  <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                 <span class="action-countdown" aria-live="polite"></span>
                  <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
                </button>`
             : `<button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
@@ -500,12 +501,14 @@
                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
                 <span class="action-key-hint" aria-hidden="true">(${stageQuitKey})</span>
               </button>
-              <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
+              <button id="stageRetryButton" class="secondary icon-button button-entice" type="button" aria-label="Retry (${retryKey})">
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                <span class="action-countdown" aria-live="polite"></span>
                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
               </button>
-              <button id="stageNextButton" class="secondary icon-button" type="button" aria-label="Next (${stageNextKey})">
+              <button id="stageNextButton" class="secondary icon-button button-entice" type="button" aria-label="Next (${stageNextKey})">
                 <img class="action-icon" src="imgs/next_button.png" alt="" />
+                <span class="action-countdown" aria-live="polite"></span>
                 <span class="action-key-hint" aria-hidden="true">(${stageNextKey})</span>
               </button>
             </div>
@@ -644,6 +647,12 @@
 
         if (typeof window.maybePromptPlayerName === "function") {
           window.maybePromptPlayerName();
+        }
+      }
+
+      function refreshResultAutoActionCountdown() {
+        if (typeof window.refreshResultAutoActionCountdown === "function") {
+          window.refreshResultAutoActionCountdown();
         }
       }
 
@@ -815,6 +824,7 @@
                 nextBtn.textContent = "Back to stages";
               }
               setPhase("Stage complete", "result");
+              refreshResultAutoActionCountdown();
               updateScore();
               return;
             }
@@ -883,6 +893,7 @@
             trackLevelSession(stageState.index, false, 0, failedElapsedSeconds, entries, "level_end", activeContext || {});
           }
           setPhase("Round complete", "result");
+          refreshResultAutoActionCountdown();
           updateScore();
           return;
         }
@@ -910,6 +921,7 @@
           }
           streak = 0;
           setPhase("Round complete", "result");
+          refreshResultAutoActionCountdown();
           updateScore();
           return;
         }
@@ -937,6 +949,7 @@
         }
         streak = 0;
         setPhase("Round complete", "result");
+        refreshResultAutoActionCountdown();
         updateScore();
       }
 
@@ -1011,6 +1024,7 @@
             showReviewFailure(entries, "practice");
           }
           setPhase("Round complete", "result");
+          refreshResultAutoActionCountdown();
           updateScore();
           updatePlatformerVisibility(false);
           return;

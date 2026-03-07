@@ -1305,6 +1305,61 @@ body.stage-fail .stage-fail-actions .icon-button {
 body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button {
   position: relative;
 }
+body.stage-fail .stage-fail-actions .icon-button.button-entice,
+body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button.button-entice {
+  transform-origin: 50% 85%;
+  animation: resultButtonWiggle 2.8s ease-in-out infinite;
+}
+body.stage-fail .stage-fail-actions .action-countdown,
+body[data-state="result"] #resultsPanel .stage-complete__actions .action-countdown {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.35rem);
+  transform: translateX(-50%);
+  min-width: max-content;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.9);
+  color: #f8fafc;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
+  z-index: 2;
+}
+body.stage-fail .stage-fail-actions .icon-button.is-auto-target .action-countdown,
+body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button.is-auto-target .action-countdown {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+@keyframes resultButtonWiggle {
+  0%,
+  78%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  82% {
+    transform: rotate(-6deg) scale(1.04);
+  }
+  86% {
+    transform: rotate(6deg) scale(1.04);
+  }
+  90% {
+    transform: rotate(-4deg) scale(1.02);
+  }
+  94% {
+    transform: rotate(4deg) scale(1.02);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.stage-fail .stage-fail-actions .icon-button.button-entice,
+  body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button.button-entice {
+    animation: none;
+  }
+}
 .tab-key-hint {
   position: fixed;
   z-index: 9;

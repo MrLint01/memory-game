@@ -17,8 +17,7 @@ service cloud.firestore {
     }
 
     match /leaderboards/{stageId}/versions/{versionId}/entries/{playerId} {
-      allow read: if request.auth != null
-        && (request.query == null || request.query.limit == null || request.query.limit <= 250);
+      allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.player_id == playerId
         && request.resource.data.auth_uid == request.auth.uid;
@@ -30,8 +29,7 @@ service cloud.firestore {
     }
 
     match /leaderboards_global/progress/entries/{playerId} {
-      allow read: if request.auth != null
-        && (request.query == null || request.query.limit == null || request.query.limit <= 250);
+      allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.player_id == playerId
         && request.resource.data.auth_uid == request.auth.uid;

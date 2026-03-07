@@ -48,7 +48,6 @@ const gameVersion = window.FLASH_RECALL_VERSION || "dev";
 const releaseChannel = window.FLASH_RECALL_RELEASE_CHANNEL || deriveReleaseChannel();
 
 const leaderboardSyncKey = `flashRecallLeaderboardSynced_${gameVersion}`;
-const LEADERBOARD_READ_LIMIT = 5000;
 const leaderboardReadBudgetKey = `flashRecallLeaderboardReadBudget_${playerId}`;
 const leaderboardSessionCache = new Map();
 const statsLeaderboardSessionCache = new Map();
@@ -57,39 +56,22 @@ const PROGRESS_LEADERBOARD_PATH = "leaderboards_global/progress/entries";
 let leaderboardReadBudget = { totalReads: 0, blocked: false };
 
 function loadLeaderboardReadBudget() {
-  try {
-    const raw = window.localStorage.getItem(leaderboardReadBudgetKey);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    const totalReads = Number(parsed && parsed.totalReads);
-    leaderboardReadBudget.totalReads = Number.isFinite(totalReads) && totalReads > 0 ? Math.floor(totalReads) : 0;
-    leaderboardReadBudget.blocked =
-      Boolean(parsed && parsed.blocked) || leaderboardReadBudget.totalReads >= LEADERBOARD_READ_LIMIT;
-  } catch (error) {
-    leaderboardReadBudget = { totalReads: 0, blocked: false };
-  }
+  leaderboardReadBudget = { totalReads: 0, blocked: false };
 }
 
 function saveLeaderboardReadBudget() {
-  try {
-    window.localStorage.setItem(leaderboardReadBudgetKey, JSON.stringify(leaderboardReadBudget));
-  } catch (error) {
-    // ignore storage failures
-  }
+  leaderboardReadBudget.blocked = false;
 }
 
 function remainingLeaderboardReads() {
-  return Math.max(0, LEADERBOARD_READ_LIMIT - (Number(leaderboardReadBudget.totalReads) || 0));
+  return Number.POSITIVE_INFINITY;
 }
 
 function incrementLeaderboardReads(count) {
   const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
   if (!safeCount) return;
   leaderboardReadBudget.totalReads = (Number(leaderboardReadBudget.totalReads) || 0) + safeCount;
-  if (leaderboardReadBudget.totalReads >= LEADERBOARD_READ_LIMIT) {
-    leaderboardReadBudget.blocked = true;
-  }
-  saveLeaderboardReadBudget();
+  leaderboardReadBudget.blocked = false;
 }
 
 function getLeaderboardCacheKey(stageId, stageVersion) {
@@ -1272,9 +1254,9 @@ window.getLeaderboardReady = () => Boolean(firebaseDb && currentUserId);
 window.getLeaderboardPlayerId = () => playerId;
 window.getLeaderboardReadBudgetStatus = () => ({
   totalReads: Number(leaderboardReadBudget.totalReads) || 0,
-  limit: LEADERBOARD_READ_LIMIT,
-  remaining: remainingLeaderboardReads(),
-  blocked: Boolean(leaderboardReadBudget.blocked)
+  limit: null,
+  remaining: null,
+  blocked: false
 });
 window.rotateLeaderboardPlayerId = () => {
   try {
