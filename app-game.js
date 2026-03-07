@@ -1378,6 +1378,9 @@
             stageState.startTime = performance.now();
             stageState.completed = false;
             stageState.failed = false;
+            if (typeof window.resetStageRoundOverridePlan === "function") {
+              window.resetStageRoundOverridePlan();
+            }
             startStageStopwatch();
             stageState.attempts = (stageState.attempts || 1) + 1;
             if (typeof trackLevelStart === "function") {
@@ -1413,7 +1416,9 @@
         }
         if (advanceRound && gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
-          if (stage && stage.noRepeatAcrossRounds) {
+          if (stage && (stage.noRepeatAcrossRounds || stage.noRepeatABAPatterns)) {
+            priorRoundItems = lastRoundItems;
+            priorRoundStageId = lastRoundStageId;
             lastRoundItems = roundItems.map((item) => ({
               category: item.category,
               label: item.label
@@ -1422,6 +1427,8 @@
           } else {
             lastRoundItems = null;
             lastRoundStageId = null;
+            priorRoundItems = null;
+            priorRoundStageId = null;
           }
         }
         renderCards(true);

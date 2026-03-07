@@ -10,15 +10,16 @@
         if (!achievementModifiers.includes("mathOps")) {
           achievementModifiers.push("mathOps");
         }
-        const ops = [
-          { label: "Add", sign: "+", fn: (value, n) => value + n },
-          { label: "Subtract", sign: "-", fn: (value, n) => value - n },
-          { label: "Multiply by", sign: "\u00d7", fn: (value, n) => value * n, multiplier: true }
-        ];
-        let op = ops[Math.floor(Math.random() * ops.length)];
+        const ops = {
+          add: { label: "Add", sign: "+", fn: (value, n) => value + n },
+          subtract: { label: "Subtract", sign: "-", fn: (value, n) => value - n },
+          multiply: { label: "Multiply by", sign: "×", fn: (value, n) => value * n, multiplier: true }
+        };
+        const useMultiply = Math.random() < 0.5;
+        let op = useMultiply ? ops.multiply : (Math.random() < 0.5 ? ops.add : ops.subtract);
         const delta = op.multiplier ? 2 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 3);
         if (op.sign === "-" && base - delta < 0) {
-          op = ops[0];
+          op = ops.add;
         }
         let recallHint = "";
         if (op.sign === "+") {
@@ -44,15 +45,16 @@
         if (!achievementModifiers.includes("mathOpsPlus")) {
           achievementModifiers.push("mathOpsPlus");
         }
-        const ops = [
-          { label: "Add", sign: "+", fn: (value, n) => value + n },
-          { label: "Subtract", sign: "-", fn: (value, n) => value - n },
-          { label: "Multiply by", sign: "\u00d7", fn: (value, n) => value * n, multiplier: true }
-        ];
-        let op = ops[Math.floor(Math.random() * ops.length)];
+        const ops = {
+          add: { label: "Add", sign: "+", fn: (value, n) => value + n },
+          subtract: { label: "Subtract", sign: "-", fn: (value, n) => value - n },
+          multiply: { label: "Multiply by", sign: "×", fn: (value, n) => value * n, multiplier: true }
+        };
+        const useMultiply = Math.random() < 0.5;
+        let op = useMultiply ? ops.multiply : (Math.random() < 0.5 ? ops.add : ops.subtract);
         const delta = op.multiplier ? 4 + Math.floor(Math.random() * 9) : 12 + Math.floor(Math.random() * 13);
         if (op.sign === "-" && base - delta < 0) {
-          op = ops[0];
+          op = ops.add;
         }
         let recallHint = "";
         if (op.sign === "+") {
