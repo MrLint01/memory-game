@@ -2425,35 +2425,45 @@ body[data-state="paused"] .hud-pause {
 }
 .stages-page-next {
   position: fixed;
-  right: -3px;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 72px;
   z-index: 6;
-  background: transparent;
-  border: none;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-right: 0;
   padding: 0;
   cursor: pointer;
   box-shadow: none;
   outline: none;
   appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 .stages-page-prev {
   position: fixed;
-  left: -3px;
+  left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 72px;
   z-index: 6;
-  background: transparent;
-  border: none;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-left: 0;
   padding: 0;
   cursor: pointer;
   box-shadow: none;
   outline: none;
   appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 .stages-page-next::before,
 .stages-page-prev::before {
@@ -2461,16 +2471,51 @@ body[data-state="paused"] .hud-pause {
   display: block;
   width: 0;
   height: 0;
-  border-top: 22px solid transparent;
-  border-bottom: 22px solid transparent;
+  border-top: 16px solid transparent;
+  border-bottom: 16px solid transparent;
 }
 .stages-page-next::before {
-  border-left: 24px solid var(--ink);
-  margin-left: 6px;
+  border-left: 18px solid var(--ink);
+  margin-left: 4px;
 }
 .stages-page-prev::before {
-  border-right: 24px solid var(--ink);
-  margin-left: 6px;
+  border-right: 18px solid var(--ink);
+  margin-right: 4px;
+}
+.stages-page-next::after,
+.stages-page-prev::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 12px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+}
+.stages-page-next::after {
+  right: 0;
+  background-image:
+    linear-gradient(var(--border), var(--border)),
+    linear-gradient(var(--border), var(--border));
+  background-size: 12px 2px, 12px 2px;
+  background-position: right top, right bottom;
+}
+.stages-page-prev::after {
+  left: 0;
+  background-image:
+    linear-gradient(var(--border), var(--border)),
+    linear-gradient(var(--border), var(--border));
+  background-size: 12px 2px, 12px 2px;
+  background-position: left top, left bottom;
+}
+.stages-page-next:hover,
+.stages-page-prev:hover {
+  background: var(--panel-muted);
+}
+.stages-page-next:disabled,
+.stages-page-prev:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .stage-list.stage-list--hidden {
   opacity: 0;
@@ -4635,6 +4680,11 @@ body[data-theme] .result-pill {
   background: var(--panel-muted);
   color: var(--ink);
   border-color: var(--border);
+}
+body[data-theme] .achievement-tile {
+  background: var(--panel);
+  border-color: var(--border);
+  border-top-color: var(--achievement-accent);
 }
 body[data-theme] button.icon-button,
 body[data-theme] .quick-action {

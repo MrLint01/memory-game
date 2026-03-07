@@ -503,6 +503,7 @@
                   id="stageCompetitiveMessage"
                   data-stage-id="${stageId}"
                   data-stage-version="${stageVersion}"
+                  data-current-time-ms="${Math.round(elapsedSeconds * 1000)}"
                 >
                   Comparing your run...
                 </div>

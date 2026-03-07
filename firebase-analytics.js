@@ -289,6 +289,8 @@ function getDefaultLeaderboardResult(overrides = {}) {
     top: [],
     me: null,
     meRank: null,
+    currentRunRank: null,
+    currentRunTotalPlayers: 0,
     totalPlayers: 0,
     averageTimeMs: null,
     fromCache: false,
@@ -312,7 +314,24 @@ function getDefaultStatsLeaderboardResult(overrides = {}) {
   };
 }
 
-function computeLeaderboardViewFromEntries(entries, limit = 5) {
+function computeCurrentRunComparison(entries, comparisonTimeMs) {
+  const timeMs = Number(comparisonTimeMs);
+  if (!Number.isFinite(timeMs)) {
+    return { currentRunRank: null, currentRunTotalPlayers: 0 };
+  }
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  const activeWithoutMe = safeEntries
+    .filter((entry) => entry && entry.active !== false)
+    .filter((entry) => Number.isFinite(Number(entry.best_time_ms)))
+    .filter((entry) => entry.player_id !== playerId);
+  const fasterCount = activeWithoutMe.filter((entry) => Number(entry.best_time_ms) < timeMs).length;
+  return {
+    currentRunRank: fasterCount + 1,
+    currentRunTotalPlayers: activeWithoutMe.length + 1
+  };
+}
+
+function computeLeaderboardViewFromEntries(entries, limit = 5, comparisonTimeMs = null) {
   const safeEntries = Array.isArray(entries) ? entries : [];
   const active = safeEntries
     .filter((entry) => entry && entry.active !== false)
@@ -326,14 +345,21 @@ function computeLeaderboardViewFromEntries(entries, limit = 5) {
   const averageTimeMs = totalPlayers
     ? active.reduce((sum, entry) => sum + Number(entry.best_time_ms), 0) / totalPlayers
     : null;
-  return { top, me, meRank, totalPlayers, averageTimeMs };
+  return {
+    top,
+    me,
+    meRank,
+    totalPlayers,
+    averageTimeMs,
+    ...computeCurrentRunComparison(active, comparisonTimeMs)
+  };
 }
 
-function getCachedLeaderboard(stageId, stageVersion, limit = 5) {
+function getCachedLeaderboard(stageId, stageVersion, limit = 5, comparisonTimeMs = null) {
   const key = getLeaderboardCacheKey(stageId, stageVersion);
   const cached = leaderboardSessionCache.get(key);
   if (!cached) return null;
-  const view = computeLeaderboardViewFromEntries(cached.entries, limit);
+  const view = computeLeaderboardViewFromEntries(cached.entries, limit, comparisonTimeMs);
   return getDefaultLeaderboardResult({ ...view, fromCache: true, stale: true });
 }
 
@@ -1245,7 +1271,7 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
 
 // window.getStageTotalPlayers = getStageTotalPlayers;
 
-async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
+async function fetchStageLeaderboard(stageId, stageVersion, limit = 5, comparisonTimeMs = null) {
   if (!areLeaderboardsEnabled()) {
     return getDefaultLeaderboardResult({
       errorCode: "disabled",
@@ -1258,7 +1284,7 @@ async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
       errorMessage: "Leaderboard service is not ready yet."
     });
   }
-  const cached = getCachedLeaderboard(stageId, stageVersion, limit);
+  const cached = getCachedLeaderboard(stageId, stageVersion, limit, comparisonTimeMs);
   if (cached) return cached;
   if (leaderboardReadBudget.blocked || remainingLeaderboardReads() < 1) {
     leaderboardReadBudget.blocked = true;
@@ -1295,7 +1321,7 @@ async function fetchStageLeaderboard(stageId, stageVersion, limit = 5) {
       if (pageSnap.size < pageSize) break;
     }
     setCachedLeaderboard(stageId, stageVersion, allEntries);
-    const view = computeLeaderboardViewFromEntries(allEntries, limit);
+    const view = computeLeaderboardViewFromEntries(allEntries, limit, comparisonTimeMs);
     return getDefaultLeaderboardResult({
       ...view,
       fromCache: false,

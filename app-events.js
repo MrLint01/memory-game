@@ -1977,9 +1977,14 @@ function runFlashCountdown(onComplete) {
       function applyResultCompetitionMessage(stageId, stageVersion, result) {
         const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
         if (!messageEl) return;
-        const rank = result && Number.isFinite(Number(result.meRank)) ? Number(result.meRank) : null;
+        const rank =
+          result && Number.isFinite(Number(result.currentRunRank))
+            ? Number(result.currentRunRank)
+            : (result && Number.isFinite(Number(result.meRank)) ? Number(result.meRank) : null);
         const totalPlayers =
-          result && Number.isFinite(Number(result.totalPlayers)) ? Number(result.totalPlayers) : 0;
+          result && Number.isFinite(Number(result.currentRunTotalPlayers))
+            ? Number(result.currentRunTotalPlayers)
+            : (result && Number.isFinite(Number(result.totalPlayers)) ? Number(result.totalPlayers) : 0);
         const averageTimeMs =
           result && Number.isFinite(Number(result.averageTimeMs)) ? Number(result.averageTimeMs) : null;
         let message = "";
@@ -2039,6 +2044,9 @@ function runFlashCountdown(onComplete) {
         loadingRow.textContent = "Loading...";
         listEl.replaceChildren(headerRow, loadingRow);
         const competitionEl = getResultCompetitionMessageElement(stageId, stageVersion);
+        const comparisonTimeMs = competitionEl && Number.isFinite(Number(competitionEl.dataset.currentTimeMs))
+          ? Number(competitionEl.dataset.currentTimeMs)
+          : null;
         if (competitionEl) {
           competitionEl.textContent = "Comparing your run...";
           competitionEl.hidden = false;
@@ -2060,7 +2068,7 @@ function runFlashCountdown(onComplete) {
         }
         listEl.dataset.lbRetryCount = "0";
         try {
-          const result = await window.fetchStageLeaderboard(stageId, stageVersion, 5);
+          const result = await window.fetchStageLeaderboard(stageId, stageVersion, 5, comparisonTimeMs);
           const top = result && Array.isArray(result.top) ? result.top : [];
           const me = result ? result.me : null;
           const fetchedMeRank = result ? result.meRank : null;
