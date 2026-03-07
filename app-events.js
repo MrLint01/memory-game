@@ -3,7 +3,15 @@
         if (gameMode === "stages") {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (stage && Number(stage.revealSeconds)) {
-            return Number(stage.revealSeconds);
+            const stageRevealSeconds = Number(stage.revealSeconds);
+            if (
+              typeof window.getAdaptiveRevealMultiplier === "function" &&
+              Number.isFinite(stageState.index) &&
+              stageState.index >= 2
+            ) {
+              return Math.max(0.1, stageRevealSeconds * window.getAdaptiveRevealMultiplier());
+            }
+            return stageRevealSeconds;
           }
         }
         return base;
@@ -33,6 +41,7 @@
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
       const LEADERBOARDS_ENABLED_STORAGE_KEY = "flashRecallLeaderboardsEnabled";
       const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
+      const ADAPTIVE_PROFILE_KEY = "flashRecallAdaptiveProfile";
       const settingsDefaults = typeof window.getFlashRecallSettingsDefaults === "function"
         ? window.getFlashRecallSettingsDefaults()
         : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
@@ -515,6 +524,123 @@
           // ignore
         }
       }
+
+      function getDefaultAdaptiveProfile() {
+        return {
+          group: null,
+          failureOnFirstTwo: false,
+          groupAMessageShown: false
+        };
+      }
+
+      function loadAdaptiveProfile() {
+        try {
+          const raw = window.localStorage.getItem(ADAPTIVE_PROFILE_KEY);
+          if (!raw) return getDefaultAdaptiveProfile();
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object") return getDefaultAdaptiveProfile();
+          return {
+            group: parsed.group === "A" || parsed.group === "B" ? parsed.group : null,
+            failureOnFirstTwo: Boolean(parsed.failureOnFirstTwo),
+            groupAMessageShown: Boolean(parsed.groupAMessageShown)
+          };
+        } catch {
+          return getDefaultAdaptiveProfile();
+        }
+      }
+
+      function saveAdaptiveProfile(profile) {
+        try {
+          window.localStorage.setItem(ADAPTIVE_PROFILE_KEY, JSON.stringify(profile));
+        } catch {
+          // ignore
+        }
+      }
+
+      let adaptiveProfile = loadAdaptiveProfile();
+      let pendingAdaptiveGroupAMessage = false;
+
+      function updateAdaptiveProfile(mutator) {
+        const next = {
+          ...getDefaultAdaptiveProfile(),
+          ...adaptiveProfile
+        };
+        if (typeof mutator === "function") {
+          mutator(next);
+        }
+        adaptiveProfile = next;
+        saveAdaptiveProfile(adaptiveProfile);
+        return adaptiveProfile;
+      }
+
+      window.getAdaptiveProfileSnapshot = function getAdaptiveProfileSnapshot() {
+        return {
+          ...adaptiveProfile,
+          group: adaptiveProfile.group === "A" || adaptiveProfile.group === "B"
+            ? adaptiveProfile.group
+            : "undecided"
+        };
+      };
+
+      function queueAdaptiveGroupAMessage() {
+        updateAdaptiveProfile((profile) => {
+          profile.groupAMessageShown = true;
+        });
+        pendingAdaptiveGroupAMessage = true;
+      }
+
+      function registerAdaptiveFailureForStage(stageIndex) {
+        if (!Number.isFinite(stageIndex) || stageIndex > 1) return;
+        if (adaptiveProfile.group) return;
+        updateAdaptiveProfile((profile) => {
+          profile.failureOnFirstTwo = true;
+          profile.group = "B";
+        });
+        if (typeof window.trackAdaptiveGroupStatus === "function") {
+          window.trackAdaptiveGroupStatus("B", {
+            source: "early_stage_failure",
+            stage_index: stageIndex,
+            level_number: stageIndex + 1
+          });
+        }
+      }
+
+      function registerAdaptiveSuccessForStage(stageIndex) {
+        if (!Number.isFinite(stageIndex) || stageIndex !== 1) return;
+        if (adaptiveProfile.group === "B") return;
+        if (adaptiveProfile.group === "A") {
+          if (!adaptiveProfile.groupAMessageShown) {
+            queueAdaptiveGroupAMessage();
+          }
+          return;
+        }
+        updateAdaptiveProfile((profile) => {
+          if (!profile.failureOnFirstTwo) {
+            profile.group = "A";
+          }
+        });
+        if (adaptiveProfile.group === "A" && typeof window.trackAdaptiveGroupStatus === "function") {
+          window.trackAdaptiveGroupStatus("A", {
+            source: "cleared_first_two_levels",
+            stage_index: stageIndex,
+            level_number: stageIndex + 1
+          });
+        }
+        if (adaptiveProfile.group === "A" && !adaptiveProfile.groupAMessageShown) {
+          queueAdaptiveGroupAMessage();
+        }
+      }
+
+      window.getAdaptiveRevealMultiplier = function getAdaptiveRevealMultiplier() {
+        return adaptiveProfile.group === "A" ? 0.5 : 1;
+      };
+      window.consumeAdaptiveGroupAMessage = function consumeAdaptiveGroupAMessage() {
+        if (!pendingAdaptiveGroupAMessage) return "";
+        pendingAdaptiveGroupAMessage = false;
+        return "Congrats, looks like you are a natural! We've decided to up the difficulty to give you a challenge. Watch out for the reveal time on future levels!";
+      };
+      window.registerAdaptiveFailureForStage = registerAdaptiveFailureForStage;
+      window.registerAdaptiveSuccessForStage = registerAdaptiveSuccessForStage;
 
       let splashStartListener = null;
       let splashAutoStartTimer = null;
@@ -2795,6 +2921,7 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallAutoAdvanceNext");
           window.localStorage.removeItem("flashRecallEnterToNext");
           window.localStorage.removeItem(LEADERBOARDS_ENABLED_STORAGE_KEY);
+          window.localStorage.removeItem(ADAPTIVE_PROFILE_KEY);
           window.localStorage.removeItem(AUDIO_MASTER_KEY);
           window.localStorage.removeItem(AUDIO_MUSIC_KEY);
           window.localStorage.removeItem(AUDIO_EFFECTS_KEY);

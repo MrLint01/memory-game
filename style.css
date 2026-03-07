@@ -1521,11 +1521,60 @@ body[data-state="result"] #resultsPanel .stage-complete {
   padding: 0 0 0.4rem;
   position: relative;
 }
+body[data-state="result"] #resultsPanel .adaptive-stage-message {
+  width: min(520px, 92%);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  padding: 0.85rem 2.6rem 0.85rem 1rem;
+  border: 2px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 88%, #ffffff 12%);
+  color: var(--ink);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  text-align: center;
+  animation: adaptiveStageMessageIn 180ms ease-out;
+}
+body[data-state="result"] #resultsPanel .adaptive-stage-message.is-hiding {
+  opacity: 0;
+  transform: translate(-50%, calc(-50% - 8px));
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+body[data-state="result"] #resultsPanel .adaptive-stage-message__text {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+body[data-state="result"] #resultsPanel .adaptive-stage-message__dismiss {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+@keyframes adaptiveStageMessageIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 10px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
 body[data-state="result"] #resultsPanel .stage-complete__header {
   display: grid;
   gap: 0.25rem;
   justify-items: center;
-  margin-top: -1.2rem;
+  margin-top: 0.4rem;
 }
 body[data-state="result"] #resultsPanel .stage-complete__header strong {
   font-family: var(--font-display);
@@ -4434,7 +4483,7 @@ body.stage-fail .rotation-icon {
 }
 .stats-leaderboard-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.45rem;
   margin-bottom: 0.65rem;
 }
@@ -4442,9 +4491,9 @@ body.stage-fail .rotation-icon {
   border: 2px solid var(--border);
   background: var(--panel-muted);
   color: var(--ink);
-  padding: 0.38rem 0.55rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  padding: 0.36rem 0.4rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .stats-leaderboard-tab.is-active {

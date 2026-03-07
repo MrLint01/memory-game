@@ -457,6 +457,9 @@
         if (typeof window.clearFirstLetterHint === "function") {
           window.clearFirstLetterHint();
         }
+        const adaptiveMessage = typeof window.consumeAdaptiveGroupAMessage === "function"
+          ? window.consumeAdaptiveGroupAMessage()
+          : "";
         stopFog();
         stopBlur();
         stopGlitching();
@@ -494,6 +497,17 @@
 
         resultsPanel.innerHTML = `
           <div class="stage-complete">
+            ${adaptiveMessage ? `
+              <div class="adaptive-stage-message" id="adaptiveStageMessage" role="status" aria-live="polite">
+                <button
+                  type="button"
+                  class="adaptive-stage-message__dismiss"
+                  id="adaptiveStageMessageDismiss"
+                  aria-label="Dismiss adaptive difficulty message"
+                >&times;</button>
+                <div class="adaptive-stage-message__text">${adaptiveMessage}</div>
+              </div>
+            ` : ""}
             <div class="stage-complete__left-column">
               <div class="stage-complete__header">
                 <strong>${stageName} complete!</strong>
@@ -569,6 +583,28 @@
 
         if (typeof window.maybePromptPlayerName === "function") {
           window.maybePromptPlayerName();
+        }
+
+        let onAdaptiveMessageDismiss = null;
+        const adaptiveMessageEl = document.getElementById("adaptiveStageMessage");
+        if (adaptiveMessageEl) {
+          const dismissAdaptiveMessage = () => {
+            if (adaptiveMessageEl.dataset.dismissed === "true") return;
+            adaptiveMessageEl.dataset.dismissed = "true";
+            adaptiveMessageEl.classList.add("is-hiding");
+            window.setTimeout(() => {
+              adaptiveMessageEl.remove();
+              if (typeof onAdaptiveMessageDismiss === "function") {
+                onAdaptiveMessageDismiss();
+                onAdaptiveMessageDismiss = null;
+              }
+            }, 220);
+          };
+          const adaptiveDismissButton = document.getElementById("adaptiveStageMessageDismiss");
+          if (adaptiveDismissButton) {
+            adaptiveDismissButton.addEventListener("click", dismissAdaptiveMessage);
+          }
+          window.setTimeout(dismissAdaptiveMessage, 7000);
         }
 
         const autoAdvanceDelayMs = 4500;
@@ -663,7 +699,8 @@
             nextTimer.classList.remove("is-waiting");
           }
         }
-        if (autoAdvanceEnabled && hasNextStage) {
+        const beginAutoAdvanceFlow = () => {
+          if (!(autoAdvanceEnabled && hasNextStage)) return;
           const shouldDeferForName = typeof window.shouldPromptForPlayerName === "function"
             ? window.shouldPromptForPlayerName()
             : false;
@@ -682,6 +719,22 @@
           } else {
             startAutoAdvanceNext();
           }
+        };
+        if (adaptiveMessageEl) {
+          if (nextTimer) {
+            nextTimer.classList.remove("is-running");
+            nextTimer.classList.remove("is-canceled");
+            nextTimer.classList.remove("is-disabled");
+            nextTimer.classList.add("is-waiting");
+          }
+          if (nextTimerFill) {
+            nextTimerFill.style.removeProperty("transition");
+            nextTimerFill.style.removeProperty("transition-duration");
+            nextTimerFill.style.removeProperty("transform");
+          }
+          onAdaptiveMessageDismiss = beginAutoAdvanceFlow;
+        } else {
+          beginAutoAdvanceFlow();
         }
 
         // Trigger bar fill animation after a short delay so the browser paints width:0 first
@@ -836,6 +889,7 @@
           failedLevelCount: 0,
           sandboxPlayed: false,
           sandboxCompletedCount: 0,
+          flashCompletedCount: 0,
           cardTypeCounts: {},
           modifierVariantCounts: {}
         };
@@ -874,6 +928,7 @@
         window.flashRecallSessionStats.failedLevelCount = Number(window.flashRecallSessionStats.failedLevelCount) || 0;
         window.flashRecallSessionStats.sandboxPlayed = Boolean(window.flashRecallSessionStats.sandboxPlayed);
         window.flashRecallSessionStats.sandboxCompletedCount = Number(window.flashRecallSessionStats.sandboxCompletedCount) || 0;
+        window.flashRecallSessionStats.flashCompletedCount = Number(window.flashRecallSessionStats.flashCompletedCount) || 0;
         window.flashRecallSessionStats.cardTypeCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.cardTypeCounts);
         window.flashRecallSessionStats.modifierVariantCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.modifierVariantCounts);
       }
@@ -892,6 +947,7 @@
           payload.failedLevelCount = Number(parsed.failedLevelCount) || 0;
           payload.sandboxPlayed = Boolean(parsed.sandboxPlayed);
           payload.sandboxCompletedCount = Number(parsed.sandboxCompletedCount) || 0;
+          payload.flashCompletedCount = Number(parsed.flashCompletedCount) || 0;
           payload.cardTypeCounts = normalizeStatsCounterMap(parsed.cardTypeCounts);
           payload.modifierVariantCounts = normalizeStatsCounterMap(parsed.modifierVariantCounts);
           return payload;
@@ -975,6 +1031,14 @@
         window.flashRecallSessionStats.sandboxCompletedCount += 1;
         const payload = loadStoredStatsPayload();
         payload.sandboxCompletedCount = (Number(payload.sandboxCompletedCount) || 0) + 1;
+        saveStoredStatsPayload(payload);
+      }
+
+      function recordFlashCompletionStat() {
+        ensureSessionStatsObject();
+        window.flashRecallSessionStats.flashCompletedCount += 1;
+        const payload = loadStoredStatsPayload();
+        payload.flashCompletedCount = (Number(payload.flashCompletedCount) || 0) + 1;
         saveStoredStatsPayload(payload);
       }
 
@@ -1078,6 +1142,12 @@
           }
               // Analytics: Track level session
               recordLevelAttemptStats(true);
+              if (typeof window.registerAdaptiveSuccessForStage === "function") {
+                window.registerAdaptiveSuccessForStage(stageState.index);
+              }
+              if (String(stage && stage.stageType ? stage.stageType : "").toLowerCase() === "flash") {
+                recordFlashCompletionStat();
+              }
               if (typeof trackLevelSession === 'function') {
                 const activeContext = typeof window.getActiveLevelContext === "function"
                   ? window.getActiveLevelContext()
@@ -1166,6 +1236,9 @@
             ? stageState.elapsedSeconds
             : (performance.now() - (stageState.startTime || performance.now())) / 1000;
           recordLevelAttemptStats(false);
+          if (typeof window.registerAdaptiveFailureForStage === "function") {
+            window.registerAdaptiveFailureForStage(stageState.index);
+          }
           if (typeof trackLevelSession === 'function') {
             const activeContext = typeof window.getActiveLevelContext === "function"
               ? window.getActiveLevelContext()
@@ -1288,6 +1361,9 @@
               ? stageState.elapsedSeconds
               : (performance.now() - (stageState.startTime || performance.now())) / 1000;
             recordLevelAttemptStats(false);
+            if (typeof window.registerAdaptiveFailureForStage === "function") {
+              window.registerAdaptiveFailureForStage(stageState.index);
+            }
             if (typeof trackLevelSession === "function") {
               const activeContext = typeof window.getActiveLevelContext === "function"
                 ? window.getActiveLevelContext()

@@ -107,7 +107,7 @@ function buildCardTypeAchievementDefinitions() {
     ACHIEVEMENT_CARD_TYPE_THRESHOLDS.map((threshold, tierIndex) => ({
       id: `card_${key}_${threshold}`,
       title: `${meta.label} ${formatAchievementThresholdShort(threshold)}`,
-      description: `See ${threshold} ${meta.noun}.`,
+      description: `Correctly complete ${threshold} ${meta.noun}.`,
       iconSrc: meta.iconSrc,
       iconBadge: getAchievementRomanTier(tierIndex)
     }))
@@ -136,7 +136,10 @@ const ACHIEVEMENT_DEFINITIONS = [
   ...buildCardTypeAchievementDefinitions(),
   ...buildModifierVariantAchievementDefinitions(),
   { id: "complete_1", title: "First Clear", description: "Complete one level.", iconText: "1" },
-  { id: "complete_flash_1", title: "Flash Initiate", description: "Complete your first flash level.", iconText: "FLASH" },
+  { id: "complete_flash_1", title: "Flash Initiate", description: "Complete a flash level 1 time.", iconText: "FLASH I" },
+  { id: "complete_flash_10", title: "Flash Runner", description: "Complete a flash level 10 times.", iconText: "FLASH II" },
+  { id: "complete_flash_100", title: "Flash Veteran", description: "Complete a flash level 100 times.", iconText: "FLASH III" },
+  { id: "complete_flash_1000", title: "Flash Legend", description: "Complete a flash level 1000 times.", iconText: "FLASH IV" },
   { id: "complete_10", title: "Ten Clears", description: "Complete 10 levels.", iconText: "10" },
   { id: "complete_all", title: "Full Clear", description: "Complete all levels.", iconText: "ALL" },
   { id: "complete_stage_67", title: "Lucky 67", description: "Complete level 67.", iconText: "67" },
@@ -151,12 +154,9 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "stars_level_1", title: "First Star", description: "Collect 1 star on a level.", iconText: "1\u2605" },
   { id: "stars_level_2", title: "Double Star", description: "Collect 2 stars on a level.", iconText: "2\u2605" },
   { id: "stars_level_3", title: "Triple Star", description: "Collect 3 stars on a level.", iconText: "3\u2605" },
-  { id: "stars_total_10", title: "Star Collector", description: "Collect 10 stars.", iconText: "10\u2605" },
-  { id: "stars_total_25", title: "Star Seeker", description: "Collect 25 stars.", iconText: "25\u2605" },
   { id: "stars_total_50", title: "Star Keeper", description: "Collect 50 stars.", iconText: "50\u2605" },
   { id: "stars_total_100", title: "Star Hoard", description: "Collect 100 stars.", iconText: "100\u2605" },
-  { id: "stars_total_200", title: "Star Vault", description: "Collect 200 stars.", iconText: "200\u2605" },
-  { id: "stars_total_300", title: "Star Legend", description: "Collect 300 stars.", iconText: "300\u2605" },
+  { id: "stars_total_150", title: "Star Vault", description: "Collect 150 stars.", iconText: "150\u2605" },
   { id: "leaderboard_top_5", title: "Top Five", description: "Get top 5 on a leaderboard.", iconText: "TOP5" },
   { id: "leaderboard_first", title: "First Place", description: "Get first place on a leaderboard.", iconText: "#1" },
   { id: "time_minutes_10", title: "Ten Minutes In", description: "Spend 10 total in-level minutes in game.", iconText: "10m" },
@@ -169,7 +169,7 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconText: "MONO" },
   { id: "secret_any_key", title: "Any Key Means Enter", description: "Type 'Any Key' on the splash screen, then press Enter.", iconText: "KEY", secret: true },
   { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "4\u2605", secret: true },
-  { id: "secret_stars_total_400", title: "Hidden Galaxy", description: "Collect 400 stars.", iconText: "400\u2605", secret: true }
+  { id: "secret_stars_total_200", title: "Hidden Galaxy", description: "Collect 200 stars.", iconText: "200\u2605", secret: true }
 ];
 const ACHIEVEMENT_DEFINITION_BY_ID = Object.fromEntries(
   ACHIEVEMENT_DEFINITIONS.map((entry) => [entry.id, entry])
@@ -180,10 +180,10 @@ function getAchievementDifficultyScore(definition) {
   if (definition && definition.secret) return 98;
   if (/^complete_all$|^leaderboard_first$|^time_minutes_100$|^fail_1000$/.test(id)) return 94;
   if (/^attempt_10000$|^complete_stage_67$/.test(id)) return 90;
-  if (/^attempt_1000$|^fail_100$|^stars_total_300$|^stars_total_200$/.test(id)) return 82;
-  if (/^attempt_100$|^complete_flash_1$|^win_monochrome$|^leaderboard_top_5$|^time_minutes_10$/.test(id)) return 70;
-  if (/^complete_10$|^fail_10$|^stars_total_100$|^stars_total_50$|^theme_changed$/.test(id)) return 58;
-  if (/^stars_level_3$|^stars_total_25$|^stars_level_2$/.test(id)) return 48;
+  if (/^attempt_1000$|^fail_100$|^complete_flash_1000$|^stars_total_150$/.test(id)) return 82;
+  if (/^attempt_100$|^complete_flash_100$|^win_monochrome$|^leaderboard_top_5$|^time_minutes_10$/.test(id)) return 70;
+  if (/^complete_10$|^fail_10$|^stars_total_100$|^complete_flash_10$|^theme_changed$/.test(id)) return 58;
+  if (/^stars_level_3$|^stars_level_2$/.test(id)) return 48;
   if (/^mod_variants_/.test(id)) {
     if (/_1000$/.test(id)) return 86;
     if (/_100$/.test(id)) return 64;
@@ -200,7 +200,7 @@ function getAchievementDifficultyScore(definition) {
   if (/^sandbox_complete_100$/.test(id)) return 80;
   if (/^sandbox_complete_10$/.test(id)) return 58;
   if (/^sandbox_complete_1$/.test(id)) return 20;
-  if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_10$/.test(id)) return 18;
+  if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_50$|^complete_flash_1$/.test(id)) return 18;
   return 45;
 }
 
@@ -499,6 +499,7 @@ function getDefaultAchievementProfile() {
     failed_count: 0,
     completed_count: 0,
     sandbox_completed_count: 0,
+    flash_completed_count: 0,
     any_key_secret: false,
     total_stars: 0,
     total_time_seconds: 0,
@@ -538,6 +539,7 @@ function normalizeAchievementProfile(raw) {
   base.failed_count = Math.max(0, Number(source.failed_count) || 0);
   base.completed_count = Math.max(0, Number(source.completed_count) || 0);
   base.sandbox_completed_count = Math.max(0, Number(source.sandbox_completed_count) || 0);
+  base.flash_completed_count = Math.max(0, Number(source.flash_completed_count) || 0);
   base.any_key_secret = Boolean(source.any_key_secret);
   base.total_stars = Math.max(0, Number(source.total_stars) || 0);
   base.total_time_seconds = Math.max(0, Number(source.total_time_seconds) || 0);
@@ -586,6 +588,10 @@ function getLocalStatsSnapshot() {
     Number(stored && stored.sandboxCompletedCount) || 0,
     Number(sessionStats.sandboxCompletedCount) || 0
   );
+  const flashCompletedCount = Math.max(
+    Number(stored && stored.flashCompletedCount) || 0,
+    Number(sessionStats.flashCompletedCount) || 0
+  );
   const failedLevelCount = Math.max(
     Number(stored && stored.failedLevelCount) || 0,
     Number(sessionStats.failedLevelCount) || 0
@@ -607,6 +613,7 @@ function getLocalStatsSnapshot() {
     totalLevelAttempts,
     totalLevelSuccesses,
     sandboxCompletedCount,
+    flashCompletedCount,
     failedLevelCount,
     sandboxPlayed,
     cardTypeCounts,
@@ -684,6 +691,7 @@ function normalizeAchievementUpdate(update = {}) {
     failedCount: null,
     completedCount: null,
     sandboxCompletedCount: null,
+    flashCompletedCount: null,
     anyKeySecret: false,
     totalStars: null,
     totalTimeSeconds: null,
@@ -707,6 +715,9 @@ function normalizeAchievementUpdate(update = {}) {
   base.completedCount = Number.isFinite(Number(update.completedCount)) ? Math.max(0, Number(update.completedCount)) : null;
   base.sandboxCompletedCount = Number.isFinite(Number(update.sandboxCompletedCount))
     ? Math.max(0, Number(update.sandboxCompletedCount))
+    : null;
+  base.flashCompletedCount = Number.isFinite(Number(update.flashCompletedCount))
+    ? Math.max(0, Number(update.flashCompletedCount))
     : null;
   base.anyKeySecret = Boolean(update.anyKeySecret);
   base.totalStars = Number.isFinite(Number(update.totalStars)) ? Math.max(0, Number(update.totalStars)) : null;
@@ -748,6 +759,12 @@ function mergeAchievementUpdateInputs(...updates) {
       merged.sandboxCompletedCount = Math.max(
         Number(merged.sandboxCompletedCount) || 0,
         update.sandboxCompletedCount
+      );
+    }
+    if (Number.isFinite(update.flashCompletedCount)) {
+      merged.flashCompletedCount = Math.max(
+        Number(merged.flashCompletedCount) || 0,
+        update.flashCompletedCount
       );
     }
     if (Number.isFinite(update.totalStars)) {
@@ -805,6 +822,7 @@ function getLocalAchievementSyncUpdate(extra = {}) {
     failedCount: stats.failedLevelCount,
     completedCount,
     sandboxCompletedCount: stats.sandboxCompletedCount,
+    flashCompletedCount: stats.flashCompletedCount,
     totalStars: starSnapshot.totalStars,
     totalTimeSeconds: stats.totalSeconds,
     maxStarsOnLevel: starSnapshot.maxStarsOnLevel,
@@ -836,6 +854,9 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   }
   if (Number.isFinite(normalized.sandboxCompletedCount)) {
     next.sandbox_completed_count = Math.max(next.sandbox_completed_count, normalized.sandboxCompletedCount);
+  }
+  if (Number.isFinite(normalized.flashCompletedCount)) {
+    next.flash_completed_count = Math.max(next.flash_completed_count, normalized.flashCompletedCount);
   }
   next.any_key_secret = next.any_key_secret || normalized.anyKeySecret;
   if (Number.isFinite(normalized.totalStars)) {
@@ -904,7 +925,10 @@ function getAchievementUnlockIds(profile) {
   if (profile.sandbox_completed_count >= 100) unlocks.push("sandbox_complete_100");
   if (profile.sandbox_completed_count >= 1000) unlocks.push("sandbox_complete_1000");
   if (profile.any_key_secret) unlocks.push("secret_any_key");
-  if (profile.completed_flash_level) unlocks.push("complete_flash_1");
+  if (profile.flash_completed_count >= 1) unlocks.push("complete_flash_1");
+  if (profile.flash_completed_count >= 10) unlocks.push("complete_flash_10");
+  if (profile.flash_completed_count >= 100) unlocks.push("complete_flash_100");
+  if (profile.flash_completed_count >= 1000) unlocks.push("complete_flash_1000");
   if (profile.completed_count >= 10) unlocks.push("complete_10");
   if (profile.total_stages > 0 && profile.completed_count >= profile.total_stages) unlocks.push("complete_all");
   if (profile.completed_stage_67) unlocks.push("complete_stage_67");
@@ -919,12 +943,9 @@ function getAchievementUnlockIds(profile) {
   if (profile.max_stars_on_level >= 1) unlocks.push("stars_level_1");
   if (profile.max_stars_on_level >= 2) unlocks.push("stars_level_2");
   if (profile.max_stars_on_level >= 3) unlocks.push("stars_level_3");
-  if (profile.total_stars >= 10) unlocks.push("stars_total_10");
-  if (profile.total_stars >= 25) unlocks.push("stars_total_25");
   if (profile.total_stars >= 50) unlocks.push("stars_total_50");
   if (profile.total_stars >= 100) unlocks.push("stars_total_100");
-  if (profile.total_stars >= 200) unlocks.push("stars_total_200");
-  if (profile.total_stars >= 300) unlocks.push("stars_total_300");
+  if (profile.total_stars >= 150) unlocks.push("stars_total_150");
   if (profile.leaderboard_top_5) unlocks.push("leaderboard_top_5");
   if (profile.leaderboard_first_place) unlocks.push("leaderboard_first");
   if (profile.total_time_seconds >= 10 * 60) unlocks.push("time_minutes_10");
@@ -932,7 +953,7 @@ function getAchievementUnlockIds(profile) {
   if (profile.theme_changed) unlocks.push("theme_changed");
   if (profile.monochrome_win) unlocks.push("win_monochrome");
   if (profile.max_stars_on_level >= 4) unlocks.push("secret_stars_level_4");
-  if (profile.total_stars >= 400) unlocks.push("secret_stars_total_400");
+  if (profile.total_stars >= 200) unlocks.push("secret_stars_total_200");
   return Array.from(new Set(unlocks));
 }
 
@@ -989,6 +1010,7 @@ async function applyAchievementUpdate(update = {}) {
         failed_count: nextProfile.failed_count,
         completed_count: nextProfile.completed_count,
         sandbox_completed_count: nextProfile.sandbox_completed_count,
+        flash_completed_count: nextProfile.flash_completed_count,
         any_key_secret: nextProfile.any_key_secret,
         total_stars: nextProfile.total_stars,
         total_time_seconds: nextProfile.total_time_seconds,
@@ -2045,6 +2067,16 @@ async function createNewSession() {
       game_build: window.FLASH_RECALL_BUILD_ID || null
     }, { immediate: true });
 
+    if (typeof window.getAdaptiveProfileSnapshot === "function") {
+      const adaptive = window.getAdaptiveProfileSnapshot();
+      const adaptiveGroup = adaptive && (adaptive.group === "A" || adaptive.group === "B")
+        ? adaptive.group
+        : "undecided";
+      await trackAdaptiveGroupStatus(adaptiveGroup, {
+        source: "session_start"
+      });
+    }
+
     startHeartbeat();
     resetActiveInactivityTimer();
     resetInactivityTimer();
@@ -2297,11 +2329,34 @@ function trackQuitReason(reason, metadata = {}) {
   }, { immediate: true });
 }
 
+async function trackAdaptiveGroupStatus(group, metadata = {}) {
+  const normalizedGroup = group === "A" || group === "B" ? group : "undecided";
+  enqueueEvent("adaptive_group_status", {
+    adaptive_group: normalizedGroup,
+    adaptive_group_decided: normalizedGroup !== "undecided",
+    ...metadata
+  }, { immediate: true });
+
+  const sessionRef = getSessionRef();
+  if (!sessionRef || !isReadyForWrites()) return;
+
+  try {
+    await sessionRef.update({
+      adaptive_group: normalizedGroup,
+      adaptive_group_decided: normalizedGroup !== "undecided",
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (error) {
+    console.warn("Failed to update adaptive group on session", error);
+  }
+}
+
 window.trackRoundCompletion = trackRoundCompletion;
 window.trackLevelStart = trackLevelStart;
 window.trackLevelSession = trackLevelSession;
 window.trackSessionEnd = trackSessionEnd;
 window.trackQuitReason = trackQuitReason;
+window.trackAdaptiveGroupStatus = trackAdaptiveGroupStatus;
 window.getLoggingDebugSnapshot = getLoggingDebugSnapshot;
 window.updateStageLeaderboard = updateStageLeaderboard;
 window.fetchStageLeaderboard = fetchStageLeaderboard;
