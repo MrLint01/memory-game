@@ -30,6 +30,7 @@
       const AUDIO_MUSIC_KEY = "flashRecallAudioMusicVolume";
       const AUDIO_EFFECTS_KEY = "flashRecallAudioEffectsVolume";
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
+      const LEADERBOARDS_ENABLED_STORAGE_KEY = "flashRecallLeaderboardsEnabled";
       const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
       const settingsDefaults = typeof window.getFlashRecallSettingsDefaults === "function"
         ? window.getFlashRecallSettingsDefaults()
@@ -73,11 +74,13 @@
         stageQuit: "q",
         practiceHome: "h",
         practiceSettings: "s",
+        fullscreen: "f",
         ...(settingsDefaults.keybinds || {})
       };
       const defaultControlSettings = {
         successAnimation: true,
         flashCountdown: true,
+        autoAdvanceNext: true,
         enterToNext: true,
         flashWarningEnabled: true,
         ...(settingsDefaults.controls || {})
@@ -96,7 +99,8 @@
         stageNext: keybindStageNext,
         stageQuit: keybindStageQuit,
         practiceHome: keybindPracticeHome,
-        practiceSettings: keybindPracticeSettings
+        practiceSettings: keybindPracticeSettings,
+        fullscreen: keybindFullscreen
       };
 
       function normalizeKey(rawKey) {
@@ -135,6 +139,13 @@
           "arrowup",
           "arrowdown"
         ].includes(value);
+      }
+
+      function isTextEntryTarget(target) {
+        if (!target) return false;
+        if (target.isContentEditable) return true;
+        const tag = String(target.tagName || "").toUpperCase();
+        return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
       }
 
       function loadKeybinds() {
@@ -316,6 +327,7 @@
         };
       };
       let splashReturnToHome = false;
+      let pendingSplashReveal = false;
       let resetLoadingActive = false;
 
       function normalizePlayerName(raw) {
@@ -383,7 +395,17 @@
         setModalState(playerNameModal, false);
         clearPlayerNameDelay();
         playerNameModalOpening = false;
-        refreshResultAutoActionCountdown();
+        flushDeferredAutoAdvanceNext();
+        if (
+          typeof window.startAutoAdvanceNextFromResults === "function" &&
+          typeof autoAdvanceNextEnabled !== "undefined" &&
+          autoAdvanceNextEnabled &&
+          !autoAdvanceNextTimerId &&
+          document.body &&
+          document.body.dataset.state === "result"
+        ) {
+          window.startAutoAdvanceNextFromResults();
+        }
       }
 
       function openPlayerNameModal() {
@@ -392,6 +414,15 @@
         window.setTimeout(() => {
           playerNameModalOpening = false;
         }, 450);
+        if (typeof window.cancelAutoAdvanceNextFromResults === "function") {
+          window.cancelAutoAdvanceNextFromResults();
+        }
+        if (
+          typeof window.deferAutoAdvanceNext === "function" &&
+          typeof window.startAutoAdvanceNextFromResults === "function"
+        ) {
+          window.deferAutoAdvanceNext(window.startAutoAdvanceNextFromResults);
+        }
         setModalState(playerNameModal, true);
         const name = getPlayerName();
         updatePlayerNameInputs(name);
@@ -471,6 +502,7 @@
           return;
         }
         splashStartListener = (event) => {
+          if (document.body.classList.contains("loading-overlay") || document.body.dataset.view === "loading") return;
           if (document.body.dataset.view !== "splash") return;
           window.removeEventListener("keydown", splashStartListener);
           window.removeEventListener("pointerdown", splashStartListener);
@@ -486,6 +518,41 @@
       let playerNamePromptDelayActive = false;
       let playerNamePromptDelayTimer = null;
       let playerNameModalOpening = false;
+
+      let pendingAutoAdvanceNextStart = null;
+      window.deferAutoAdvanceNext = function deferAutoAdvanceNext(startFn, force = false) {
+        if (typeof startFn !== "function") return false;
+        if (force) {
+          pendingAutoAdvanceNextStart = startFn;
+          return true;
+        }
+        if (
+          playerNamePromptDelayActive ||
+          playerNameModalOpening ||
+          (playerNameModal && playerNameModal.classList.contains("show"))
+        ) {
+          pendingAutoAdvanceNextStart = startFn;
+          return true;
+        }
+        return false;
+      };
+      window.clearDeferredAutoAdvanceNext = function clearDeferredAutoAdvanceNext() {
+        pendingAutoAdvanceNextStart = null;
+      };
+
+      function flushDeferredAutoAdvanceNext() {
+        if (!pendingAutoAdvanceNextStart) return;
+        if (
+          playerNamePromptDelayActive ||
+          playerNameModalOpening ||
+          (playerNameModal && playerNameModal.classList.contains("show"))
+        ) {
+          return;
+        }
+        const startFn = pendingAutoAdvanceNextStart;
+        pendingAutoAdvanceNextStart = null;
+        startFn();
+      }
 
       function setResultInteractionsEnabled(enabled) {
         const value = enabled ? "" : "none";
@@ -508,10 +575,20 @@
 
       window.getPlayerName = getPlayerName;
       window.setPlayerName = setPlayerName;
+      window.shouldPromptForPlayerName = shouldPromptForPlayerName;
       window.maybePromptPlayerName = function maybePromptPlayerName() {
         if (!shouldPromptForPlayerName()) return;
         playerNamePromptDelayActive = true;
         setResultInteractionsEnabled(false);
+        if (typeof window.cancelAutoAdvanceNextFromResults === "function") {
+          window.cancelAutoAdvanceNextFromResults();
+        }
+        if (
+          typeof window.deferAutoAdvanceNext === "function" &&
+          typeof window.startAutoAdvanceNextFromResults === "function"
+        ) {
+          window.deferAutoAdvanceNext(window.startAutoAdvanceNextFromResults);
+        }
         playerNamePromptDelayTimer = window.setTimeout(() => {
           playerNamePromptDelayTimer = null;
           try {
@@ -559,6 +636,8 @@
         streak = 0;
         roundItems = [];
         roundItemsBase = [];
+        lastRoundItems = null;
+        lastRoundStageId = null;
         updateScore();
         if (timerFill) {
           timerFill.style.width = "100%";
@@ -689,6 +768,10 @@
 
       let stageIntroPendingIndex = null;
       let stageIntroOriginEl = null;
+      let stageIntroAnimationMode = null;
+      window.setStageIntroAnimationMode = function setStageIntroAnimationMode(mode) {
+        stageIntroAnimationMode = mode;
+      };
       let flashStagePendingIndex = null;
       let flashCountdownTimers = [];
       let flashCountdownActive = false;
@@ -698,14 +781,22 @@
       let tabTutorialDisabledInputs = [];
       let tabTutorialHintEl = null;
       let tabTutorialHintTimeout = null;
-      const tabTutorialStageIds = new Set([2, 3]);
+      const isTabTutorialEnabledForStage = (stage) => stage && stage.tabTutorialEnabled === true;
       let firstLetterHintCooldown = 0;
       let firstLetterHintEl = null;
       let firstLetterHintTimeout = null;
-      const firstLetterHintStageMessages = {
+      const legacyFirstLetterHintMessages = {
         5: "FIRST LETTER\n(Triangle -> T, Circle -> C, Square -> S)",
         6: "FIRST LETTER\n(Right -> R, Left -> L, Up -> U, ...)",
         7: "FIRST LETTER\n(White -> W, Red -> R, Blue -> B, ...)"
+      };
+      const getFirstLetterHintMessage = (stage) => {
+        if (!stage) return "";
+        if (stage.firstLetterHintEnabled === false) return "";
+        if (typeof stage.firstLetterHintMessage === "string" && stage.firstLetterHintMessage.trim()) {
+          return stage.firstLetterHintMessage;
+        }
+        return legacyFirstLetterHintMessages[stage.id] || "";
       };
       let stageListAnimTimeout = null;
       let stageListStarTimeout = null;
@@ -714,6 +805,7 @@
       let stageListSkipListener = null;
       let flashCountdownEnabled = true;
       let enterToNextEnabled = true;
+      let leaderboardsEnabled = true;
       let stageStarShineInterval = null;
       let resultAutoActionTimers = [];
       const RESULT_AUTO_ACTION_SECONDS = 3;
@@ -743,7 +835,7 @@
           stageIntroCard.style.setProperty("--intro-from-x", `${dx}px`);
           stageIntroCard.style.setProperty("--intro-from-y", `${dy}px`);
           stageIntroCard.style.setProperty("--intro-from-scale", `${Math.max(0.6, scale)}`);
-          stageIntroCard.classList.remove("intro-animate");
+          stageIntroCard.classList.remove("intro-animate", "intro-soft", "intro-auto");
           void stageIntroCard.offsetWidth;
           stageIntroCard.classList.add("intro-animate");
         });
@@ -753,11 +845,12 @@
         stageIntroPendingIndex = null;
         stageIntroOriginEl = null;
         if (stageIntroCard) {
-          stageIntroCard.classList.remove("intro-animate");
+          stageIntroCard.classList.remove("intro-animate", "intro-soft", "intro-auto");
           stageIntroCard.style.removeProperty("--intro-from-x");
           stageIntroCard.style.removeProperty("--intro-from-y");
           stageIntroCard.style.removeProperty("--intro-from-scale");
         }
+        clearStageIntroAutoStart();
         setModalState(stageIntroModal, false);
       }
 
@@ -900,12 +993,6 @@ function runFlashCountdown(onComplete) {
         if (playerNameModal && playerNameModal.classList.contains("show")) return;
         if (stageState.failed) {
           startResultAutoActionCountdown("retry");
-          return;
-        }
-        if (!stageState.completed) return;
-        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
-        if (stages[stageState.index + 1]) {
-          startResultAutoActionCountdown("next");
         }
       }
 
@@ -923,6 +1010,59 @@ function runFlashCountdown(onComplete) {
       function closeFlashStagePrompt() {
         flashStagePendingIndex = null;
         setModalState(flashStageModal, false);
+      }
+
+      function clearStageIntroAutoStart() {
+        if (stageIntroAutoStartTimerId) {
+          clearTimeout(stageIntroAutoStartTimerId);
+          stageIntroAutoStartTimerId = null;
+        }
+        if (stageIntroCard) {
+          stageIntroCard.classList.remove("intro-auto");
+        }
+        const timer = document.querySelector("#stageIntroModal .stage-intro-start-timer");
+        if (timer) {
+          timer.classList.remove("is-running");
+          timer.classList.remove("is-canceled");
+        }
+        const fill = timer ? timer.querySelector(".stage-intro-start-timer__fill") : null;
+        if (fill) {
+          fill.style.removeProperty("transition");
+          fill.style.removeProperty("transition-duration");
+          fill.style.removeProperty("transform");
+        }
+      }
+
+      function cancelStageIntroAutoStartBar() {
+        if (stageIntroAutoStartTimerId) {
+          clearTimeout(stageIntroAutoStartTimerId);
+          stageIntroAutoStartTimerId = null;
+        }
+        const timer = document.querySelector("#stageIntroModal .stage-intro-start-timer");
+        const fill = timer ? timer.querySelector(".stage-intro-start-timer__fill") : null;
+        if (timer) {
+          timer.classList.remove("is-running");
+          timer.classList.add("is-canceled");
+        }
+        if (fill) {
+          fill.style.transition = "none";
+          fill.style.transform = "scaleX(0)";
+          void fill.offsetWidth;
+        }
+      }
+
+      function cancelStageNextAutoAdvanceBar() {
+        const timer = document.querySelector("#resultsPanel .stage-next-timer");
+        const fill = timer ? timer.querySelector(".stage-next-timer__fill") : null;
+        if (timer) {
+          timer.classList.remove("is-running");
+          timer.classList.add("is-canceled");
+        }
+        if (fill) {
+          fill.style.transition = "none";
+          fill.style.transform = "scaleX(0)";
+          void fill.offsetWidth;
+        }
       }
 
       function openStageIntro(index, originEl = null) {
@@ -1076,7 +1216,46 @@ function runFlashCountdown(onComplete) {
         }
         stageIntroOriginEl = originEl;
         setModalState(stageIntroModal, true);
-        applyStageIntroOrigin(stageIntroOriginEl);
+        if (stageIntroCard) {
+          stageIntroCard.classList.remove("intro-animate", "intro-soft", "intro-auto");
+        }
+        clearStageIntroAutoStart();
+        const animateMode = stageIntroAnimationMode;
+        stageIntroAnimationMode = null;
+        if (animateMode === "auto") {
+          if (stageIntroCard) {
+            void stageIntroCard.offsetWidth;
+            stageIntroCard.classList.add("intro-soft", "intro-auto");
+          }
+          const autoDelayMs = 3000;
+          const timer = document.querySelector("#stageIntroModal .stage-intro-start-timer");
+          const fill = timer ? timer.querySelector(".stage-intro-start-timer__fill") : null;
+          if (fill) {
+            fill.style.transitionDuration = `${autoDelayMs}ms`;
+          }
+          if (timer) {
+            timer.classList.remove("is-running");
+            timer.classList.remove("is-canceled");
+            requestAnimationFrame(() => {
+              timer.classList.add("is-running");
+            });
+          }
+          stageIntroAutoStartTimerId = window.setTimeout(() => {
+            stageIntroAutoStartTimerId = null;
+            if (stageIntroModal && stageIntroModal.classList.contains("show")) {
+              if (stageIntroStart) {
+                stageIntroStart.click();
+              }
+            }
+          }, autoDelayMs);
+        } else if (animateMode === "soft") {
+          if (stageIntroCard) {
+            void stageIntroCard.offsetWidth;
+            stageIntroCard.classList.add("intro-soft");
+          }
+        } else {
+          applyStageIntroOrigin(stageIntroOriginEl);
+        }
         return true;
       }
 
@@ -1383,7 +1562,36 @@ function runFlashCountdown(onComplete) {
           });
         }
       }
-      
+
+      let stagesScaleFrame = null;
+      function scheduleStagesScale() {
+        if (!stagesScreen) return;
+        if (stagesScaleFrame) {
+          cancelAnimationFrame(stagesScaleFrame);
+        }
+        stagesScaleFrame = requestAnimationFrame(() => {
+          stagesScaleFrame = null;
+          updateStagesScale();
+        });
+      }
+
+      function updateStagesScale() {
+        if (!stagesScreen) return;
+        if (document.body.dataset.view !== "stages") {
+          return;
+        }
+        stagesScreen.style.setProperty("--stages-scale", "1");
+        const bodyStyles = getComputedStyle(document.body);
+        const padX = parseFloat(bodyStyles.paddingLeft) + parseFloat(bodyStyles.paddingRight);
+        const padY = parseFloat(bodyStyles.paddingTop) + parseFloat(bodyStyles.paddingBottom);
+        const availableWidth = Math.max(320, window.innerWidth - padX);
+        const availableHeight = Math.max(320, window.innerHeight - padY);
+        const rect = stagesScreen.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const scale = Math.min(1, availableWidth / rect.width, availableHeight / rect.height);
+        stagesScreen.style.setProperty("--stages-scale", scale.toFixed(3));
+      }
+
       function startStarShineLoop() {
         if (stageStarShineInterval) { 
           clearInterval(stageStarShineInterval);
@@ -1440,7 +1648,13 @@ function runFlashCountdown(onComplete) {
 
       function openSplashScreen() {
         if (splashScreen) {
-          splashScreen.removeAttribute("aria-hidden");
+          if (document.body.classList.contains("loading-overlay")) {
+            pendingSplashReveal = true;
+            splashScreen.setAttribute("aria-hidden", "true");
+          } else {
+            splashScreen.removeAttribute("hidden");
+            splashScreen.removeAttribute("aria-hidden");
+          }
         }
         if (mainHeader) {
           mainHeader.setAttribute("aria-hidden", "true");
@@ -1452,6 +1666,7 @@ function runFlashCountdown(onComplete) {
       function closeSplashScreen() {
         if (splashScreen) {
           splashScreen.setAttribute("aria-hidden", "true");
+          splashScreen.setAttribute("hidden", "");
         }
         if (mainHeader) {
           mainHeader.removeAttribute("aria-hidden");
@@ -1482,8 +1697,16 @@ function runFlashCountdown(onComplete) {
 
       function closeSplashLoading(skipViewReset = false, keepHeaderHidden = false) {
         document.body.classList.remove("loading-overlay");
+        if (document.body.classList.contains("initial-loading")) {
+          document.body.classList.remove("initial-loading");
+        }
         if (splashLoading) {
           splashLoading.setAttribute("aria-hidden", "true");
+        }
+        if (pendingSplashReveal && splashScreen) {
+          splashScreen.removeAttribute("hidden");
+          splashScreen.removeAttribute("aria-hidden");
+          pendingSplashReveal = false;
         }
         if (!keepHeaderHidden && mainHeader) {
           mainHeader.removeAttribute("aria-hidden", "true");
@@ -1562,6 +1785,7 @@ function runFlashCountdown(onComplete) {
       }
 
       async function startFromSplash() {
+        const shouldCountdownToFirstStage = shouldShowSplashScreen() && !splashReturnToHome;
         if (splashReturnToHome) {
           splashReturnToHome = false;
           closeSplashScreen();
@@ -1585,9 +1809,13 @@ function runFlashCountdown(onComplete) {
           : Promise.resolve();
         await Promise.all([minimumDelay, fontsReady]).catch(() => {});
         closeSplashLoading();
-        runFlashCountdown(() => {
-          startStage(0, { skipIntro: true });
-        });
+        if (shouldCountdownToFirstStage) {
+          runFlashCountdown(() => {
+            startStage(0, { skipIntro: true });
+          });
+          return;
+        }
+        startStage(0, { skipIntro: true });
       }
 
       practiceStart.addEventListener("click", () => {
@@ -1796,6 +2024,7 @@ function runFlashCountdown(onComplete) {
       };
       if (stageIntroStart && stageIntroModal) {
         stageIntroStart.addEventListener("click", async () => {
+          clearStageIntroAutoStart();
           if (leaderboardModal) {
             setModalState(leaderboardModal, false);
           }
@@ -1835,11 +2064,42 @@ function runFlashCountdown(onComplete) {
         });
       }
       if (stageIntroModal) {
+        stageIntroModal.addEventListener("pointerdown", () => {
+          if (stageIntroCard && stageIntroCard.classList.contains("intro-auto")) {
+            cancelStageIntroAutoStartBar();
+          }
+        });
         stageIntroModal.addEventListener("click", (event) => {
+          if (stageIntroCard && stageIntroCard.classList.contains("intro-auto")) {
+            cancelStageIntroAutoStartBar();
+          }
           if (event.target === stageIntroModal) {
             closeStageIntro();
           }
         });
+      }
+      if (!window.__stageIntroAutoCancelListener) {
+        window.__stageIntroAutoCancelListener = true;
+        document.addEventListener("pointerdown", () => {
+          if (
+            stageIntroModal &&
+            stageIntroModal.classList.contains("show") &&
+            stageIntroCard &&
+            stageIntroCard.classList.contains("intro-auto")
+          ) {
+            cancelStageIntroAutoStartBar();
+          }
+        }, { capture: true });
+      }
+      if (!window.__stageNextAutoCancelListener) {
+        window.__stageNextAutoCancelListener = true;
+        document.addEventListener("pointerdown", () => {
+          if (document.body && document.body.dataset.state === "result" && autoAdvanceNextTimerId) {
+            clearTimeout(autoAdvanceNextTimerId);
+            autoAdvanceNextTimerId = null;
+            cancelStageNextAutoAdvanceBar();
+          }
+        }, { capture: true });
       }
       if (flashStageStart) {
         flashStageStart.addEventListener("click", async () => {
@@ -1910,13 +2170,21 @@ function runFlashCountdown(onComplete) {
           }
         });
       }
-      if (fullscreenToggle) {
-        fullscreenToggle.addEventListener("click", async () => {
+      async function toggleFullscreen() {
+        try {
           if (!document.fullscreenElement) {
             await document.documentElement.requestFullscreen();
           } else {
             await document.exitFullscreen();
           }
+        } catch (error) {
+          console.warn("Fullscreen toggle failed", error);
+        }
+      }
+
+      if (fullscreenToggle) {
+        fullscreenToggle.addEventListener("click", async () => {
+          await toggleFullscreen();
         });
       }
 
@@ -1941,6 +2209,19 @@ function runFlashCountdown(onComplete) {
         splashReturnToHome = true;
         openSplashScreen();
         attachSplashStartListeners();
+      }
+
+      if (document.body.classList.contains("loading-overlay")) {
+        const initialLoadingDelayMs = 1000;
+        const minimumDelay = new Promise((resolve) => {
+          window.setTimeout(resolve, initialLoadingDelayMs);
+        });
+        const fontsReady = document.fonts && document.fonts.ready
+          ? document.fonts.ready
+          : Promise.resolve();
+        Promise.all([minimumDelay, fontsReady]).finally(() => {
+          closeSplashLoading(true, true);
+        });
       }
 
       if (stagesOpen) {
@@ -2004,29 +2285,28 @@ function runFlashCountdown(onComplete) {
           inputs[nextIndex].focus();
         });
         inputGrid.addEventListener("input", (event) => {
-          if (tabTutorialActive) return;
           if (gameMode !== "stages" || phase !== "recall") return;
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (!stage) return;
-          if (tabTutorialStageIds.has(stage.id)) {
-            if (tabTutorialShownRound === round) return;
-            const input = event.target && event.target.closest('input[data-index="0"]');
-            if (!input || !input.value) return;
-            tabTutorialShownRound = round;
-            tabTutorialActive = enterToNextEnabled ? false : true;
-            if (!enterToNextEnabled) { 
-              tabTutorialDisabledInputs = [];
-              inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
-                const idx = Number(field.dataset.index);
-                if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
-                  field.disabled = true;
-                  tabTutorialDisabledInputs.push(field);
-                }
-              });
+          const hintMessage = getFirstLetterHintMessage(stage);
+          if (tabTutorialActive && !hintMessage) return;
+          if (isTabTutorialEnabledForStage(stage) && !enterToNextEnabled) {
+            if (tabTutorialShownRound !== round) {
+              const input = event.target && event.target.closest('input[data-index="0"]');
+              if (input && input.value) {
+                tabTutorialShownRound = round;
+                tabTutorialActive = true;
+                tabTutorialDisabledInputs = [];
+                inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
+                  const idx = Number(field.dataset.index);
+                  if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
+                    field.disabled = true;
+                    tabTutorialDisabledInputs.push(field);
+                  }
+                });
+              }
             }
-            return;
           }
-          const hintMessage = firstLetterHintStageMessages[stage.id];
           if (!hintMessage) return;
           const targetInput = event.target && event.target.closest('input[data-index]');
           if (!targetInput) return;
@@ -2271,9 +2551,7 @@ function runFlashCountdown(onComplete) {
           }
           document.body.classList.remove("home-anim");
           await new Promise((resolve) => window.requestAnimationFrame(resolve));
-          const fallbackTimer = window.setTimeout(() => {
-            showSplashAfterLoading();
-          }, 3000);
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
           try {
             const bestTimesSnapshot = window.stageBestTimes ? { ...window.stageBestTimes } : {};
           window.stageStars = {};
@@ -2295,6 +2573,14 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem(APPEARANCE_FONT_KEY);
           window.localStorage.removeItem(APPEARANCE_LAYOUT_KEY);
           window.localStorage.removeItem(KEYBINDS_STORAGE_KEY);
+          window.localStorage.removeItem("flashRecallSuccessAnimation");
+          window.localStorage.removeItem("flashRecallFlashCountdown");
+          window.localStorage.removeItem("flashRecallAutoAdvanceNext");
+          window.localStorage.removeItem("flashRecallEnterToNext");
+          window.localStorage.removeItem(LEADERBOARDS_ENABLED_STORAGE_KEY);
+          window.localStorage.removeItem(AUDIO_MASTER_KEY);
+          window.localStorage.removeItem(AUDIO_MUSIC_KEY);
+          window.localStorage.removeItem(AUDIO_EFFECTS_KEY);
           const resetTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
             ? defaultAppearance.theme
             : appearanceOptions.themes[0];
@@ -2309,6 +2595,41 @@ function runFlashCountdown(onComplete) {
             resetFont,
             resetLayout
           );
+          if (appearanceTheme) {
+            appearanceTheme.value = resetTheme;
+          }
+          if (appearanceFont) {
+            appearanceFont.value = resetFont;
+          }
+          if (successAnimationToggle) {
+            successAnimationToggle.checked = Boolean(defaultControlSettings.successAnimation);
+            setSuccessAnimationEnabled(successAnimationToggle.checked);
+          }
+          if (flashCountdownToggle) {
+            flashCountdownToggle.checked = Boolean(defaultControlSettings.flashCountdown);
+            flashCountdownEnabled = flashCountdownToggle.checked;
+          }
+          if (autoAdvanceNextToggle) {
+            autoAdvanceNextToggle.checked = Boolean(defaultControlSettings.autoAdvanceNext);
+            autoAdvanceNextEnabled = autoAdvanceNextToggle.checked;
+            if (!autoAdvanceNextEnabled && autoAdvanceNextTimerId) {
+              clearTimeout(autoAdvanceNextTimerId);
+              autoAdvanceNextTimerId = null;
+              cancelStageNextAutoAdvanceBar();
+            }
+          }
+          if (enterToNextToggle) {
+            enterToNextToggle.checked = Boolean(defaultControlSettings.enterToNext);
+            enterToNextEnabled = enterToNextToggle.checked;
+          }
+          if (photosensitivityWarningToggle) {
+            setFlashWarningEnabled(Boolean(defaultControlSettings.flashWarningEnabled), false);
+          }
+          if (leaderboardsEnabledToggle) {
+            leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
+            leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+          }
+          applyAudioSettings(defaultAudioSettings, false);
           keybinds = { ...defaultKeybinds };
           activeRebindAction = null;
           refreshKeybindButtons();
@@ -2325,6 +2646,9 @@ function runFlashCountdown(onComplete) {
             window.deactivateLocalLeaderboardEntries(bestTimesSnapshot).catch(() => {});
           }
           if (typeof window.rotateLeaderboardPlayerId === "function") {
+            try {
+              sessionStorage.setItem("flashRecallSkipInitialLoading", "1");
+            } catch (error) {}
             window.rotateLeaderboardPlayerId();
             window.setTimeout(() => {
               window.location.reload();
@@ -2354,7 +2678,6 @@ function runFlashCountdown(onComplete) {
           showSplashAfterLoading();
           resetLoadingActive = false;
           } finally {
-            window.clearTimeout(fallbackTimer);
           }
         });
         resetConfirmYes.addEventListener("keydown", (event) => {
@@ -2859,6 +3182,10 @@ function runFlashCountdown(onComplete) {
         drawBlur();
       });
 
+      window.addEventListener("resize", () => {
+        if (document.body.dataset.view !== "stages") return;
+      });
+
       window.addEventListener("keydown", (event) => {
         if (!isPlatformerControlActive()) return;
         const key = event.key.toLowerCase();
@@ -2990,6 +3317,11 @@ function runFlashCountdown(onComplete) {
 
       function handleResultActionClick(event) {
         clearResultAutoActionCountdown();
+        if (autoAdvanceNextTimerId) {
+          clearTimeout(autoAdvanceNextTimerId);
+          autoAdvanceNextTimerId = null;
+          cancelStageNextAutoAdvanceBar();
+        }
         const menuButton = event.target.closest("#stageMenuButton, #stageBackButton");
         if (menuButton) {
           // Analytics: Track level quit via back button
@@ -3021,7 +3353,10 @@ function runFlashCountdown(onComplete) {
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const nextIndex = stageState.index + 1;
           if (!stages[nextIndex]) return;
-          startStage(nextIndex, { skipIntro: false });
+          if (typeof window.setStageIntroAnimationMode === "function") {
+            window.setStageIntroAnimationMode("soft");
+          }
+          startStage(nextIndex, { skipIntro: false, originEl: null });
           return;
         }
         const practiceBack = event.target.closest("#practiceBackButton");
@@ -3148,6 +3483,11 @@ function runFlashCountdown(onComplete) {
             }
             return;
           }
+        }
+        if (!isTextEntryTarget(event.target) && keybindMatches(event, "fullscreen")) {
+          event.preventDefault();
+          toggleFullscreen();
+          return;
         }
         if (referenceModal && referenceModal.classList.contains("show")) {
           if (event.key === "Escape") {
@@ -3312,7 +3652,7 @@ function runFlashCountdown(onComplete) {
         } else if (phase === "recall") {
           const inputs = Array.from(inputGrid.querySelectorAll('input[data-index]'));
           const activeIndex = inputs.indexOf(document.activeElement);
-          if (activeIndex !== -1 && activeIndex < inputs.length - 1) {
+          if (enterToNextEnabled && activeIndex !== -1 && activeIndex < inputs.length - 1) {
             event.preventDefault();
             inputs[activeIndex + 1].focus();
             return;
@@ -3478,8 +3818,22 @@ function runFlashCountdown(onComplete) {
           setSuccessAnimationEnabled(successAnimationToggle.checked);
         });
       }
-      enterToNextEnabled = true;
-
+      if (enterToNextToggle) {
+        const storageKey = "flashRecallEnterToNext";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          enterToNextToggle.checked = saved === "1";
+        } else {
+          enterToNextToggle.checked = Boolean(defaultControlSettings.enterToNext);
+        }
+        enterToNextEnabled = enterToNextToggle.checked;
+        enterToNextToggle.addEventListener("change", () => {
+          enterToNextEnabled = enterToNextToggle.checked;
+          window.localStorage.setItem(storageKey, enterToNextEnabled ? "1" : "0");
+        });
+      } else {
+        enterToNextEnabled = Boolean(defaultControlSettings.enterToNext);
+      }
 
       if (flashCountdownToggle) {
         const storageKey = "flashRecallFlashCountdown";
@@ -3494,6 +3848,52 @@ function runFlashCountdown(onComplete) {
           flashCountdownEnabled = flashCountdownToggle.checked;
           window.localStorage.setItem(storageKey, flashCountdownToggle.checked ? "1" : "0");
         });
+      }
+      if (autoAdvanceNextToggle) {
+        const storageKey = "flashRecallAutoAdvanceNext";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          autoAdvanceNextToggle.checked = saved === "1";
+        } else {
+          autoAdvanceNextToggle.checked = Boolean(defaultControlSettings.autoAdvanceNext);
+        }
+        autoAdvanceNextEnabled = autoAdvanceNextToggle.checked;
+        autoAdvanceNextToggle.addEventListener("change", () => {
+          autoAdvanceNextEnabled = autoAdvanceNextToggle.checked;
+          window.localStorage.setItem(storageKey, autoAdvanceNextToggle.checked ? "1" : "0");
+          if (!autoAdvanceNextEnabled) {
+            if (typeof window.clearDeferredAutoAdvanceNext === "function") {
+              window.clearDeferredAutoAdvanceNext();
+            }
+            if (autoAdvanceNextTimerId) {
+              clearTimeout(autoAdvanceNextTimerId);
+              autoAdvanceNextTimerId = null;
+              cancelStageNextAutoAdvanceBar();
+            }
+          }
+        });
+      } else {
+        autoAdvanceNextEnabled = Boolean(defaultControlSettings.autoAdvanceNext);
+      }
+
+      if (leaderboardsEnabledToggle) {
+        const storageKey = LEADERBOARDS_ENABLED_STORAGE_KEY;
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          leaderboardsEnabledToggle.checked = saved === "1";
+        } else {
+          leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
+        }
+        leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+        leaderboardsEnabledToggle.addEventListener("change", () => {
+          leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+          window.localStorage.setItem(storageKey, leaderboardsEnabled ? "1" : "0");
+          if (typeof window.refreshVisibleLeaderboards === "function") {
+            window.refreshVisibleLeaderboards();
+          }
+        });
+      } else {
+        leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
       }
 
       if (appearanceTheme && appearanceFont) {

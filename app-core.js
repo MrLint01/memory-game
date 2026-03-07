@@ -87,14 +87,18 @@ const revealInput = document.getElementById("revealTime");
       const keybindStageQuit = document.getElementById("keybindStageQuit");
       const keybindPracticeHome = document.getElementById("keybindPracticeHome");
       const keybindPracticeSettings = document.getElementById("keybindPracticeSettings");
+      const keybindFullscreen = document.getElementById("keybindFullscreen");
       const keybindResetDefaults = document.getElementById("keybindResetDefaults");
       const flashCountdownToggle = document.getElementById("flashCountdownToggle");
+      const enterToNextToggle = document.getElementById("enterToNextToggle");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
       const flashStageModal = document.getElementById("flashStageModal");
       const flashStageStart = document.getElementById("flashStageStart");
       const flashCountdown = document.getElementById("flashCountdown");
       const flashStageSkip = document.getElementById("flashStageSkip");
+      const autoAdvanceNextToggle = document.getElementById("autoAdvanceNextToggle");
+      const leaderboardsEnabledToggle = document.getElementById("leaderboardsEnabledToggle");
       const stageIntroModal = document.getElementById("stageIntroModal");
       const stageIntroTitle = document.getElementById("stageIntroTitle");
       const stageIntroSubtitle = document.getElementById("stageIntroSubtitle");
@@ -155,6 +159,8 @@ const revealInput = document.getElementById("revealTime");
       }
       let roundItems = [];
       let roundItemsBase = [];
+      let lastRoundItems = null;
+      let lastRoundStageId = null;
       let gameMode = "practice";
       let pausedState = null;
       let timerState = null;
@@ -171,6 +177,9 @@ const revealInput = document.getElementById("revealTime");
         keys: { left: false, right: false, jump: false }
       };
       let adTimer = null;
+      let autoAdvanceNextTimerId = null;
+      let autoAdvanceNextEnabled = true;
+      let stageIntroAutoStartTimerId = null;
       let adEnabled = false;
       let adActive = false;
       let adShownThisRound = false;
@@ -1200,6 +1209,12 @@ const revealInput = document.getElementById("revealTime");
         return plan;
       }
 
+      function buildItemKey(category, label) {
+        const value = String(label || "").trim();
+        if (!value) return String(category || "").toLowerCase();
+        return value[0].toLowerCase();
+      }
+
       function pickItems() {
         const options = getChallengeOptions(round);
         const stage = gameMode === "stages" && window.getStageConfig
@@ -1209,6 +1224,8 @@ const revealInput = document.getElementById("revealTime");
           gameMode === "stages" && window.getStageCardCounts
             ? window.getStageCardCounts(stage)
             : null;
+        const uniqueCardTypesPerRound =
+          gameMode === "stages" && stage && stage.uniqueCardTypesPerRound === true;
         let categories = getActiveCategories(round);
         let forcedCategory = null;
         if (gameMode === "stages" && stage && Number(stage.rounds) > 1) {
@@ -1265,8 +1282,23 @@ const revealInput = document.getElementById("revealTime");
         }, 0);
         const targetCount = Math.max(1, count);
         const allowDuplicates = uniquePool > 0 && count > uniquePool;
+        const noRepeatAcrossRounds =
+          gameMode === "stages" && stage && stage.noRepeatAcrossRounds === true;
+        const previousKeysByIndex =
+          noRepeatAcrossRounds &&
+          lastRoundStageId === (stage && stage.id) &&
+          Array.isArray(lastRoundItems) &&
+          lastRoundItems.length
+            ? lastRoundItems.map((item) => buildItemKey(item.category, item.label))
+            : null;
         const chosen = [];
         const used = new Set();
+        const usedCategories = new Set();
+        const noteCategoryUsed = (category) => {
+          if (uniqueCardTypesPerRound) {
+            usedCategories.add(category);
+          }
+        };
         const findFixedItem = (category, label) => {
           const list = dataSets[category];
           if (!Array.isArray(list) || !list.length) {
@@ -1286,24 +1318,32 @@ const revealInput = document.getElementById("revealTime");
         const pickFromCategory = (category) => {
           const list = dataSets[category];
           if (!Array.isArray(list) || !list.length) return false;
-          const rawItem = list[Math.floor(Math.random() * list.length)];
-          const item = typeof rawItem === "string" ? { label: rawItem } : rawItem;
-          const key = `${category}-${item.label}`.toLowerCase();
-          if (!allowDuplicates) {
-            if (used.has(key)) return false;
-            used.add(key);
+          if (uniqueCardTypesPerRound && usedCategories.has(category)) return false;
+          const maxAttempts = Math.min(10, list.length);
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const rawItem = list[Math.floor(Math.random() * list.length)];
+            const item = typeof rawItem === "string" ? { label: rawItem } : rawItem;
+            const key = `${category}-${item.label}`.toLowerCase();
+            if (!allowDuplicates && used.has(key)) continue;
+            if (!allowDuplicates) {
+              used.add(key);
+            }
+            chosen.push({ ...item, category });
+            noteCategoryUsed(category);
+            return true;
           }
-          chosen.push({ ...item, category });
-          return true;
+          return false;
         };
         if (fixedCards && fixedCards.length) {
           fixedCards.slice(0, targetCount).forEach((entry) => {
             if (!entry || typeof entry.category !== "string" || typeof entry.label !== "string") return;
             const item = findFixedItem(entry.category, entry.label);
             const key = `${entry.category}-${item.label}`.toLowerCase();
+            if (uniqueCardTypesPerRound && usedCategories.has(entry.category)) return;
             if (!allowDuplicates && used.has(key)) return;
             used.add(key);
             chosen.push({ ...item, category: entry.category });
+            noteCategoryUsed(entry.category);
           });
         }
         if (cardCounts && typeof cardCounts === "object") {
@@ -1318,14 +1358,87 @@ const revealInput = document.getElementById("revealTime");
             }
           });
         }
-        while (chosen.length < targetCount) {
-          const category = categories[Math.floor(Math.random() * categories.length)];
-          pickFromCategory(category);
+        let remainingUniqueCategories = null;
+        if (uniqueCardTypesPerRound) {
+          remainingUniqueCategories = shuffleArray(
+            categories.filter((category) => !usedCategories.has(category))
+          );
         }
-        if (!fixedCards || !fixedCards.length) {
-          for (let i = chosen.length - 1; i > 0; i -= 1) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
+        let fillGuard = 0;
+        const maxFillGuard = 200;
+        while (chosen.length < targetCount) {
+          if (fillGuard >= maxFillGuard) break;
+          const category = uniqueCardTypesPerRound &&
+            remainingUniqueCategories &&
+            remainingUniqueCategories.length
+            ? remainingUniqueCategories.pop()
+            : categories[Math.floor(Math.random() * categories.length)];
+          const picked = pickFromCategory(category);
+          if (!picked) {
+            fillGuard += 1;
+            continue;
+          }
+          fillGuard = 0;
+        }
+        const canShuffle = !fixedCards || !fixedCards.length;
+        if (canShuffle) {
+          const shuffleInPlace = (list) => {
+            for (let i = list.length - 1; i > 0; i -= 1) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [list[i], list[j]] = [list[j], list[i]];
+            }
+          };
+          const hasSameSlotRepeat = (list) => {
+            if (!previousKeysByIndex) return false;
+            const limit = Math.min(list.length, previousKeysByIndex.length);
+            for (let i = 0; i < limit; i += 1) {
+              const prevKey = previousKeysByIndex[i];
+              if (!prevKey) continue;
+              if (buildItemKey(list[i].category, list[i].label) === prevKey) {
+                return true;
+              }
+            }
+            return false;
+          };
+          if (previousKeysByIndex && previousKeysByIndex.length) {
+            const maxAttempts = 10;
+            if (chosen.length <= 1) {
+              const prevKey = previousKeysByIndex[0];
+              if (prevKey && buildItemKey(chosen[0].category, chosen[0].label) === prevKey) {
+                let replacement = null;
+                for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                  const category = categories[Math.floor(Math.random() * categories.length)];
+                  const list = dataSets[category];
+                  if (!Array.isArray(list) || !list.length) continue;
+                  const rawItem = list[Math.floor(Math.random() * list.length)];
+                  const item = typeof rawItem === "string" ? { label: rawItem } : rawItem;
+                  const key = buildItemKey(category, item.label);
+                  if (key === prevKey) continue;
+                  replacement = { ...item, category };
+                  break;
+                }
+                if (replacement) {
+                  chosen[0] = replacement;
+                }
+              }
+            } else {
+              let candidate = chosen.slice();
+              let fallback = candidate.slice();
+              let satisfied = false;
+              for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                shuffleInPlace(candidate);
+                fallback = candidate.slice();
+                if (!hasSameSlotRepeat(candidate)) {
+                  satisfied = true;
+                  break;
+                }
+              }
+              const result = satisfied ? candidate : fallback;
+              chosen.length = 0;
+              chosen.push(...result);
+            }
+          } else {
+            shuffleInPlace(chosen);
           }
         }
         const plan = planModifierAssignments(chosen, options);

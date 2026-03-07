@@ -24,6 +24,24 @@
           </div>
         </div>
         <div class="control-group">
+          <label>Gameplay</label>
+          <div class="checkboxes">
+            <label>
+              <input id="autoAdvanceNextToggle" type="checkbox" checked />
+              Auto-advance to next stage after clear
+            </label>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Leaderboards</label>
+          <div class="checkboxes">
+            <label>
+              <input id="leaderboardsEnabledToggle" type="checkbox" checked />
+              Enable leaderboard reads and writes
+            </label>
+          </div>
+        </div>
+        <div class="control-group">
           <label>Progress</label>
           <div class="confirm-anchor">
             <div class="checkboxes">
@@ -40,6 +58,16 @@
         </div>
       </div>
       <div class="settings-pane" data-settings-pane="controls" hidden>
+        <div class="control-group">
+          <label>Keyboard controls</label>
+          <div class="checkboxes">
+            <label>
+              <input id="enterToNextToggle" type="checkbox" checked />
+              Press Enter to move to next card input
+            </label>
+          </div>
+        </div>
+        <hr class="settings-divider settings-divider--section" />
         <div class="control-group control-group--keybinds">
           <label>Action keybinds</label>
           <div class="keybind-grid">
@@ -62,6 +90,10 @@
             <div class="keybind-row">
               <span>Sandbox settings</span>
               <button id="keybindPracticeSettings" class="secondary keybind-btn" type="button">S</button>
+            </div>
+            <div class="keybind-row">
+              <span>Toggle fullscreen</span>
+              <button id="keybindFullscreen" class="secondary keybind-btn" type="button">F</button>
             </div>
           </div>
           <div id="keybindStatus" class="small" aria-live="polite"></div>

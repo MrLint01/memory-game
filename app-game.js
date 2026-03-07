@@ -44,18 +44,54 @@
       function setModalState(modal, open) {
         if (!modal) return;
         if (open) {
-          modal.classList.add("show");
           modal.removeAttribute("aria-hidden");
           modal.removeAttribute("inert");
           modal.removeAttribute("hidden");
+          if (modal.__closeTimer) {
+            clearTimeout(modal.__closeTimer);
+            modal.__closeTimer = null;
+          }
+          if (modal.dataset.closing === "true") {
+            delete modal.dataset.closing;
+          }
+          if (modal.classList.contains("closing")) {
+            modal.classList.remove("closing");
+          }
+          if (!modal.classList.contains("show")) {
+            // Ensure transitions fire after un-hiding.
+            modal.classList.remove("show");
+            void modal.offsetWidth;
+            modal.classList.add("show");
+          }
         } else {
           if (document.activeElement && modal.contains(document.activeElement)) {
             document.activeElement.blur();
           }
-          modal.classList.remove("show");
           modal.setAttribute("aria-hidden", "true");
           modal.setAttribute("inert", "");
-          modal.setAttribute("hidden", "");
+          if (modal.hasAttribute("hidden") || modal.dataset.closing === "true") {
+            return;
+          }
+          modal.dataset.closing = "true";
+          modal.classList.add("closing");
+          const finishClose = () => {
+            if (modal.dataset.closing !== "true") return;
+            delete modal.dataset.closing;
+            modal.classList.remove("closing");
+            modal.classList.remove("show");
+            modal.setAttribute("hidden", "");
+            modal.removeEventListener("transitionend", onCloseEnd);
+            if (modal.__closeTimer) {
+              clearTimeout(modal.__closeTimer);
+              modal.__closeTimer = null;
+            }
+          };
+          const onCloseEnd = (event) => {
+            if (event.target !== modal) return;
+            finishClose();
+          };
+          modal.addEventListener("transitionend", onCloseEnd);
+          modal.__closeTimer = setTimeout(finishClose, 260);
         }
       }
 
@@ -506,15 +542,119 @@
                 <span class="action-countdown" aria-live="polite"></span>
                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
               </button>
-              <button id="stageNextButton" class="secondary icon-button button-entice" type="button" aria-label="Next (${stageNextKey})">
-                <img class="action-icon" src="imgs/next_button.png" alt="" />
-                <span class="action-countdown" aria-live="polite"></span>
-                <span class="action-key-hint" aria-hidden="true">(${stageNextKey})</span>
-              </button>
+              <div class="stage-next-wrap">
+                <div class="stage-next-timer" aria-hidden="true">
+                  <span class="stage-next-timer__fill"></span>
+                </div>
+                <button id="stageNextButton" class="secondary icon-button button-entice" type="button" aria-label="Next (${stageNextKey})">
+                  <img class="action-icon" src="imgs/next_button.png" alt="" />
+                  <span class="action-key-hint" aria-hidden="true">(${stageNextKey})</span>
+                </button>
+              </div>
             </div>
           </div>
         `;
         resultsPanel.classList.add("show");
+
+        if (typeof window.maybePromptPlayerName === "function") {
+          window.maybePromptPlayerName();
+        }
+
+        const autoAdvanceDelayMs = 4500;
+        if (autoAdvanceNextTimerId) {
+          clearTimeout(autoAdvanceNextTimerId);
+          autoAdvanceNextTimerId = null;
+        }
+        const nextTimer = document.querySelector("#resultsPanel .stage-next-timer");
+        const nextTimerFill = nextTimer
+          ? nextTimer.querySelector(".stage-next-timer__fill")
+          : null;
+        const startAutoAdvanceNext = () => {
+          const autoAdvanceEnabledNow = typeof autoAdvanceNextEnabled === "undefined"
+            ? true
+            : autoAdvanceNextEnabled;
+          if (!autoAdvanceEnabledNow) {
+            if (nextTimer) {
+              nextTimer.classList.add("is-disabled");
+            }
+            return;
+          }
+          if (nextTimer) {
+            nextTimer.classList.remove("is-running");
+            nextTimer.classList.remove("is-canceled");
+            nextTimer.classList.remove("is-disabled");
+            nextTimer.classList.remove("is-waiting");
+          }
+          if (nextTimerFill) {
+            nextTimerFill.style.removeProperty("transition");
+            nextTimerFill.style.removeProperty("transition-duration");
+            nextTimerFill.style.removeProperty("transform");
+            nextTimerFill.style.transitionDuration = `${autoAdvanceDelayMs}ms`;
+          }
+          requestAnimationFrame(() => {
+            if (nextTimer) {
+              nextTimer.classList.add("is-running");
+            }
+          });
+          autoAdvanceNextTimerId = window.setTimeout(() => {
+            autoAdvanceNextTimerId = null;
+            const nextBtn = document.getElementById("stageNextButton");
+            const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+            if (nextBtn && stages[stageState.index + 1]) {
+              if (typeof window.setStageIntroAnimationMode === "function") {
+                window.setStageIntroAnimationMode("auto");
+              }
+              startStage(stageState.index + 1, { skipIntro: false, originEl: null });
+            }
+          }, autoAdvanceDelayMs);
+        };
+        const cancelAutoAdvanceNextFromResults = () => {
+          if (autoAdvanceNextTimerId) {
+            clearTimeout(autoAdvanceNextTimerId);
+            autoAdvanceNextTimerId = null;
+          }
+          if (nextTimer) {
+            nextTimer.classList.remove("is-running");
+            nextTimer.classList.remove("is-canceled");
+            nextTimer.classList.add("is-waiting");
+          }
+          if (nextTimerFill) {
+            nextTimerFill.style.removeProperty("transition");
+            nextTimerFill.style.removeProperty("transition-duration");
+            nextTimerFill.style.removeProperty("transform");
+          }
+        };
+        window.startAutoAdvanceNextFromResults = startAutoAdvanceNext;
+        window.cancelAutoAdvanceNextFromResults = cancelAutoAdvanceNextFromResults;
+        const autoAdvanceEnabled = typeof autoAdvanceNextEnabled === "undefined"
+          ? true
+          : autoAdvanceNextEnabled;
+        if (nextTimer) {
+          nextTimer.classList.toggle("is-disabled", !autoAdvanceEnabled);
+          if (!autoAdvanceEnabled) {
+            nextTimer.classList.remove("is-waiting");
+          }
+        }
+        if (autoAdvanceEnabled) {
+          const shouldDeferForName = typeof window.shouldPromptForPlayerName === "function"
+            ? window.shouldPromptForPlayerName()
+            : false;
+          const deferred = typeof window.deferAutoAdvanceNext === "function"
+            ? window.deferAutoAdvanceNext(startAutoAdvanceNext, shouldDeferForName)
+            : false;
+          if (deferred) {
+            if (nextTimer) {
+              nextTimer.classList.add("is-waiting");
+            }
+            if (nextTimerFill) {
+              nextTimerFill.style.removeProperty("transition");
+              nextTimerFill.style.removeProperty("transition-duration");
+              nextTimerFill.style.removeProperty("transform");
+            }
+          } else {
+            startAutoAdvanceNext();
+          }
+        }
 
         // Trigger bar fill animation after a short delay so the browser paints width:0 first
 
@@ -645,9 +785,6 @@
         //     });
         // }
 
-        if (typeof window.maybePromptPlayerName === "function") {
-          window.maybePromptPlayerName();
-        }
       }
 
       function refreshResultAutoActionCountdown() {
@@ -1147,6 +1284,19 @@
           roundItemsBase = roundItems.map((item) => ({ ...item }));
         } else {
           roundItems = roundItemsBase.map((item) => ({ ...item }));
+        }
+        if (advanceRound && gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          if (stage && stage.noRepeatAcrossRounds) {
+            lastRoundItems = roundItems.map((item) => ({
+              category: item.category,
+              label: item.label
+            }));
+            lastRoundStageId = stage.id;
+          } else {
+            lastRoundItems = null;
+            lastRoundStageId = null;
+          }
         }
         renderCards(true);
         renderInputs();

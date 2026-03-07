@@ -21,8 +21,10 @@
     controls: {
       successAnimation: true,
       flashCountdown: true,
-      enterToNext: true,
-      flashWarningEnabled: true
+      autoAdvanceNext: true,
+      enterToNext: false,
+      flashWarningEnabled: true,
+      leaderboardsEnabled: true
     },
     audio: {
       master: 100,
@@ -34,7 +36,8 @@
       stageNext: "enter",
       stageQuit: "q",
       practiceHome: "h",
-      practiceSettings: "s"
+      practiceSettings: "s",
+      fullscreen: "f"
     },
     playerName: {
       value: ""
