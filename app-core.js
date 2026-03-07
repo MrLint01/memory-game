@@ -3,6 +3,7 @@ const revealInput = document.getElementById("revealTime");
       const practiceStart = document.getElementById("practiceStart");
       const playStart = document.getElementById("playStart");
       const splashScreen = document.getElementById("splashScreen");
+      const splashAutoStartMessage = document.getElementById("splashAutoStartMessage");
       const splashLoading = document.getElementById("splashLoading");
       const mainHeader = document.querySelector("header");
       const mainMenuTitle = document.getElementById("mainMenuTitle");
@@ -55,10 +56,24 @@ const revealInput = document.getElementById("revealTime");
       const practicePreviousCard = document.getElementById("practicePreviousCard");
       const settingsOpen = document.getElementById("settingsOpen");
       const statsOpen = document.getElementById("statsOpen");
+      const achievementsOpen = document.getElementById("achievementsOpen");
       const settingsModal = document.getElementById("settingsModal");
       const settingsClose = document.getElementById("settingsClose");
       const statsModal = document.getElementById("statsModal");
       const statsClose = document.getElementById("statsClose");
+      const achievementsModal = document.getElementById("achievementsModal");
+      const achievementsClose = document.getElementById("achievementsClose");
+      const achievementsList = document.getElementById("achievementsList");
+      const achievementsEmpty = document.getElementById("achievementsEmpty");
+      const achievementsSummary = document.getElementById("achievementsSummary");
+      const achievementInfoModal = document.getElementById("achievementInfoModal");
+      const achievementInfoCard = document.getElementById("achievementInfoCard");
+      const achievementInfoIcon = document.getElementById("achievementInfoIcon");
+      const achievementInfoTitle = document.getElementById("achievementInfoTitle");
+      const achievementInfoDescription = document.getElementById("achievementInfoDescription");
+      const achievementInfoMeta = document.getElementById("achievementInfoMeta");
+      const achievementInfoClose = document.getElementById("achievementInfoClose");
+      const achievementToastStack = document.getElementById("achievementToastStack");
       const statsLeaderboardOpen = document.getElementById("statsLeaderboardOpen");
       const statsLeaderboardModal = document.getElementById("statsLeaderboardModal");
       const statsLeaderboardTitle = document.getElementById("statsLeaderboardTitle");
@@ -72,7 +87,7 @@ const revealInput = document.getElementById("revealTime");
       const playerNameSetting = document.getElementById("playerNameSetting");
       const photosensitivityWarningToggle = document.getElementById("photosensitivityWarningToggle");
       const appearanceTheme = document.getElementById("appearanceTheme");
-      const appearanceFont = document.getElementById("appearanceFont");
+      const appearanceColorVision = document.getElementById("appearanceColorVision");
       const appearanceLayout = document.getElementById("appearanceLayout");
       const appearanceShuffle = document.getElementById("appearanceShuffle");
       const audioMasterVolume = document.getElementById("audioMasterVolume");
@@ -93,6 +108,151 @@ const revealInput = document.getElementById("revealTime");
       const enterToNextToggle = document.getElementById("enterToNextToggle");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
+
+      const colorVisionProfiles = {
+        standard: {
+          palette: {
+            red: { label: "Red", color: "#ef4444", pattern: "solid" },
+            blue: { label: "Blue", color: "#3b82f6", pattern: "solid" },
+            yellow: { label: "Yellow", color: "#facc15", pattern: "solid" },
+            green: { label: "Green", color: "#22c55e", pattern: "solid" },
+            white: { label: "White", color: "#f8fafc", pattern: "solid" },
+            orange: { label: "Orange", color: "#f97316", pattern: "solid" },
+            pink: { label: "Pink", color: "#ec4899", pattern: "solid" },
+            brown: { label: "Brown", color: "#8b5e34", pattern: "solid" },
+            purple: { label: "Purple", color: "#8b5cf6", pattern: "solid" }
+          }
+        },
+        protanopia: {
+          palette: {
+            red: { label: "Red", color: "#b24592", pattern: "diagonal" },
+            blue: { label: "Blue", color: "#2563eb", pattern: "dots" },
+            yellow: { label: "Yellow", color: "#f5d547", pattern: "horizontal" },
+            green: { label: "Green", color: "#14866d", pattern: "vertical" },
+            white: { label: "White", color: "#f8fafc", pattern: "solid" },
+            orange: { label: "Orange", color: "#c47a1b", pattern: "crosshatch" },
+            pink: { label: "Pink", color: "#e07bb2", pattern: "rings" },
+            brown: { label: "Brown", color: "#6b4f2d", pattern: "grid" },
+            purple: { label: "Purple", color: "#6d5bd0", pattern: "waves" }
+          }
+        },
+        deuteranopia: {
+          palette: {
+            red: { label: "Red", color: "#c05a8a", pattern: "diagonal" },
+            blue: { label: "Blue", color: "#2f6fde", pattern: "dots" },
+            yellow: { label: "Yellow", color: "#f0d247", pattern: "horizontal" },
+            green: { label: "Green", color: "#1c8d7b", pattern: "vertical" },
+            white: { label: "White", color: "#f8fafc", pattern: "solid" },
+            orange: { label: "Orange", color: "#c7831e", pattern: "crosshatch" },
+            pink: { label: "Pink", color: "#e38ec2", pattern: "rings" },
+            brown: { label: "Brown", color: "#6b5136", pattern: "grid" },
+            purple: { label: "Purple", color: "#7358d7", pattern: "waves" }
+          }
+        },
+        tritanopia: {
+          palette: {
+            red: { label: "Red", color: "#d44c4c", pattern: "diagonal" },
+            blue: { label: "Blue", color: "#3a86a8", pattern: "dots" },
+            yellow: { label: "Yellow", color: "#e6b800", pattern: "horizontal" },
+            green: { label: "Green", color: "#3ba55d", pattern: "vertical" },
+            white: { label: "White", color: "#f8fafc", pattern: "solid" },
+            orange: { label: "Orange", color: "#f08b24", pattern: "crosshatch" },
+            pink: { label: "Pink", color: "#d46aa5", pattern: "rings" },
+            brown: { label: "Brown", color: "#7b5838", pattern: "grid" },
+            purple: { label: "Purple", color: "#7a4cc2", pattern: "waves" }
+          }
+        },
+        monochromacy: {
+          palette: {
+            red: { label: "Red", color: "#1f2937", pattern: "diagonal" },
+            blue: { label: "Blue", color: "#334155", pattern: "dots" },
+            yellow: { label: "Yellow", color: "#475569", pattern: "horizontal" },
+            green: { label: "Green", color: "#64748b", pattern: "vertical" },
+            white: { label: "White", color: "#f8fafc", pattern: "solid" },
+            orange: { label: "Orange", color: "#94a3b8", pattern: "crosshatch" },
+            pink: { label: "Pink", color: "#cbd5e1", pattern: "rings" },
+            brown: { label: "Brown", color: "#52525b", pattern: "grid" },
+            purple: { label: "Purple", color: "#0f172a", pattern: "waves" }
+          }
+        }
+      };
+
+      function normalizeColorVisionLabel(label) {
+        return String(label || "").trim().toLowerCase();
+      }
+
+      function getColorVisionMode() {
+        const requestedMode = document.body.dataset.colorVision || "standard";
+        return Object.prototype.hasOwnProperty.call(colorVisionProfiles, requestedMode)
+          ? requestedMode
+          : "standard";
+      }
+
+      function getAccessibleColorEntry(label, fallbackColor) {
+        const key = normalizeColorVisionLabel(label);
+        const profile = colorVisionProfiles[getColorVisionMode()] || colorVisionProfiles.standard;
+        const entry = profile.palette[key] || colorVisionProfiles.standard.palette[key];
+        if (entry) {
+          return {
+            label: entry.label,
+            color: entry.color,
+            pattern: entry.pattern || "solid"
+          };
+        }
+        return {
+          label: label || "",
+          color: fallbackColor || "#94a3b8",
+          pattern: "solid"
+        };
+      }
+
+      function getReadableCardInk(hexColor) {
+        const value = String(hexColor || "").trim();
+        const match = value.match(/^#?([0-9a-f]{6})$/i);
+        if (!match) return "#0f172a";
+        const hex = match[1];
+        const red = parseInt(hex.slice(0, 2), 16);
+        const green = parseInt(hex.slice(2, 4), 16);
+        const blue = parseInt(hex.slice(4, 6), 16);
+        const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+        return luminance > 0.58 ? "#0f172a" : "#f8fafc";
+      }
+
+      function applyCardColorVisionAssist(card, fillCue, textCue) {
+        const existingCueStack = card.querySelector(".card-color-cues");
+        if (existingCueStack) {
+          existingCueStack.remove();
+        }
+        delete card.dataset.fillPattern;
+        card.classList.remove("card--color-vision");
+        if (getColorVisionMode() === "standard" || (!fillCue && !textCue)) {
+          return;
+        }
+        card.classList.add("card--color-vision");
+        if (fillCue && fillCue.pattern && fillCue.pattern !== "solid") {
+          card.dataset.fillPattern = fillCue.pattern;
+        }
+        const cueStack = document.createElement("div");
+        cueStack.className = "card-color-cues";
+        if (fillCue) {
+          const fillBadge = document.createElement("span");
+          fillBadge.className = "card-color-cue";
+          fillBadge.textContent = `Fill: ${fillCue.label}`;
+          cueStack.appendChild(fillBadge);
+        }
+        if (textCue) {
+          const textBadge = document.createElement("span");
+          textBadge.className = "card-color-cue";
+          textBadge.textContent = `Text: ${textCue.label}`;
+          cueStack.appendChild(textBadge);
+        }
+        if (cueStack.childElementCount) {
+          card.appendChild(cueStack);
+        }
+      }
+
+      window.getFlashRecallColorVisionMode = getColorVisionMode;
+      window.getAccessibleColorEntry = getAccessibleColorEntry;
       const flashStageModal = document.getElementById("flashStageModal");
       const flashStageStart = document.getElementById("flashStageStart");
       const flashCountdown = document.getElementById("flashCountdown");
@@ -220,23 +380,85 @@ const revealInput = document.getElementById("revealTime");
       let lastCompletedLevel = 0;
       let dragSelecting = false;
       let dragTargetState = null;
+      function getCurrentModifierKeys() {
+        if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+          const modifiers = window.getStageModifiers
+            ? window.getStageModifiers(stage)
+            : (stage && stage.modifiers ? stage.modifiers : {});
+          return Object.keys(modifiers || {}).filter((key) => Boolean(modifiers[key]));
+        }
+        const active = [];
+        if (practiceMathOps && practiceMathOps.checked) active.push("mathOps");
+        if (practiceMathOpsPlus && practiceMathOpsPlus.checked) active.push("mathOpsPlus");
+        if (practiceMisleadColors && practiceMisleadColors.checked) active.push("misleadColors");
+        if (practiceBackgroundColor && practiceBackgroundColor.checked) active.push("backgroundColor");
+        if (practiceTextColor && practiceTextColor.checked) active.push("textColor");
+        if (practicePreviousCard && practicePreviousCard.checked) active.push("previousCard");
+        if (practiceRotate && practiceRotate.checked) active.push("rotate");
+        if (practiceRotatePlus && practiceRotatePlus.checked) active.push("rotatePlus");
+        if (practiceSwap && practiceSwap.checked) active.push("swapCards");
+        if (practicePlatformer && practicePlatformer.checked) active.push("platformer");
+        if (practiceGlitch && practiceGlitch.checked) active.push("glitch");
+        if (practiceFog && practiceFog.checked) active.push("fog");
+        if (practiceBlur && practiceBlur.checked) active.push("blur");
+        if (practiceAds && practiceAds.checked) active.push("ads");
+        return active;
+      }
+
+      function incrementAchievementCounter(map, key, amount = 1) {
+        if (!map || !key || !Number.isFinite(amount) || amount <= 0) return;
+        map[key] = (Number(map[key]) || 0) + amount;
+      }
+
+      function buildRoundAchievementSnapshot(items) {
+        const safeItems = Array.isArray(items) ? items : [];
+        const cardTypeCounts = {};
+        const modifierVariantCounts = {};
+        safeItems.forEach((item) => {
+          if (!item || typeof item !== "object") return;
+          if (typeof item.category === "string" && item.category) {
+            incrementAchievementCounter(cardTypeCounts, item.category);
+          }
+          const itemModifiers = Array.isArray(item.achievementModifiers) ? item.achievementModifiers : [];
+          itemModifiers.forEach((modifierKey) => {
+            incrementAchievementCounter(modifierVariantCounts, modifierKey);
+          });
+        });
+        const perRoundModifiers = new Set(["swapCards", "platformer", "glitch", "fog", "blur", "ads"]);
+        getCurrentModifierKeys().forEach((modifierKey) => {
+          if (perRoundModifiers.has(modifierKey)) {
+            incrementAchievementCounter(modifierVariantCounts, modifierKey);
+          }
+        });
+        return { cardTypeCounts, modifierVariantCounts };
+      }
+
       function getActiveLevelContext() {
         if (gameMode !== "stages" || !stageState.active) return null;
         const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
-        const modifiers = window.getStageModifiers
-          ? window.getStageModifiers(stage)
-          : (stage && stage.modifiers ? stage.modifiers : {});
-        const activeModifiers = Object.keys(modifiers || {}).filter((key) => Boolean(modifiers[key]));
+        const activeModifiers = getCurrentModifierKeys();
         return {
           mode: gameMode,
           stage_index: stageState.index,
           level_number: stageState.index + 1,
           stage_name: stage && stage.name ? stage.name : null,
+          stage_type: stage && stage.stageType ? String(stage.stageType) : null,
           attempt_number: Number.isFinite(stageState.attempts) ? stageState.attempts : null,
           active_modifiers: activeModifiers
         };
       }
       window.getActiveLevelContext = getActiveLevelContext;
+      window.getCurrentModifierKeys = getCurrentModifierKeys;
+      window.getRoundAchievementSnapshot = buildRoundAchievementSnapshot;
+      window.achievementInfoModal = achievementInfoModal;
+      window.achievementInfoCard = achievementInfoCard;
+      window.achievementInfoIcon = achievementInfoIcon;
+      window.achievementInfoTitle = achievementInfoTitle;
+      window.achievementInfoDescription = achievementInfoDescription;
+      window.achievementInfoMeta = achievementInfoMeta;
+      window.achievementInfoClose = achievementInfoClose;
+      window.achievementToastStack = achievementToastStack;
       window.getCurrentGameMode = function getCurrentGameMode() {
         return gameMode;
       };
@@ -445,7 +667,7 @@ const revealInput = document.getElementById("revealTime");
                 costEl.className = "icon-cost";
                 tile.appendChild(costEl);
               }
-              costEl.innerHTML = `${cost}<span class="stage-star is-filled icon-cost__star">✦</span>`;
+              costEl.innerHTML = `${cost}<span class="stage-star is-filled icon-cost__star">\u2726</span>`;
             } else if (costEl) {
               costEl.remove();
             }
@@ -567,10 +789,10 @@ const revealInput = document.getElementById("revealTime");
           }
           if (entry.color) {
             const theme = document.body.dataset.theme;
-            const forceThemeInk = theme === "paper-night"
-              || theme === "ocean-deep"
-              || theme === "forest-camp"
-              || theme === "steel-grid";
+            const forceThemeInk = theme === "night-drive"
+              || theme === "ember-glow"
+              || theme === "velvet-noir"
+              || theme === "vault-ops";
             box.style.color = forceThemeInk ? "var(--ink)" : entry.color;
           }
           stageInstructions.appendChild(box);
@@ -923,12 +1145,20 @@ const revealInput = document.getElementById("revealTime");
           const answerLabel = formatCompassLabel(rotatedKey);
           const answerCategory =
             ["up", "right", "down", "left"].includes(rotatedKey) ? "directions" : "diagonal";
-          const symbol = direction === "ccw" ? "↺" : "↻";
+          const symbol = direction === "ccw" ? "\u21ba" : "\u21bb";
+          const achievementModifiers = Array.isArray(item.achievementModifiers)
+            ? item.achievementModifiers.slice()
+            : [];
+          const modifierKey = enableRotatePlus ? "rotatePlus" : "rotate";
+          if (!achievementModifiers.includes(modifierKey)) {
+            achievementModifiers.push(modifierKey);
+          }
           return {
             ...item,
             answer: answerLabel,
             answerCategory,
-            recallHint: `${degree}° ${symbol}`
+            recallHint: `${degree}\u00b0 ${symbol}`,
+            achievementModifiers
           };
         });
       }
@@ -951,10 +1181,10 @@ const revealInput = document.getElementById("revealTime");
         if (category === "directions") {
           const initial = expected.charAt(0);
           const arrowMap = {
-            up: "↑",
-            down: "↓",
-            left: "←",
-            right: "→"
+            up: "\u2191",
+            down: "\u2193",
+            left: "\u2190",
+            right: "\u2192"
           };
           const cardinalMap = { up: "n", right: "e", down: "s", left: "w" };
           return (
@@ -969,10 +1199,10 @@ const revealInput = document.getElementById("revealTime");
           const compact = actual.replace(/\s+/g, "");
           if (compact === expected || compact === normalized) return true;
           const arrowPairs = {
-            ne: ["↑→", "→↑"],
-            nw: ["↑←", "←↑"],
-            se: ["↓→", "→↓"],
-            sw: ["↓←", "←↓"]
+            ne: ["\u2191\u2192", "\u2192\u2191"],
+            nw: ["\u2191\u2190", "\u2190\u2191"],
+            se: ["\u2193\u2192", "\u2192\u2193"],
+            sw: ["\u2193\u2190", "\u2190\u2193"]
           };
           const allowed = arrowPairs[normalized];
             return Array.isArray(allowed) && allowed.includes(compact);
@@ -1001,7 +1231,10 @@ const revealInput = document.getElementById("revealTime");
           backgroundColorLabel: null,
           backgroundColorHex: null,
           textColorLabel: null,
-          textColorHex: null
+          textColorHex: null,
+          achievementModifiers: Array.isArray(item.achievementModifiers)
+            ? item.achievementModifiers.slice()
+            : []
         };
         const previousRoundItems =
           typeof window.getPreviousRoundItems === "function" ? window.getPreviousRoundItems() : null;
@@ -1019,6 +1252,9 @@ const revealInput = document.getElementById("revealTime");
           if (usePrevious && previousItem) {
             challenge.answer = previousItem.textLabel || previousItem.label || previousItem.answer || "";
             challenge.recallHint = "Previous card";
+            if (!challenge.achievementModifiers.includes("previousCard")) {
+              challenge.achievementModifiers.push("previousCard");
+            }
           }
         }
         const canUseTextColor = ["numbers", "letters", "colors"].includes(item.category);
@@ -1030,6 +1266,9 @@ const revealInput = document.getElementById("revealTime");
           const textColor = pickTextColor();
           challenge.textColorLabel = textColor.label;
           challenge.textColorHex = textColor.color;
+          if (!challenge.achievementModifiers.includes("textColor")) {
+            challenge.achievementModifiers.push("textColor");
+          }
           const promptChance =
             typeof options.textPromptChance === "number" ? options.textPromptChance : 0.5;
           const shouldPrompt = options._useTextPromptPlan
@@ -1048,6 +1287,9 @@ const revealInput = document.getElementById("revealTime");
               : plan.forceMislead || Math.random() < options.misleadChance;
             if (useMislead) {
               challenge.misleadingLabel = pickMisleadingLabel(item.label);
+              if (!challenge.achievementModifiers.includes("misleadColors")) {
+                challenge.achievementModifiers.push("misleadColors");
+              }
             }
           }
           challenge.textLabel = challenge.misleadingLabel || challenge.label;
@@ -1072,6 +1314,9 @@ const revealInput = document.getElementById("revealTime");
             if (challenge.colorTarget === "background") {
               challenge.answer = challenge.label;
               challenge.recallHint = "Background color";
+              if (!challenge.achievementModifiers.includes("backgroundColor")) {
+                challenge.achievementModifiers.push("backgroundColor");
+              }
             } else {
               challenge.answer = challenge.textLabel;
               challenge.recallHint = "Text";
@@ -1085,6 +1330,9 @@ const revealInput = document.getElementById("revealTime");
             const backgroundColor = pickBackgroundColor();
             challenge.backgroundColorLabel = backgroundColor.label;
             challenge.backgroundColorHex = backgroundColor.color;
+            if (!challenge.achievementModifiers.includes("backgroundColor")) {
+              challenge.achievementModifiers.push("backgroundColor");
+            }
             const promptChance =
               typeof options.backgroundPromptChance === "number" ? options.backgroundPromptChance : 0.5;
             const shouldPrompt = usePromptPlan
@@ -1490,29 +1738,35 @@ const revealInput = document.getElementById("revealTime");
               const symbol = item.symbol ? `${item.symbol} ` : "";
               card.innerHTML = `${symbol}${cardLabel}`;
             }
+            let fillCue = null;
+            let textCue = null;
             if (item.color) {
-              card.style.background = item.color;
+              fillCue = getAccessibleColorEntry(item.label, item.color);
+              card.style.background = fillCue.color;
               if (!item.textColorHex) {
-                card.style.color = "#0f172a";
+                card.style.color = getReadableCardInk(fillCue.color);
               }
             } else if (item.backgroundColorHex) {
-              card.style.background = item.backgroundColorHex;
+              fillCue = getAccessibleColorEntry(item.backgroundColorLabel, item.backgroundColorHex);
+              card.style.background = fillCue.color;
               if (!item.textColorHex) {
-                card.style.color = "#0f172a";
+                card.style.color = getReadableCardInk(fillCue.color);
               }
               card.classList.add("background-color");
             }
             if (item.textColorHex) {
-              card.style.color = item.textColorHex;
+              textCue = getAccessibleColorEntry(item.textColorLabel, item.textColorHex);
+              card.style.color = textCue.color;
               card.classList.add("card--text-color");
             }
+            applyCardColorVisionAssist(card, fillCue, textCue);
           } else {
             const cardLabel = `Card ${index + 1}`;
             const categoryLabel = formatCategoryLabel(item.category);
             if (item.recallHint) {
               const hintHtml = String(item.recallHint)
-                .replace(/↻/g, '<span class="rotation-icon">↻</span>')
-                .replace(/↺/g, '<span class="rotation-icon">↺</span>');
+                .replace(/\u21bb/g, '<span class="rotation-icon">\u21bb</span>')
+                .replace(/\u21ba/g, '<span class="rotation-icon">\u21ba</span>');
               card.innerHTML = `
                 <small>${cardLabel}</small>
                 <span>${hintHtml}</span>
@@ -1527,6 +1781,13 @@ const revealInput = document.getElementById("revealTime");
         cardGrid.appendChild(card);
       });
     }
+
+      window.refreshRenderedCardsForAppearance = function refreshRenderedCardsForAppearance() {
+        if (!cardGrid || !cardGrid.children.length) return;
+        const firstCard = cardGrid.children[0];
+        const showingCards = !firstCard.classList.contains("hidden-card");
+        renderCards(showingCards);
+      };
 
       function renderInputs() {
         inputGrid.innerHTML = "";

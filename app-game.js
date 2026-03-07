@@ -469,6 +469,8 @@
           actions.innerHTML = "";
         }
         const stageName = stage && stage.name ? stage.name : `Stage ${stageState.index + 1}`;
+        const stageId = stage && stage.id ? String(stage.id) : String(stageState.index + 1);
+        const stageVersion = window.getStageVersion ? window.getStageVersion(stage) : 1;
         // Get star times from stages-data
         const starTimes = stage && stage.starTimes ? stage.starTimes : {};
         bronzeTime = starTimes.bronze || null;
@@ -496,6 +498,14 @@
               <div class="stage-complete__header">
                 <strong>${stageName} complete!</strong>
                 <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s <span class="stage-meta--best" id="stageCompleteBestTime"></span></div>
+                <div
+                  class="stage-competitive-message"
+                  id="stageCompetitiveMessage"
+                  data-stage-id="${stageId}"
+                  data-stage-version="${stageVersion}"
+                >
+                  Comparing your run...
+                </div>
               </div>
               <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}" style="gap: ${starGap};">
                 <div class="star-column">
@@ -537,7 +547,7 @@
                 <img class="action-icon" src="imgs/menu_button.png" alt="" />
                 <span class="action-key-hint" aria-hidden="true">(${stageQuitKey})</span>
               </button>
-              <button id="stageRetryButton" class="secondary icon-button button-entice" type="button" aria-label="Retry (${retryKey})">
+              <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
                 <span class="action-countdown" aria-live="polite"></span>
                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
@@ -565,11 +575,22 @@
           clearTimeout(autoAdvanceNextTimerId);
           autoAdvanceNextTimerId = null;
         }
+        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        const hasNextStage = Boolean(stages[stageState.index + 1]);
         const nextTimer = document.querySelector("#resultsPanel .stage-next-timer");
         const nextTimerFill = nextTimer
           ? nextTimer.querySelector(".stage-next-timer__fill")
           : null;
         const startAutoAdvanceNext = () => {
+          if (!hasNextStage) {
+            if (nextTimer) {
+              nextTimer.classList.add("is-disabled");
+              nextTimer.classList.remove("is-running");
+              nextTimer.classList.remove("is-canceled");
+              nextTimer.classList.remove("is-waiting");
+            }
+            return;
+          }
           const autoAdvanceEnabledNow = typeof autoAdvanceNextEnabled === "undefined"
             ? true
             : autoAdvanceNextEnabled;
@@ -599,7 +620,6 @@
           autoAdvanceNextTimerId = window.setTimeout(() => {
             autoAdvanceNextTimerId = null;
             const nextBtn = document.getElementById("stageNextButton");
-            const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
             if (nextBtn && stages[stageState.index + 1]) {
               if (typeof window.setStageIntroAnimationMode === "function") {
                 window.setStageIntroAnimationMode("auto");
@@ -614,6 +634,13 @@
             autoAdvanceNextTimerId = null;
           }
           if (nextTimer) {
+            if (!hasNextStage) {
+              nextTimer.classList.add("is-disabled");
+              nextTimer.classList.remove("is-running");
+              nextTimer.classList.remove("is-canceled");
+              nextTimer.classList.remove("is-waiting");
+              return;
+            }
             nextTimer.classList.remove("is-running");
             nextTimer.classList.remove("is-canceled");
             nextTimer.classList.add("is-waiting");
@@ -630,12 +657,12 @@
           ? true
           : autoAdvanceNextEnabled;
         if (nextTimer) {
-          nextTimer.classList.toggle("is-disabled", !autoAdvanceEnabled);
-          if (!autoAdvanceEnabled) {
+          nextTimer.classList.toggle("is-disabled", !autoAdvanceEnabled || !hasNextStage);
+          if (!autoAdvanceEnabled || !hasNextStage) {
             nextTimer.classList.remove("is-waiting");
           }
         }
-        if (autoAdvanceEnabled) {
+        if (autoAdvanceEnabled && hasNextStage) {
           const shouldDeferForName = typeof window.shouldPromptForPlayerName === "function"
             ? window.shouldPromptForPlayerName()
             : false;
@@ -804,8 +831,33 @@
           totalSeconds: 0,
           totalCards: 0,
           totalLevelAttempts: 0,
-          totalLevelSuccesses: 0
+          totalLevelSuccesses: 0,
+          failedLevelCount: 0,
+          sandboxPlayed: false,
+          cardTypeCounts: {},
+          modifierVariantCounts: {}
         };
+      }
+
+      function normalizeStatsCounterMap(source) {
+        const normalized = {};
+        const input = source && typeof source === "object" ? source : {};
+        Object.keys(input).forEach((key) => {
+          const value = Math.max(0, Math.floor(Number(input[key]) || 0));
+          if (value > 0) {
+            normalized[key] = value;
+          }
+        });
+        return normalized;
+      }
+
+      function mergeStatsCounterMaps(target, source) {
+        const next = normalizeStatsCounterMap(target);
+        const incoming = normalizeStatsCounterMap(source);
+        Object.keys(incoming).forEach((key) => {
+          next[key] = (Number(next[key]) || 0) + incoming[key];
+        });
+        return next;
       }
 
       function ensureSessionStatsObject() {
@@ -817,6 +869,10 @@
         window.flashRecallSessionStats.totalCards = Number(window.flashRecallSessionStats.totalCards) || 0;
         window.flashRecallSessionStats.totalLevelAttempts = Number(window.flashRecallSessionStats.totalLevelAttempts) || 0;
         window.flashRecallSessionStats.totalLevelSuccesses = Number(window.flashRecallSessionStats.totalLevelSuccesses) || 0;
+        window.flashRecallSessionStats.failedLevelCount = Number(window.flashRecallSessionStats.failedLevelCount) || 0;
+        window.flashRecallSessionStats.sandboxPlayed = Boolean(window.flashRecallSessionStats.sandboxPlayed);
+        window.flashRecallSessionStats.cardTypeCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.cardTypeCounts);
+        window.flashRecallSessionStats.modifierVariantCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.modifierVariantCounts);
       }
 
       function loadStoredStatsPayload() {
@@ -830,6 +886,10 @@
           payload.totalCards = Number(parsed.totalCards) || 0;
           payload.totalLevelAttempts = Number(parsed.totalLevelAttempts) || 0;
           payload.totalLevelSuccesses = Number(parsed.totalLevelSuccesses) || 0;
+          payload.failedLevelCount = Number(parsed.failedLevelCount) || 0;
+          payload.sandboxPlayed = Boolean(parsed.sandboxPlayed);
+          payload.cardTypeCounts = normalizeStatsCounterMap(parsed.cardTypeCounts);
+          payload.modifierVariantCounts = normalizeStatsCounterMap(parsed.modifierVariantCounts);
           return payload;
         } catch (error) {
           return getDefaultStatsPayload();
@@ -855,20 +915,76 @@
         saveStoredStatsPayload(payload);
       }
 
-      function recordLevelAttemptStats(success) {
+      function recordCorrectCardAchievementProgress(entries, roundModifierKeys = []) {
+        const safeEntries = Array.isArray(entries) ? entries : [];
+        const roundModifiers = Array.isArray(roundModifierKeys) ? roundModifierKeys : [];
+        const correctEntries = safeEntries.filter((entry) => entry && entry.correct);
+        if (!correctEntries.length) return;
+        const snapshot = {
+          cardTypeCounts: {},
+          modifierVariantCounts: {}
+        };
+        const perRoundModifiers = new Set(["swapCards", "platformer", "glitch", "fog", "blur", "ads"]);
+        correctEntries.forEach((entry) => {
+          if (entry.category) {
+            snapshot.cardTypeCounts[entry.category] = (Number(snapshot.cardTypeCounts[entry.category]) || 0) + 1;
+          }
+          const entryModifiers = Array.isArray(entry.achievementModifiers) ? entry.achievementModifiers : [];
+          entryModifiers.forEach((modifierKey) => {
+            snapshot.modifierVariantCounts[modifierKey] = (Number(snapshot.modifierVariantCounts[modifierKey]) || 0) + 1;
+          });
+          roundModifiers.forEach((modifierKey) => {
+            if (!perRoundModifiers.has(modifierKey)) return;
+            snapshot.modifierVariantCounts[modifierKey] = (Number(snapshot.modifierVariantCounts[modifierKey]) || 0) + 1;
+          });
+        });
+        ensureSessionStatsObject();
+        const payload = loadStoredStatsPayload();
+        window.flashRecallSessionStats.cardTypeCounts = mergeStatsCounterMaps(
+          window.flashRecallSessionStats.cardTypeCounts,
+          snapshot.cardTypeCounts
+        );
+        window.flashRecallSessionStats.modifierVariantCounts = mergeStatsCounterMaps(
+          window.flashRecallSessionStats.modifierVariantCounts,
+          snapshot.modifierVariantCounts
+        );
+        payload.cardTypeCounts = mergeStatsCounterMaps(payload.cardTypeCounts, snapshot.cardTypeCounts);
+        payload.modifierVariantCounts = mergeStatsCounterMaps(payload.modifierVariantCounts, snapshot.modifierVariantCounts);
+        saveStoredStatsPayload(payload);
+      }
+
+      function recordSandboxPlayedStat() {
+        ensureSessionStatsObject();
+        if (window.flashRecallSessionStats.sandboxPlayed) {
+          return;
+        }
+        window.flashRecallSessionStats.sandboxPlayed = true;
+        const payload = loadStoredStatsPayload();
+        if (!payload.sandboxPlayed) {
+          payload.sandboxPlayed = true;
+          saveStoredStatsPayload(payload);
+        }
+      }
+
+      function recordLevelAttemptStats(success, options = {}) {
         ensureSessionStatsObject();
         window.flashRecallSessionStats.totalLevelAttempts += 1;
         if (success) {
           window.flashRecallSessionStats.totalLevelSuccesses += 1;
+        } else if (options.countFailure !== false) {
+          window.flashRecallSessionStats.failedLevelCount += 1;
         }
         const payload = loadStoredStatsPayload();
         payload.totalLevelAttempts += 1;
         if (success) {
           payload.totalLevelSuccesses += 1;
+        } else if (options.countFailure !== false) {
+          payload.failedLevelCount += 1;
         }
         saveStoredStatsPayload(payload);
       }
       window.recordLevelAttemptStats = recordLevelAttemptStats;
+      window.recordSandboxPlayedStat = recordSandboxPlayedStat;
 
       async function checkAnswers() {
         if (phase !== "recall") return;
@@ -884,6 +1000,8 @@
         const platformerRequired = platformerState.required;
         const roundTimeSpent = (performance.now() - roundStartTime) / 1000;
         recordRoundStats(roundTimeSpent, roundItems.length);
+        const activeRoundModifiers =
+          typeof window.getCurrentModifierKeys === "function" ? window.getCurrentModifierKeys() : [];
         const entries = roundItems.map((item, index) => {
           const mappedIndex = swapMap ? swapMap[index] : index;
           const expectedItem = roundItems[mappedIndex];
@@ -898,9 +1016,16 @@
             raw,
             correct: isCorrectAnswer(expectedItem, raw),
             category: expectedItem.category,
-            answer: expectedItem.label || expectedItem
+            answer: expectedItem.label || expectedItem,
+            achievementModifiers: Array.isArray(expectedItem.achievementModifiers)
+              ? expectedItem.achievementModifiers.slice()
+              : []
           };
         });
+        recordCorrectCardAchievementProgress(entries, activeRoundModifiers);
+        if (gameMode === "practice" && typeof window.syncAchievementsFromLocal === "function") {
+          window.syncAchievementsFromLocal({ usedModifiers: activeRoundModifiers });
+        }
         window.__lastEntries = entries;
         const allCorrect =
           (!platformerRequired || (platformerState.completed && !platformerState.failed)) &&

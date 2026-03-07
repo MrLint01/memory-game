@@ -1,21 +1,18 @@
 (() => {
   const defaults = {
     appearance: {
-      theme: "mono-ink",
-      font: "original",
+      theme: "studio-light",
+      colorVision: "standard",
       layout: "classic",
       themes: [
-        "mono-ink",
-        "paper-night",
-        "pastel-dawn",
-        "pastel-mint",
-        "sunset-pop",
-        "ocean-deep",
-        "forest-camp",
-        "cherry-cream",
-        "steel-grid"
+        "studio-light",
+        "night-drive",
+        "sea-glass",
+        "ember-glow",
+        "velvet-noir",
+        "vault-ops"
       ],
-      fonts: ["original", "arcade", "rounded", "space", "mono", "poster"],
+      colorVisionModes: ["standard", "protanopia", "deuteranopia", "tritanopia", "monochromacy"],
       layouts: ["classic"]
     },
     controls: {

@@ -106,7 +106,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-  <body class="loading-overlay initial-loading" data-state="idle" data-mode="practice" data-view="loading" data-theme="mono-ink" data-font="original" data-layout="classic">
+  <body class="loading-overlay initial-loading" data-state="idle" data-mode="practice" data-view="loading" data-theme="studio-light" data-layout="classic">
     <script>
       (function () {
         if (!document.documentElement.classList.contains("skip-initial-loading")) return;
@@ -138,6 +138,9 @@
           <span class="splash-title__shine" aria-hidden="true">Flash Recall</span>
         </h1>
         <div class="splash-message" role="status">Press Any Key to Start</div>
+        <div class="splash-autostart" id="splashAutoStartMessage" aria-live="polite" hidden>
+          Starting in 5.0
+        </div>
       </section>
       <section class="layout">
         <aside class="panel">
@@ -157,6 +160,13 @@
               </button>
               <button id="statsOpen" class="quick-action icon-button" type="button" aria-label="Open stats">
                 <img class="action-icon" src="imgs/stat_button.png" alt="" />
+              </button>
+              <button id="achievementsOpen" class="quick-action icon-button" type="button" aria-label="Open achievements">
+                <span class="action-glyph action-glyph--stars" aria-hidden="true">
+                  <span class="action-glyph__star">✦</span>
+                  <span class="action-glyph__star">✦</span>
+                  <span class="action-glyph__star">✦</span>
+                </span>
               </button>
               <button id="fullscreenToggle" class="quick-action icon-button" type="button" aria-label="Toggle fullscreen">
                 <img class="action-icon" src="imgs/fullscreen_button.png" alt="" />
@@ -435,6 +445,7 @@
     <div data-include="ui/player-name.html"></div>
     <div data-include="ui/leaderboard.html"></div>
     <div data-include="ui/stats.html"></div>
+    <div data-include="ui/achievements.html"></div>
     <div data-include="ui/stage-intro.html"></div>
     <div data-include="ui/reference.html"></div>
     <div class="modal" id="flashStageModal" aria-hidden="true">
@@ -476,6 +487,7 @@
     <canvas class="fog-overlay" id="fogCanvas"></canvas>
     <div class="fog-blur" id="fogBlur" aria-hidden="true"></div>
     <div class="success-toast" id="successToast" aria-hidden="true">All correct!</div>
+    <div class="achievement-toast-stack" id="achievementToastStack" aria-live="polite" aria-atomic="false"></div>
     <div class="config-hidden" hidden>
       <select id="modeSelect">
         <option value="practice" selected>Practice</option>

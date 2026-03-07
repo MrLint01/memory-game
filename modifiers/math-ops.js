@@ -4,10 +4,16 @@
        */
       function applyNumberChallenge(item) {
         const base = Number(item.label);
+        const achievementModifiers = Array.isArray(item.achievementModifiers)
+          ? item.achievementModifiers.slice()
+          : [];
+        if (!achievementModifiers.includes("mathOps")) {
+          achievementModifiers.push("mathOps");
+        }
         const ops = [
           { label: "Add", sign: "+", fn: (value, n) => value + n },
           { label: "Subtract", sign: "-", fn: (value, n) => value - n },
-          { label: "Multiply by", sign: "×", fn: (value, n) => value * n, multiplier: true }
+          { label: "Multiply by", sign: "\u00d7", fn: (value, n) => value * n, multiplier: true }
         ];
         let op = ops[Math.floor(Math.random() * ops.length)];
         const delta = op.multiplier ? 2 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 3);
@@ -20,21 +26,28 @@
         } else if (op.sign === "-") {
           recallHint = `- ${delta}`;
         } else {
-          recallHint = `* ${delta}`;
+          recallHint = `&times; ${delta}`;
         }
         return {
           ...item,
           recallHint,
-          answer: String(op.fn(base, delta))
+          answer: String(op.fn(base, delta)),
+          achievementModifiers
         };
       }
 
       function applyNumberChallengePlus(item) {
         const base = Number(item.label);
+        const achievementModifiers = Array.isArray(item.achievementModifiers)
+          ? item.achievementModifiers.slice()
+          : [];
+        if (!achievementModifiers.includes("mathOpsPlus")) {
+          achievementModifiers.push("mathOpsPlus");
+        }
         const ops = [
           { label: "Add", sign: "+", fn: (value, n) => value + n },
           { label: "Subtract", sign: "-", fn: (value, n) => value - n },
-          { label: "Multiply by", sign: "×", fn: (value, n) => value * n, multiplier: true }
+          { label: "Multiply by", sign: "\u00d7", fn: (value, n) => value * n, multiplier: true }
         ];
         let op = ops[Math.floor(Math.random() * ops.length)];
         const delta = op.multiplier ? 4 + Math.floor(Math.random() * 9) : 12 + Math.floor(Math.random() * 13);
@@ -47,12 +60,13 @@
         } else if (op.sign === "-") {
           recallHint = `- ${delta}`;
         } else {
-          recallHint = `* ${delta}`;
+          recallHint = `&times; ${delta}`;
         }
         return {
           ...item,
           recallHint,
-          answer: String(op.fn(base, delta))
+          answer: String(op.fn(base, delta)),
+          achievementModifiers
         };
       }
 

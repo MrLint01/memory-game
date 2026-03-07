@@ -1,6 +1,6 @@
 level_number,card_type,count
-1,numbers,967
-2,numbers,81
+1,numbers,968
+2,numbers,83
 3,letters,112
 4,letters,18
 4,numbers,32
@@ -88,7 +88,7 @@ level_number,card_type,count
 81,numbers,3
 88,directions,4
 90,numbers,11
-101,directions,5
-101,letters,2
+101,directions,6
+101,letters,6
 101,numbers,2
-101,shapes,4
+101,shapes,5

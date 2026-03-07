@@ -24,6 +24,7 @@
       const PLAYER_NAME_PROMPT_KEY = "flashRecallPlayerNamePrompted";
       const APPEARANCE_THEME_KEY = "flashRecallAppearanceTheme";
       const APPEARANCE_FONT_KEY = "flashRecallAppearanceFont";
+      const APPEARANCE_COLOR_VISION_KEY = "flashRecallAppearanceColorVision";
       const APPEARANCE_LAYOUT_KEY = "flashRecallAppearanceLayout";
       const KEYBINDS_STORAGE_KEY = "flashRecallKeybinds";
       const AUDIO_MASTER_KEY = "flashRecallAudioMasterVolume";
@@ -36,21 +37,18 @@
         ? window.getFlashRecallSettingsDefaults()
         : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
       const fallbackAppearance = {
-        theme: "mono-ink",
-        font: "original",
+        theme: "studio-light",
+        colorVision: "standard",
         layout: "classic",
         themes: [
-          "mono-ink",
-          "paper-night",
-          "pastel-dawn",
-          "pastel-mint",
-          "sunset-pop",
-          "ocean-deep",
-          "forest-camp",
-          "cherry-cream",
-          "steel-grid"
+          "studio-light",
+          "night-drive",
+          "sea-glass",
+          "ember-glow",
+          "velvet-noir",
+          "vault-ops"
         ],
-        fonts: ["original", "arcade", "rounded", "space", "mono", "poster"],
+        colorVisionModes: ["standard", "protanopia", "deuteranopia", "tritanopia", "monochromacy"],
         layouts: ["classic"]
       };
       const defaultAppearance = {
@@ -61,9 +59,9 @@
         themes: Array.isArray(defaultAppearance.themes) && defaultAppearance.themes.length
           ? defaultAppearance.themes
           : fallbackAppearance.themes,
-        fonts: Array.isArray(defaultAppearance.fonts) && defaultAppearance.fonts.length
-          ? defaultAppearance.fonts
-          : fallbackAppearance.fonts,
+        colorVisionModes: Array.isArray(defaultAppearance.colorVisionModes) && defaultAppearance.colorVisionModes.length
+          ? defaultAppearance.colorVisionModes
+          : fallbackAppearance.colorVisionModes,
         layouts: Array.isArray(defaultAppearance.layouts) && defaultAppearance.layouts.length
           ? defaultAppearance.layouts
           : fallbackAppearance.layouts
@@ -214,39 +212,58 @@
         return pressed && expected && pressed === expected;
       }
 
+      function isConfirmKey(event) {
+        if (!event) return false;
+        return event.key === "Enter" || event.code === "Enter" || event.code === "NumpadEnter";
+      }
+
       window.getActionKeyLabel = function getActionKeyLabel(action) {
         if (!action) return "";
         return getKeyLabel(keybinds[action] || defaultKeybinds[action] || "");
       };
 
-      function applyAppearance(theme, font, layout) {
+      function applyAppearance(theme, layout, colorVision) {
         const nextTheme = appearanceOptions.themes.includes(theme) ? theme : appearanceOptions.themes[0];
-        const nextFont = appearanceOptions.fonts.includes(font) ? font : appearanceOptions.fonts[0];
+        const colorVisionModes = Array.isArray(appearanceOptions.colorVisionModes)
+          ? appearanceOptions.colorVisionModes
+          : ["standard"];
+        const nextColorVision = colorVisionModes.includes(colorVision)
+          ? colorVision
+          : colorVisionModes.includes(defaultAppearance.colorVision)
+            ? defaultAppearance.colorVision
+            : colorVisionModes[0];
         const nextLayout = "classic";
         document.body.dataset.theme = nextTheme;
-        document.body.dataset.font = nextFont;
+        delete document.body.dataset.font;
+        document.body.dataset.colorVision = nextColorVision;
         document.body.dataset.layout = nextLayout;
         if (appearanceTheme) appearanceTheme.value = nextTheme;
-        if (appearanceFont) appearanceFont.value = nextFont;
+        if (appearanceColorVision) appearanceColorVision.value = nextColorVision;
         if (appearanceLayout) appearanceLayout.value = nextLayout;
+        if (typeof window.refreshRenderedCardsForAppearance === "function") {
+          window.refreshRenderedCardsForAppearance();
+        }
       }
 
       function getStoredAppearance() {
         const savedTheme = window.localStorage.getItem(APPEARANCE_THEME_KEY);
-        const savedFont = window.localStorage.getItem(APPEARANCE_FONT_KEY);
+        const savedColorVision = window.localStorage.getItem(APPEARANCE_COLOR_VISION_KEY);
         const savedLayout = "classic";
         const fallbackTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
           ? defaultAppearance.theme
           : appearanceOptions.themes[0];
-        const fallbackFont = appearanceOptions.fonts.includes(defaultAppearance.font)
-          ? defaultAppearance.font
-          : appearanceOptions.fonts[0];
+        const colorVisionModes = Array.isArray(appearanceOptions.colorVisionModes)
+          ? appearanceOptions.colorVisionModes
+          : ["standard"];
+        const fallbackColorVision = colorVisionModes.includes(defaultAppearance.colorVision)
+          ? defaultAppearance.colorVision
+          : colorVisionModes[0];
         const fallbackLayout = appearanceOptions.layouts.includes(defaultAppearance.layout)
           ? defaultAppearance.layout
           : appearanceOptions.layouts[0];
         return {
           theme: appearanceOptions.themes.includes(savedTheme) ? savedTheme : fallbackTheme,
-          font: appearanceOptions.fonts.includes(savedFont) ? savedFont : fallbackFont,
+          colorVision: colorVisionModes.includes(savedColorVision) ? savedColorVision : fallbackColorVision,
           layout: appearanceOptions.layouts.includes(savedLayout) ? savedLayout : fallbackLayout
         };
       }
@@ -354,6 +371,9 @@
           }
         } catch {
           // ignore storage errors
+        }
+        if (normalized && typeof window.syncAchievementsFromLocal === "function") {
+          window.syncAchievementsFromLocal({ playerName: normalized });
         }
         return normalized;
       }
@@ -497,6 +517,67 @@
       }
 
       let splashStartListener = null;
+      let splashAutoStartTimer = null;
+      let splashAutoStartInterval = null;
+      let splashStartInProgress = false;
+      let bootSplashAutoStartPending = true;
+      const SPLASH_AUTO_START_MS = 5000;
+
+      function updateSplashAutoStartLabel(remainingMs = SPLASH_AUTO_START_MS) {
+        if (!splashAutoStartMessage) return;
+        const safeMs = Math.max(0, Number(remainingMs) || 0);
+        const seconds = (safeMs / 1000).toFixed(1);
+        splashAutoStartMessage.textContent = `Starting in ${seconds}`;
+      }
+
+      function clearSplashAutoStart() {
+        if (splashAutoStartTimer) {
+          window.clearTimeout(splashAutoStartTimer);
+          splashAutoStartTimer = null;
+        }
+        if (splashAutoStartInterval) {
+          window.clearInterval(splashAutoStartInterval);
+          splashAutoStartInterval = null;
+        }
+        if (splashAutoStartMessage) {
+          splashAutoStartMessage.setAttribute("hidden", "");
+        }
+      }
+
+      function scheduleSplashAutoStart() {
+        clearSplashAutoStart();
+        if (document.body.classList.contains("loading-overlay")) return;
+        if (document.body.dataset.view !== "splash") return;
+        if (splashReturnToHome) return;
+        if (!bootSplashAutoStartPending && !shouldShowSplashScreen()) return;
+        const startedAt = Date.now();
+        if (splashAutoStartMessage) {
+          updateSplashAutoStartLabel(SPLASH_AUTO_START_MS);
+          splashAutoStartMessage.removeAttribute("hidden");
+        }
+        splashAutoStartInterval = window.setInterval(() => {
+          const elapsedMs = Date.now() - startedAt;
+          const remainingMs = SPLASH_AUTO_START_MS - elapsedMs;
+          if (remainingMs <= 0) {
+            updateSplashAutoStartLabel(0);
+            return;
+          }
+          updateSplashAutoStartLabel(remainingMs);
+        }, 100);
+        splashAutoStartTimer = window.setTimeout(() => {
+          splashAutoStartTimer = null;
+          if (splashAutoStartInterval) {
+            window.clearInterval(splashAutoStartInterval);
+            splashAutoStartInterval = null;
+          }
+          if (document.body.classList.contains("loading-overlay")) return;
+          if (document.body.dataset.view !== "splash") return;
+          if (splashReturnToHome) return;
+          if (!bootSplashAutoStartPending && !shouldShowSplashScreen()) return;
+          startFromSplash();
+        }, SPLASH_AUTO_START_MS);
+      }
+
       function attachSplashStartListeners() {
         if (splashStartListener) {
           return;
@@ -698,21 +779,24 @@
 
       function openPracticeModal() {
         setModalState(practiceModal, true);
-        const starsEl = document.getElementById("sandboxStars");
-        if (starsEl && typeof window.getSandboxStarsAvailable === "function") {
-          const availableEl = starsEl.querySelector(".sandbox-stars__available");
-          const available = window.getSandboxStarsAvailable();
-          if (availableEl) {
-            availableEl.textContent = String(available);
-          } else {
-            starsEl.textContent = `✦ ${available}`;
-          }
-        }
+        updateSandboxStarsDisplay();
         updateCategoryControls();
       }
 
       function closePracticeModal() {
         setModalState(practiceModal, false);
+      }
+
+      function updateSandboxStarsDisplay() {
+        const starsEl = document.getElementById("sandboxStars");
+        if (!(starsEl && typeof window.getSandboxStarsAvailable === "function")) return;
+        const availableEl = starsEl.querySelector(".sandbox-stars__available");
+        const available = window.getSandboxStarsAvailable();
+        if (availableEl) {
+          availableEl.textContent = String(available);
+        } else {
+          starsEl.textContent = `\u2726 ${available}`;
+        }
       }
 
       function isPracticeUnlocked() {
@@ -734,7 +818,7 @@
           practiceStart.classList.toggle("mode-card--locked", !unlocked);
           const lockText = practiceStart.querySelector(".mode-card__lock");
           if (lockText) {
-            lockText.textContent = unlocked ? "" : "Locked • Clear Stage 5";
+            lockText.textContent = unlocked ? "" : "Locked \u2022 Clear Stage 5";
           }
           if (unlocked && wasUnlocked === false && lockText) {
             lockText.classList.remove("lock-fade");
@@ -924,7 +1008,7 @@ function runFlashCountdown(onComplete) {
         resultAutoActionTimers.forEach((timerId) => clearTimeout(timerId));
         resultAutoActionTimers = [];
         document
-          .querySelectorAll("#stageRetryButton, #stageNextButton")
+          .querySelectorAll("#stageRetryButton")
           .forEach((button) => {
             if (!button) return;
             button.classList.remove("is-auto-target");
@@ -938,9 +1022,6 @@ function runFlashCountdown(onComplete) {
       function getResultAutoActionButton(kind) {
         if (kind === "retry") {
           return document.getElementById("stageRetryButton");
-        }
-        if (kind === "next") {
-          return document.getElementById("stageNextButton");
         }
         return null;
       }
@@ -960,13 +1041,6 @@ function runFlashCountdown(onComplete) {
         if (phase !== "result" || gameMode !== "stages") return;
         if (kind === "retry") {
           startStage(stageState.index, { skipIntro: true });
-          return;
-        }
-        if (kind === "next") {
-          const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
-          const nextIndex = stageState.index + 1;
-          if (!stages[nextIndex]) return;
-          startStage(nextIndex, { skipIntro: false });
         }
       }
 
@@ -991,9 +1065,6 @@ function runFlashCountdown(onComplete) {
         if (phase !== "result" || gameMode !== "stages") return;
         if (playerNamePromptDelayActive || playerNameModalOpening) return;
         if (playerNameModal && playerNameModal.classList.contains("show")) return;
-        if (stageState.failed) {
-          startResultAutoActionCountdown("retry");
-        }
       }
 
       window.clearResultAutoActionCountdown = clearResultAutoActionCountdown;
@@ -1056,7 +1127,9 @@ function runFlashCountdown(onComplete) {
         const fill = timer ? timer.querySelector(".stage-next-timer__fill") : null;
         if (timer) {
           timer.classList.remove("is-running");
+          timer.classList.remove("is-waiting");
           timer.classList.add("is-canceled");
+          timer.classList.add("is-disabled");
         }
         if (fill) {
           fill.style.transition = "none";
@@ -1088,13 +1161,13 @@ function runFlashCountdown(onComplete) {
           [1, 2, 3].forEach((value) => {
             const star = document.createElement("span");
             star.className = `stage-star${starsEarned >= value ? " is-filled" : ""}`;
-            star.textContent = "✦";
+            star.textContent = "\u2726";
             stageIntroStars.appendChild(star);
           });
           if (starsEarned >= 4) {
             const secret = document.createElement("span");
             secret.className = "stage-star is-filled is-secret";
-            secret.textContent = "✦";
+            secret.textContent = "\u2726";
             stageIntroStars.appendChild(secret);
           }
         }
@@ -1105,7 +1178,7 @@ function runFlashCountdown(onComplete) {
           const bestSeconds = Number(window.stageBestTimes && window.stageBestTimes[bestKey]);
           stageIntroBest.textContent = Number.isFinite(bestSeconds)
             ? `Best: ${bestSeconds.toFixed(2)}s`
-            : "Best: —";
+            : "Best: \u2014";
         }
         if (stageIntroSubtitle) {
           const rounds = stage.rounds || 1;
@@ -1350,10 +1423,10 @@ function runFlashCountdown(onComplete) {
             return sum + (window.stageCompleted && window.stageCompleted[stageKey] ? 1 : 0);
           }, 0);
           if (stagesTotal) {
-            stagesTotal.innerHTML = `<span class="stage-total__stars">✦</span><span class="stage-total__count">${totalStars}</span>`;
+            stagesTotal.innerHTML = `<span class="stage-total__stars">\u2726</span><span class="stage-total__count">${totalStars}</span>`;
           }
           if (stagesProgress) {
-            stagesProgress.innerHTML = `<span class="stage-progress__label stage-progress__label--check">✓</span><span class="stage-progress__count">${completedCount}/${stages.length}</span>`;
+            stagesProgress.innerHTML = `<span class="stage-progress__label stage-progress__label--check">\u2713</span><span class="stage-progress__count">${completedCount}/${stages.length}</span>`;
           }
         }
         if (!stages.length) {
@@ -1391,14 +1464,15 @@ function runFlashCountdown(onComplete) {
             const starsMarkup = [1, 2, 3]
               .map((value) => {
                 const filled = stars >= value ? " is-filled" : "";
-                return `<span class="stage-star${filled}">✦</span>`;
+                return `<span class="stage-star${filled}">\u2726</span>`;
               })
               .join("");
-            const secretStarMarkup = stars >= 4 ? `<span class="stage-star is-filled is-secret">✦</span>` : "";
+            const secretStarMarkup = stars >= 4 ? `<span class="stage-star is-filled is-secret">\u2726</span>` : "";
 
             const name = stage && stage.id ? String(stage.id) : String(index + 1);
             const unlocked = isStageUnlocked(index);
             const lockedClass = unlocked ? "" : " stage-card--locked";
+            const stageTypeClass = stageType ? ` stage-card--${stageType}` : "";
             const lockedAttr = unlocked ? "" : " disabled";
             const lockIcon = unlocked
               ? ""
@@ -1416,7 +1490,7 @@ function runFlashCountdown(onComplete) {
                 : "";
             const placeholderStars =
               `<div class="stage-meta stage-stars stage-meta--placeholder" aria-hidden="true">` +
-              `<span class="stage-star">✦</span><span class="stage-star">✦</span><span class="stage-star">✦</span>` +
+              `<span class="stage-star">\u2726</span><span class="stage-star">\u2726</span><span class="stage-star">\u2726</span>` +
               `</div>`;
             const placeholderBest = `<div class="stage-meta stage-best stage-meta--placeholder" aria-hidden="true"></div>`;
 
@@ -1425,7 +1499,7 @@ function runFlashCountdown(onComplete) {
             }
 
             return `
-              <button class="stage-card stage-card--clickable${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${offset}" data-anim-state="pending"${lockedAttr}>
+              <button class="stage-card stage-card--clickable${stageTypeClass}${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${offset}" data-anim-state="pending" data-stage-type="${stageType}"${lockedAttr}>
                 ${unlocked ? `<strong>${name}</strong>` : ""}
                 ${lockIcon}
                 ${lockedLabel}
@@ -1647,6 +1721,7 @@ function runFlashCountdown(onComplete) {
       }
 
       function openSplashScreen() {
+        clearSplashAutoStart();
         if (splashScreen) {
           if (document.body.classList.contains("loading-overlay")) {
             pendingSplashReveal = true;
@@ -1661,9 +1736,11 @@ function runFlashCountdown(onComplete) {
           mainHeader.style.display = "none";
         }
         document.body.dataset.view = "splash";
+        scheduleSplashAutoStart();
       }
 
       function closeSplashScreen() {
+        clearSplashAutoStart();
         if (splashScreen) {
           splashScreen.setAttribute("aria-hidden", "true");
           splashScreen.setAttribute("hidden", "");
@@ -1683,7 +1760,7 @@ function runFlashCountdown(onComplete) {
         if (splashLoading) {
           const textEl = splashLoading.querySelector(".splash-loading__text");
           if (textEl) {
-            const nextMessage = message || (resetLoadingActive ? "Resetting…" : "Loading…");
+            const nextMessage = message || (resetLoadingActive ? "Resetting..." : "Loading...");
             textEl.textContent = nextMessage;
           }
           splashLoading.removeAttribute("aria-hidden");
@@ -1708,6 +1785,7 @@ function runFlashCountdown(onComplete) {
           splashScreen.removeAttribute("aria-hidden");
           pendingSplashReveal = false;
         }
+        scheduleSplashAutoStart();
         if (!keepHeaderHidden && mainHeader) {
           mainHeader.removeAttribute("aria-hidden", "true");
           mainHeader.style.display = "";
@@ -1785,6 +1863,12 @@ function runFlashCountdown(onComplete) {
       }
 
       async function startFromSplash() {
+        if (splashStartInProgress) {
+          return;
+        }
+        splashStartInProgress = true;
+        clearSplashAutoStart();
+        bootSplashAutoStartPending = false;
         const shouldCountdownToFirstStage = shouldShowSplashScreen() && !splashReturnToHome;
         if (splashReturnToHome) {
           splashReturnToHome = false;
@@ -1796,6 +1880,7 @@ function runFlashCountdown(onComplete) {
             mainHeader.style.display = "";
           }
           triggerHomeFadeIn();
+          splashStartInProgress = false;
           return;
         }
         closeSplashScreen();
@@ -1813,9 +1898,11 @@ function runFlashCountdown(onComplete) {
           runFlashCountdown(() => {
             startStage(0, { skipIntro: true });
           });
+          splashStartInProgress = false;
           return;
         }
         startStage(0, { skipIntro: true });
+        splashStartInProgress = false;
       }
 
       practiceStart.addEventListener("click", () => {
@@ -1879,6 +1966,55 @@ function runFlashCountdown(onComplete) {
           }
         });
       }
+      function getResultCompetitionMessageElement(stageId, stageVersion) {
+        const messageEl = document.getElementById("stageCompetitiveMessage");
+        if (!messageEl) return null;
+        if (messageEl.dataset.stageId !== String(stageId)) return null;
+        if (messageEl.dataset.stageVersion !== String(Number(stageVersion) || 1)) return null;
+        return messageEl;
+      }
+
+      function applyResultCompetitionMessage(stageId, stageVersion, result) {
+        const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
+        if (!messageEl) return;
+        const rank = result && Number.isFinite(Number(result.meRank)) ? Number(result.meRank) : null;
+        const totalPlayers =
+          result && Number.isFinite(Number(result.totalPlayers)) ? Number(result.totalPlayers) : 0;
+        const averageTimeMs =
+          result && Number.isFinite(Number(result.averageTimeMs)) ? Number(result.averageTimeMs) : null;
+        let message = "";
+        let messageColor = "";
+        if (rank && totalPlayers > 1) {
+          const percentBeaten = Math.max(
+            0,
+            Math.min(100, Math.round(((totalPlayers - rank) / (totalPlayers - 1)) * 100))
+          );
+          message = `You did better than ${percentBeaten}% of players.`;
+          const ratio = percentBeaten / 100;
+          const red = Math.round(220 * (1 - ratio) + 34 * ratio);
+          const green = Math.round(38 * (1 - ratio) + 197 * ratio);
+          const blue = Math.round(38 * (1 - ratio) + 94 * ratio);
+          messageColor = `rgb(${red}, ${green}, ${blue})`;
+        } else if (averageTimeMs !== null) {
+          message = `Average time: ${(averageTimeMs / 1000).toFixed(2)}s`;
+        } else if (result && result.errorCode === "disabled") {
+          message = "";
+        }
+        if (message) {
+          messageEl.textContent = message;
+          if (messageColor) {
+            messageEl.style.color = messageColor;
+          } else {
+            messageEl.style.removeProperty("color");
+          }
+          messageEl.hidden = false;
+        } else {
+          messageEl.textContent = "";
+          messageEl.style.removeProperty("color");
+          messageEl.hidden = true;
+        }
+      }
+
       window.renderStageLeaderboard = async function renderStageLeaderboard(stage, index, listId, emptyId) {
         const listEl = document.getElementById(listId);
         const emptyEl = document.getElementById(emptyId);
@@ -1900,8 +2036,13 @@ function runFlashCountdown(onComplete) {
         headerRow.innerHTML = "<span>#</span><span>Player</span><span>Time</span>";
         const loadingRow = document.createElement("div");
         loadingRow.className = "leaderboard-row leaderboard-row--empty";
-        loadingRow.textContent = "Loading…";
+        loadingRow.textContent = "Loading...";
         listEl.replaceChildren(headerRow, loadingRow);
+        const competitionEl = getResultCompetitionMessageElement(stageId, stageVersion);
+        if (competitionEl) {
+          competitionEl.textContent = "Comparing your run...";
+          competitionEl.hidden = false;
+        }
         const leaderboardReady = typeof window.getLeaderboardReady === "function"
           ? window.getLeaderboardReady()
           : true;
@@ -1914,6 +2055,7 @@ function runFlashCountdown(onComplete) {
           } else if (emptyEl) {
             loadingRow.textContent = "No data yet";
           }
+          applyResultCompetitionMessage(stageId, stageVersion, null);
           return;
         }
         listEl.dataset.lbRetryCount = "0";
@@ -1935,7 +2077,7 @@ function runFlashCountdown(onComplete) {
               meRank = idx + 1;
             }
             const time = Number(entry.best_time_ms);
-            const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "—";
+            const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "\u2014";
             const isMe =
               entry.player_id && window.getLeaderboardPlayerId && entry.player_id === window.getLeaderboardPlayerId();
             const rawName = isMe && localName ? localName : (entry.player_name || `Player ${entry.player_id || "?"}`);
@@ -1949,11 +2091,11 @@ function runFlashCountdown(onComplete) {
             const row = document.createElement("div");
             row.className = "leaderboard-row leaderboard-row--me";
             const time = Number(source.best_time_ms);
-            const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "—";
+            const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "\u2014";
             const rawName = localName || source.player_name || `Player ${source.player_id || "?"}`;
             const name = truncateLeaderboardName(rawName);
             row.dataset.playerId = source.player_id || "";
-            const rankText = meRank ? String(meRank) : "—";
+            const rankText = meRank ? String(meRank) : "\u2014";
             row.innerHTML = `<span>${rankText}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
             rows.push(row);
           } else {
@@ -1985,10 +2127,12 @@ function runFlashCountdown(onComplete) {
             }
             listEl.appendChild(statusRow);
           }
+          applyResultCompetitionMessage(stageId, stageVersion, result);
         } catch (error) {
           console.warn("Failed to render leaderboard", error);
           loadingRow.textContent = "Leaderboard failed to load. Please try again later.";
           listEl.replaceChildren(headerRow, loadingRow);
+          applyResultCompetitionMessage(stageId, stageVersion, null);
         }
       };
 
@@ -2037,7 +2181,7 @@ function runFlashCountdown(onComplete) {
               return;
             }
             closeStageIntro();
-            openSplashLoading("Loading…");
+            openSplashLoading("Loading...");
             const minimumDelay = new Promise((resolve) => {
               window.setTimeout(resolve, 750);
             });
@@ -2051,7 +2195,7 @@ function runFlashCountdown(onComplete) {
             return;
           }
           closeStageIntro();
-          openSplashLoading("Loading…");
+          openSplashLoading("Loading...");
           const minimumDelay = new Promise((resolve) => {
             window.setTimeout(resolve, 750);
           });
@@ -2109,7 +2253,7 @@ function runFlashCountdown(onComplete) {
             closeStageIntro();
           }
           if (Number.isFinite(index)) {
-            openSplashLoading("Loading…");
+            openSplashLoading("Loading...");
             const minimumDelay = new Promise((resolve) => {
               window.setTimeout(resolve, 750);
             });
@@ -2203,10 +2347,11 @@ function runFlashCountdown(onComplete) {
       }
 
       if (shouldShowSplashScreen()) {
+        splashReturnToHome = false;
         openSplashScreen();
         attachSplashStartListeners();
       } else {
-        splashReturnToHome = true;
+        splashReturnToHome = false;
         openSplashScreen();
         attachSplashStartListeners();
       }
@@ -2542,11 +2687,11 @@ function runFlashCountdown(onComplete) {
           if (settingsModal) {
             setModalState(settingsModal, false);
           }
-          openSplashLoading("Resetting…");
+          openSplashLoading("Resetting...");
           if (splashLoading) {
             const textEl = splashLoading.querySelector(".splash-loading__text");
             if (textEl) {
-              textEl.textContent = "Resetting…";
+              textEl.textContent = "Resetting...";
             }
           }
           document.body.classList.remove("home-anim");
@@ -2562,7 +2707,11 @@ function runFlashCountdown(onComplete) {
             totalSeconds: 0,
             totalCards: 0,
             totalLevelAttempts: 0,
-            totalLevelSuccesses: 0
+            totalLevelSuccesses: 0,
+            failedLevelCount: 0,
+            sandboxPlayed: false,
+            cardTypeCounts: {},
+            modifierVariantCounts: {}
           };
           window.localStorage.removeItem("flashRecallStats");
           window.localStorage.removeItem(FLASH_WARNING_KEY);
@@ -2571,6 +2720,7 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallPlayerNamePrompted");
           window.localStorage.removeItem(APPEARANCE_THEME_KEY);
           window.localStorage.removeItem(APPEARANCE_FONT_KEY);
+          window.localStorage.removeItem(APPEARANCE_COLOR_VISION_KEY);
           window.localStorage.removeItem(APPEARANCE_LAYOUT_KEY);
           window.localStorage.removeItem(KEYBINDS_STORAGE_KEY);
           window.localStorage.removeItem("flashRecallSuccessAnimation");
@@ -2584,22 +2734,25 @@ function runFlashCountdown(onComplete) {
           const resetTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
             ? defaultAppearance.theme
             : appearanceOptions.themes[0];
-          const resetFont = appearanceOptions.fonts.includes(defaultAppearance.font)
-            ? defaultAppearance.font
-            : appearanceOptions.fonts[0];
+          const colorVisionModes = Array.isArray(appearanceOptions.colorVisionModes)
+            ? appearanceOptions.colorVisionModes
+            : ["standard"];
+          const resetColorVision = colorVisionModes.includes(defaultAppearance.colorVision)
+            ? defaultAppearance.colorVision
+            : colorVisionModes[0];
           const resetLayout = appearanceOptions.layouts.includes(defaultAppearance.layout)
             ? defaultAppearance.layout
             : appearanceOptions.layouts[0];
           applyAppearance(
             resetTheme,
-            resetFont,
-            resetLayout
+            resetLayout,
+            resetColorVision
           );
           if (appearanceTheme) {
             appearanceTheme.value = resetTheme;
           }
-          if (appearanceFont) {
-            appearanceFont.value = resetFont;
+          if (appearanceColorVision) {
+            appearanceColorVision.value = resetColorVision;
           }
           if (successAnimationToggle) {
             successAnimationToggle.checked = Boolean(defaultControlSettings.successAnimation);
@@ -2663,14 +2816,7 @@ function runFlashCountdown(onComplete) {
           }
           if (practiceModal && practiceModal.classList.contains("show")) {
             updateCategoryControls();
-            const starsEl = document.getElementById("sandboxStars");
-            if (starsEl && typeof window.getSandboxStarsAvailable === "function") {
-              const availableEl = starsEl.querySelector(".sandbox-stars__available");
-              const available = window.getSandboxStarsAvailable();
-              if (availableEl) {
-                availableEl.textContent = String(available);
-              }
-            }
+            updateSandboxStarsDisplay();
           }
           await new Promise((resolve) => {
             window.setTimeout(resolve, 750);
@@ -2789,7 +2935,7 @@ function runFlashCountdown(onComplete) {
             meRow.dataset.playerId = me.player_id || "";
             const value = Number(me[metric]);
             const safeValue = Number.isFinite(value) ? value : localValue;
-            const rankText = meRank ? String(meRank) : "—";
+            const rankText = meRank ? String(meRank) : "\u2014";
             const name = localName || me.player_name || `Player ${me.player_id || "?"}`;
             meRow.innerHTML = `<span>${rankText}</span><span class="leaderboard-name">${name}</span><span>${safeValue}</span>`;
             rows.push(meRow);
@@ -2822,6 +2968,238 @@ function runFlashCountdown(onComplete) {
       };
       let activeStatsLeaderboardTab = "stars_earned";
 
+      function maskAchievementText(text) {
+        return String(text || "").replace(/[^\s]/g, "?");
+      }
+
+      function escapeAchievementHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function buildAchievementIconMarkup(item) {
+        const isSecretLocked = item && item.secret && !item.unlocked;
+        if (isSecretLocked) {
+          return '<span class="achievement-icon__text">?</span>';
+        }
+        if (item && item.iconSrc) {
+          return `<img class="achievement-icon__img" src="${item.iconSrc}" alt="" />`;
+        }
+        const text = item && item.iconText ? String(item.iconText) : "?";
+        return `<span class="achievement-icon__text">${text}</span>`;
+      }
+
+      function getAchievementDisplayTitle(item) {
+        if (item && item.secret && !item.unlocked) {
+          return maskAchievementText(item.title);
+        }
+        return String(item && item.title ? item.title : "");
+      }
+
+      function openAchievementInfoModal(item, totalPlayers) {
+        const modal = window.achievementInfoModal;
+        const card = window.achievementInfoCard;
+        const icon = window.achievementInfoIcon;
+        const titleEl = window.achievementInfoTitle;
+        const descriptionEl = window.achievementInfoDescription;
+        const metaEl = window.achievementInfoMeta;
+        if (!(modal && card && icon && titleEl && descriptionEl && metaEl && item)) return;
+        const isSecretLocked = item.secret && !item.unlocked;
+        const title = getAchievementDisplayTitle(item);
+        const description = isSecretLocked ? maskAchievementText(item.description) : item.description;
+        const percentText = item.unlocked
+          ? `${Math.max(0, Number(item.percentUnlocked) || 0)}% of players`
+          : "";
+        const playersText = item.unlocked && Number(totalPlayers) > 0
+          ? `${Math.max(0, Number(totalPlayers) || 0)} tracked players`
+          : "";
+        card.style.setProperty("--achievement-accent", item.difficultyColor || "var(--accent)");
+        card.classList.toggle("is-locked", !item.unlocked);
+        icon.innerHTML = buildAchievementIconMarkup(item);
+        titleEl.textContent = title;
+        descriptionEl.textContent = description;
+        metaEl.innerHTML = "";
+        [percentText, playersText].filter(Boolean).forEach((value) => {
+          const chip = document.createElement("span");
+          chip.textContent = value;
+          metaEl.appendChild(chip);
+        });
+        setModalState(modal, true);
+      }
+
+      function showAchievementUnlockToast(item) {
+        if (!achievementToastStack || !item) return;
+        const toast = document.createElement("div");
+        toast.className = "achievement-toast";
+        toast.style.setProperty("--achievement-accent", item.difficultyColor || "var(--accent)");
+        toast.innerHTML = `
+          <div class="achievement-toast__icon">${buildAchievementIconMarkup({ ...item, unlocked: true })}</div>
+          <div class="achievement-toast__copy">
+            <div class="achievement-toast__eyebrow">Achievement unlocked</div>
+            <strong class="achievement-toast__title">${escapeAchievementHtml(item.title)}</strong>
+            <div class="achievement-toast__description">${escapeAchievementHtml(item.description)}</div>
+          </div>
+          <button class="achievement-toast__close" type="button" aria-label="Dismiss achievement notification">&times;</button>
+        `;
+        const dismiss = () => {
+          if (toast.dataset.dismissed === "true") return;
+          toast.dataset.dismissed = "true";
+          if (toast.dataset.timerId) {
+            clearTimeout(Number(toast.dataset.timerId));
+          }
+          toast.classList.remove("show");
+          window.setTimeout(() => {
+            toast.remove();
+          }, 220);
+        };
+        const closeButton = toast.querySelector(".achievement-toast__close");
+        if (closeButton) {
+          closeButton.addEventListener("click", dismiss);
+        }
+        achievementToastStack.appendChild(toast);
+        window.requestAnimationFrame(() => {
+          toast.classList.add("show");
+        });
+        toast.dataset.timerId = String(window.setTimeout(dismiss, 5200));
+      }
+
+      function renderAchievementsOverviewLegacy(result) {
+        if (!achievementsList) return;
+        const summaryText = achievementsSummary;
+        const items = result && Array.isArray(result.items) ? result.items : [];
+        const unlockedCount = result ? Number(result.unlockedCount) || 0 : 0;
+        const totalCount = result ? Number(result.totalCount) || items.length : items.length;
+        const totalPlayers = result ? Number(result.totalPlayers) || 0 : 0;
+        if (summaryText) {
+          const baseText = `${unlockedCount}/${totalCount} unlocked`;
+          summaryText.textContent = totalPlayers > 0
+            ? `${baseText} • Based on ${totalPlayers} players`
+            : baseText;
+        }
+        achievementsList.innerHTML = "";
+
+        if (!items.length) {
+          const emptyRow = document.createElement("div");
+          emptyRow.className = "achievement-row achievement-row--empty";
+          emptyRow.textContent = (result && result.errorMessage) || "No achievements available.";
+          achievementsList.appendChild(emptyRow);
+          return;
+        }
+
+        items
+          .map((item, index) => ({ item, index }))
+          .sort((left, right) => {
+            const unlockedDelta = Number(Boolean(right.item.unlocked)) - Number(Boolean(left.item.unlocked));
+            if (unlockedDelta !== 0) return unlockedDelta;
+            return left.index - right.index;
+          })
+          .forEach(({ item }) => {
+          const isSecretLocked = item.secret && !item.unlocked;
+          const row = document.createElement("div");
+          row.className = `achievement-row${item.unlocked ? " is-unlocked" : " is-locked"}${isSecretLocked ? " is-secret-locked" : ""}`;
+          const description = isSecretLocked ? maskAchievementText(item.description) : item.description;
+          const percentText = item.unlocked
+            ? `${Math.max(0, Number(item.percentUnlocked) || 0)}% of players`
+            : "";
+          row.innerHTML = `
+            <div class="achievement-icon">${buildAchievementIconMarkup(item)}</div>
+            <div class="achievement-copy">
+              <div class="achievement-title-row">
+                <strong class="achievement-title">${item.title}</strong>
+              </div>
+              <div class="achievement-description">${description}</div>
+            </div>
+            <div class="achievement-percent">${percentText}</div>
+          `;
+          achievementsList.appendChild(row);
+        });
+      }
+
+      function renderAchievementsOverview(result) {
+        if (!achievementsList) return;
+        const summaryText = achievementsSummary;
+        const items = result && Array.isArray(result.items) ? result.items : [];
+        const unlockedCount = result ? Number(result.unlockedCount) || 0 : 0;
+        const totalCount = result ? Number(result.totalCount) || items.length : items.length;
+        const totalPlayers = result ? Number(result.totalPlayers) || 0 : 0;
+        if (summaryText) {
+          const baseText = `${unlockedCount}/${totalCount} achievements unlocked`;
+          summaryText.textContent = totalPlayers > 0
+            ? `${baseText} | ${totalPlayers} tracked players`
+            : baseText;
+        }
+        achievementsList.innerHTML = "";
+
+        if (!items.length) {
+          const emptyRow = document.createElement("div");
+          emptyRow.className = "achievement-tile achievement-tile--empty";
+          emptyRow.textContent = (result && result.errorMessage) || "No achievements available.";
+          achievementsList.appendChild(emptyRow);
+          return;
+        }
+
+        const sortedItems = items
+          .map((item, index) => ({ item, index }))
+          .sort((left, right) => {
+            const unlockedDelta = Number(Boolean(right.item.unlocked)) - Number(Boolean(left.item.unlocked));
+            if (unlockedDelta !== 0) return unlockedDelta;
+            return left.index - right.index;
+          })
+          .map(({ item }) => item);
+
+        sortedItems.forEach((item) => {
+          const isSecretLocked = item.secret && !item.unlocked;
+          const tile = document.createElement("button");
+          tile.type = "button";
+          tile.className = `achievement-tile${item.unlocked ? " is-unlocked" : " is-locked"}${isSecretLocked ? " is-secret-locked" : ""}`;
+          tile.style.setProperty("--achievement-accent", item.difficultyColor || "var(--accent)");
+          tile.setAttribute("aria-pressed", "false");
+          tile.innerHTML = `
+            <div class="achievement-tile__icon">${buildAchievementIconMarkup(item)}</div>
+            <strong class="achievement-tile__title">${escapeAchievementHtml(getAchievementDisplayTitle(item))}</strong>
+          `;
+          tile.addEventListener("click", () => {
+            openAchievementInfoModal(item, totalPlayers);
+          });
+          achievementsList.appendChild(tile);
+        });
+      }
+
+      async function openAchievementsModal() {
+        if (!achievementsModal || !achievementsList) return;
+        if (achievementsSummary) {
+          achievementsSummary.textContent = "Loading achievements...";
+        }
+        achievementsList.innerHTML = "";
+        const loadingRow = document.createElement("div");
+        loadingRow.className = "achievement-tile achievement-tile--empty";
+        loadingRow.textContent = "Loading...";
+        achievementsList.appendChild(loadingRow);
+        setModalState(achievementsModal, true);
+
+        if (typeof window.fetchAchievementOverview !== "function") {
+          renderAchievementsOverview({
+            items: [],
+            errorMessage: "Achievements are unavailable."
+          });
+          return;
+        }
+
+        try {
+          const result = await window.fetchAchievementOverview({ refresh: true });
+          renderAchievementsOverview(result);
+        } catch (error) {
+          renderAchievementsOverview({
+            items: [],
+            errorMessage: "Could not load achievements right now."
+          });
+        }
+      }
+
       async function openStatsLeaderboard(metric = activeStatsLeaderboardTab) {
         if (!statsLeaderboardModal) return;
         const nextTab = statsLeaderboardTabs[metric] ? metric : "stars_earned";
@@ -2849,6 +3227,8 @@ function runFlashCountdown(onComplete) {
           const stagesClearedEl = document.getElementById("statsStagesCleared");
           const stagesTotalEl = document.getElementById("statsStagesTotal");
           const starsEarnedEl = document.getElementById("statsStarsEarned");
+          const achievementsUnlockedEl = document.getElementById("statsAchievementsUnlocked");
+          const achievementsTotalEl = document.getElementById("statsAchievementsTotal");
           const avgPerCardEl = document.getElementById("statsAvgPerCard");
           const avgBestPerCardEl = document.getElementById("statsAvgBestPerCard");
           const totalTimeSpentEl = document.getElementById("statsTotalTimeSpent");
@@ -2875,6 +3255,22 @@ function runFlashCountdown(onComplete) {
               const name = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
               window.updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, name);
             }
+          }
+
+          if (achievementsUnlockedEl || achievementsTotalEl) {
+            let unlockedValue = 0;
+            let totalValue = typeof window.getAchievementCatalog === "function"
+              ? window.getAchievementCatalog().length
+              : 0;
+            if (typeof window.fetchAchievementOverview === "function") {
+              try {
+                const achievementOverview = await window.fetchAchievementOverview({ refresh: false });
+                unlockedValue = Number(achievementOverview && achievementOverview.unlockedCount) || 0;
+                totalValue = Number(achievementOverview && achievementOverview.totalCount) || totalValue;
+              } catch (error) {}
+            }
+            if (achievementsUnlockedEl) achievementsUnlockedEl.textContent = String(unlockedValue);
+            if (achievementsTotalEl) achievementsTotalEl.textContent = String(totalValue);
           }
 
           const key = "flashRecallStats";
@@ -2964,10 +3360,15 @@ function runFlashCountdown(onComplete) {
             if (totals.cards > 0) {
               avgBestPerCardEl.textContent = `${(totals.seconds / totals.cards).toFixed(2)}s`;
             } else {
-              avgBestPerCardEl.textContent = "�";
+              avgBestPerCardEl.textContent = "\u2014";
             }
           }
           setModalState(statsModal, true);
+        });
+      }
+      if (achievementsOpen && achievementsModal) {
+        achievementsOpen.addEventListener("click", () => {
+          openAchievementsModal();
         });
       }
       if (statsLeaderboardOpen) {
@@ -3000,6 +3401,14 @@ function runFlashCountdown(onComplete) {
           setModalState(statsModal, false);
         });
       }
+      if (achievementsClose && achievementsModal) {
+        achievementsClose.addEventListener("click", () => {
+          setModalState(achievementsModal, false);
+          if (window.achievementInfoModal) {
+            setModalState(window.achievementInfoModal, false);
+          }
+        });
+      }
       if (statsModal) {
         statsModal.addEventListener("click", (event) => {
           if (event.target === statsModal) {
@@ -3007,6 +3416,34 @@ function runFlashCountdown(onComplete) {
           }
         });
       }
+      if (achievementsModal) {
+        achievementsModal.addEventListener("click", (event) => {
+          if (event.target === achievementsModal) {
+            setModalState(achievementsModal, false);
+            if (window.achievementInfoModal) {
+              setModalState(window.achievementInfoModal, false);
+            }
+          }
+        });
+      }
+      if (window.achievementInfoClose && window.achievementInfoModal) {
+        window.achievementInfoClose.addEventListener("click", () => {
+          setModalState(window.achievementInfoModal, false);
+        });
+      }
+      if (window.achievementInfoModal) {
+        window.achievementInfoModal.addEventListener("click", (event) => {
+          if (event.target === window.achievementInfoModal) {
+            setModalState(window.achievementInfoModal, false);
+          }
+        });
+      }
+      window.addEventListener("flashrecall:achievements-unlocked", (event) => {
+        const items = event && event.detail && Array.isArray(event.detail.items) ? event.detail.items : [];
+        items.forEach((item) => {
+          showAchievementUnlockToast(item);
+        });
+      });
       if (statsLeaderboardClose && statsLeaderboardModal) {
         statsLeaderboardClose.addEventListener("click", () => {
           setModalState(statsLeaderboardModal, false);
@@ -3024,6 +3461,7 @@ function runFlashCountdown(onComplete) {
         const selectedTypes = Array.from(
           practiceModal.querySelectorAll(".control-group .checkboxes input[type=\"checkbox\"][value]")
         ).filter((input) => input.checked);
+        const activePracticeModifiers = [];
         if (!selectedTypes.length) {
           const error = document.getElementById("practiceTypeError");
           if (error) {
@@ -3049,6 +3487,29 @@ function runFlashCountdown(onComplete) {
         updateModeUI();
         resetGame();
         closePracticeModal();
+        if (practiceMathOps && practiceMathOps.checked) activePracticeModifiers.push("mathOps");
+        if (practiceMathOpsPlus && practiceMathOpsPlus.checked) activePracticeModifiers.push("mathOpsPlus");
+        if (practiceMisleadColors && practiceMisleadColors.checked) activePracticeModifiers.push("misleadColors");
+        if (practiceBackgroundColor && practiceBackgroundColor.checked) activePracticeModifiers.push("backgroundColor");
+        if (practiceTextColor && practiceTextColor.checked) activePracticeModifiers.push("textColor");
+        if (practicePreviousCard && practicePreviousCard.checked) activePracticeModifiers.push("previousCard");
+        if (practiceRotate && practiceRotate.checked) activePracticeModifiers.push("rotate");
+        if (practiceRotatePlus && practiceRotatePlus.checked) activePracticeModifiers.push("rotatePlus");
+        if (practiceSwap && practiceSwap.checked) activePracticeModifiers.push("swapCards");
+        if (practicePlatformer && practicePlatformer.checked) activePracticeModifiers.push("platformer");
+        if (practiceGlitch && practiceGlitch.checked) activePracticeModifiers.push("glitch");
+        if (practiceFog && practiceFog.checked) activePracticeModifiers.push("fog");
+        if (practiceBlur && practiceBlur.checked) activePracticeModifiers.push("blur");
+        if (practiceAds && practiceAds.checked) activePracticeModifiers.push("ads");
+        if (typeof window.recordSandboxPlayedStat === "function") {
+          window.recordSandboxPlayedStat();
+        }
+        if (typeof window.syncAchievementsFromLocal === "function") {
+          window.syncAchievementsFromLocal({
+            sandboxPlayed: true,
+            usedModifiers: activePracticeModifiers
+          });
+        }
         startRound();
       });
 
@@ -3084,16 +3545,46 @@ function runFlashCountdown(onComplete) {
           const isLocked = target.dataset.locked === "true";
           if (target.checked && isLocked && unlockType) {
             const unlockKey = unlockType === "modifiers" ? target.id : target.value;
+            const availableStars =
+              typeof window.getSandboxStarsAvailable === "function" ? window.getSandboxStarsAvailable() : 0;
+            if (availableStars < cost) {
+              target.checked = false;
+              if (error) {
+                error.textContent = `You can't afford this yet. Need ${cost} stars.`;
+                error.hidden = false;
+                error.classList.remove("show");
+                void error.offsetWidth;
+                error.classList.add("show");
+                if (error.dataset.hideTimer) {
+                  clearTimeout(Number(error.dataset.hideTimer));
+                }
+                const timerId = window.setTimeout(() => {
+                  hidePracticeError(error, "Select at least one card type to start Sandbox.");
+                }, 2200);
+                error.dataset.hideTimer = String(timerId);
+              }
+              return;
+            }
+            const labelSource =
+              target.closest("label") && target.closest("label").querySelector(".label")
+                ? target.closest("label").querySelector(".label").textContent
+                : target.value || target.id;
+            const itemLabel = String(labelSource || unlockKey || "this item").trim();
+            const confirmed = window.confirm(`Unlock ${itemLabel} for ${cost} stars?`);
+            if (!confirmed) {
+              target.checked = false;
+              return;
+            }
             const unlocked =
               typeof window.unlockSandboxItem === "function"
                 ? window.unlockSandboxItem(unlockType, unlockKey)
                 : false;
-            if (!unlocked) {
-              target.checked = false;
-              if (error) {
-                error.textContent = `Need ${cost} stars to unlock.`;
-                error.hidden = false;
-                error.classList.remove("show");
+              if (!unlocked) {
+                target.checked = false;
+                if (error) {
+                  error.textContent = `You can't afford this yet. Need ${cost} stars.`;
+                  error.hidden = false;
+                  error.classList.remove("show");
                 void error.offsetWidth;
                 error.classList.add("show");
                 if (error.dataset.hideTimer) {
@@ -3107,16 +3598,7 @@ function runFlashCountdown(onComplete) {
               return;
             }
             updateCategoryControls();
-            const starsEl = document.getElementById("sandboxStars");
-            if (starsEl && typeof window.getSandboxStarsAvailable === "function") {
-              const availableEl = starsEl.querySelector(".sandbox-stars__available");
-              const available = window.getSandboxStarsAvailable();
-              if (availableEl) {
-                availableEl.textContent = String(available);
-              } else {
-                starsEl.textContent = `✦ ${available}`;
-              }
-            }
+            updateSandboxStarsDisplay();
           }
           if (!error) return;
           const anyChecked = Array.from(
@@ -3228,9 +3710,9 @@ function runFlashCountdown(onComplete) {
           case "ArrowUp":
             event.preventDefault();
             if (activeInput) {
-              const nextArrow = "↑";
+              const nextArrow = "\u2191";
               const current = String(activeInput.value || "").trim();
-              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
               if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
@@ -3242,9 +3724,9 @@ function runFlashCountdown(onComplete) {
           case "ArrowDown":
             event.preventDefault();
             if (activeInput) {
-              const nextArrow = "↓";
+              const nextArrow = "\u2193";
               const current = String(activeInput.value || "").trim();
-              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
               if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
@@ -3256,9 +3738,9 @@ function runFlashCountdown(onComplete) {
           case "ArrowLeft":
             event.preventDefault();
             if (activeInput) {
-              const nextArrow = "←";
+              const nextArrow = "\u2190";
               const current = String(activeInput.value || "").trim();
-              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
               if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
@@ -3270,9 +3752,9 @@ function runFlashCountdown(onComplete) {
           case "ArrowRight":
             event.preventDefault();
             if (activeInput) {
-              const nextArrow = "→";
+              const nextArrow = "\u2192";
               const current = String(activeInput.value || "").trim();
-              const isArrowSeq = /^[↑↓←→]+$/.test(current);
+              const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
               if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
@@ -3337,7 +3819,7 @@ function runFlashCountdown(onComplete) {
               trackQuitReason("menu_quit", activeContext || {});
             }
             if (typeof window.recordLevelAttemptStats === "function") {
-              window.recordLevelAttemptStats(false);
+              window.recordLevelAttemptStats(false, { countFailure: false });
             }
             if (typeof trackLevelSession === 'function') {
               trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries, "menu_quit", activeContext || {});
@@ -3569,7 +4051,7 @@ function runFlashCountdown(onComplete) {
                 trackQuitReason("menu_quit", activeContext || {});
               }
               if (typeof window.recordLevelAttemptStats === "function") {
-                window.recordLevelAttemptStats(false);
+                window.recordLevelAttemptStats(false, { countFailure: false });
               }
               if (typeof trackLevelSession === 'function') {
                 trackLevelSession(stageState.index, false, 0, backElapsedSeconds, backEntries, "menu_quit", activeContext || {});
@@ -3603,7 +4085,7 @@ function runFlashCountdown(onComplete) {
             if (retryBtn) retryBtn.click();
             return;
           }
-          if (event.key === "Enter" && document.body.classList.contains("stage-fail")) {
+          if (isConfirmKey(event) && stageState && stageState.failed) {
             event.preventDefault();
             const retryBtn = document.getElementById("stageRetryButton");
             if (retryBtn) retryBtn.click();
@@ -3624,7 +4106,7 @@ function runFlashCountdown(onComplete) {
             if (retryBtn) retryBtn.click();
             return;
           }
-          if (event.key === "Enter" && document.body.classList.contains("stage-fail")) {
+          if (isConfirmKey(event) && document.body.classList.contains("stage-fail")) {
             event.preventDefault();
             const retryBtn = document.getElementById("practiceRetryButton");
             if (retryBtn) retryBtn.click();
@@ -3776,7 +4258,11 @@ function runFlashCountdown(onComplete) {
 
       {
         const storedAppearance = getStoredAppearance();
-        applyAppearance(storedAppearance.theme, storedAppearance.font, storedAppearance.layout);
+        applyAppearance(
+          storedAppearance.theme,
+          storedAppearance.layout,
+          storedAppearance.colorVision
+        );
       }
       {
         const storedAudio = getStoredAudioSettings();
@@ -3896,25 +4382,39 @@ function runFlashCountdown(onComplete) {
         leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
       }
 
-      if (appearanceTheme && appearanceFont) {
+      if (appearanceTheme) {
         const persistAndApplyAppearance = () => {
+          const previousTheme = document.body && document.body.dataset ? document.body.dataset.theme || "" : "";
           const theme = appearanceTheme.value;
-          const font = appearanceFont.value;
-          applyAppearance(theme, font, "classic");
+          const colorVision = appearanceColorVision ? appearanceColorVision.value : "standard";
+          applyAppearance(theme, "classic", colorVision);
           window.localStorage.setItem(APPEARANCE_THEME_KEY, document.body.dataset.theme || appearanceOptions.themes[0]);
-          window.localStorage.setItem(APPEARANCE_FONT_KEY, document.body.dataset.font || appearanceOptions.fonts[0]);
+          window.localStorage.removeItem(APPEARANCE_FONT_KEY);
+          if (appearanceColorVision) {
+            const colorVisionModes = Array.isArray(appearanceOptions.colorVisionModes)
+              ? appearanceOptions.colorVisionModes
+              : ["standard"];
+            window.localStorage.setItem(
+              APPEARANCE_COLOR_VISION_KEY,
+              document.body.dataset.colorVision || colorVisionModes[0]
+            );
+          }
           window.localStorage.setItem(APPEARANCE_LAYOUT_KEY, "classic");
+          if (typeof window.recordAchievementThemeChange === "function") {
+            window.recordAchievementThemeChange(previousTheme, document.body.dataset.theme || "");
+          }
         };
         appearanceTheme.addEventListener("change", persistAndApplyAppearance);
-        appearanceFont.addEventListener("change", persistAndApplyAppearance);
+        if (appearanceColorVision) {
+          appearanceColorVision.addEventListener("change", persistAndApplyAppearance);
+        }
 
       }
 
-      if (appearanceShuffle && appearanceTheme && appearanceFont) {
+      if (appearanceShuffle && appearanceTheme) {
         appearanceShuffle.addEventListener("click", () => {
           const pick = (list) => list[Math.floor(Math.random() * list.length)];
           appearanceTheme.value = pick(appearanceOptions.themes);
-          appearanceFont.value = pick(appearanceOptions.fonts);
           appearanceTheme.dispatchEvent(new Event("change"));
         });
       }

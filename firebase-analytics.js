@@ -54,6 +54,201 @@ const leaderboardSessionCache = new Map();
 const statsLeaderboardSessionCache = new Map();
 const STATS_LEADERBOARD_CACHE_TTL_MS = 60 * 1000;
 const PROGRESS_LEADERBOARD_PATH = "leaderboards_global/progress/entries";
+const ACHIEVEMENT_PROFILE_PATH = "achievement_profiles";
+const ACHIEVEMENT_SUMMARY_PATH = "achievements_global/summary";
+const ACHIEVEMENT_ENTRY_PATH = `${ACHIEVEMENT_SUMMARY_PATH}/entries`;
+const ACHIEVEMENT_CACHE_TTL_MS = 60 * 1000;
+const ACHIEVEMENT_CARD_TYPE_THRESHOLDS = [1, 10, 100, 1000];
+const ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS = [10, 100, 1000];
+const ACHIEVEMENT_CARD_TYPE_META = {
+  numbers: { label: "Numbers", noun: "number cards", short: "NUM" },
+  letters: { label: "Letters", noun: "letter cards", short: "LET" },
+  shapes: { label: "Shapes", noun: "shape cards", short: "SHP" },
+  directions: { label: "Directions", noun: "direction cards", short: "DIR" },
+  colors: { label: "Colors", noun: "color cards", short: "CLR" },
+  diagonal: { label: "Diagonals", noun: "diagonal cards", short: "DIA" },
+  fruits: { label: "Fruits", noun: "fruit cards", short: "FRT" }
+};
+const ACHIEVEMENT_MODIFIER_META = {
+  mathOps: { firstUseId: "mod_math_ops", label: "Math Ops", iconSrc: "imgs/icons/mod-mathops.svg", short: "MATH" },
+  mathOpsPlus: { firstUseId: "mod_math_ops_plus", label: "Math Ops+", iconSrc: "imgs/icons/mod-mathopsplus.svg", short: "M+" },
+  misleadColors: { firstUseId: "mod_mislead_colors", label: "Misleading Colors", iconSrc: "imgs/icons/mod-misleadcolors.svg", short: "MIS" },
+  backgroundColor: { firstUseId: "mod_background_color", label: "Background Color", iconSrc: "imgs/icons/mod-backgroundcolor.svg", short: "BG" },
+  textColor: { firstUseId: "mod_text_color", label: "Text Color", iconSrc: "imgs/icons/mod-textcolor.svg", short: "TXT" },
+  previousCard: { firstUseId: "mod_previous_card", label: "Previous Card", iconSrc: "imgs/icons/mod-previouscard.svg", short: "PREV" },
+  rotate: { firstUseId: "mod_rotate", label: "Rotate", iconSrc: "imgs/icons/mod-rotate.svg", short: "ROT" },
+  rotatePlus: { firstUseId: "mod_rotate_plus", label: "Rotate+", iconSrc: "imgs/icons/mod-rotateplus.svg", short: "R+" },
+  swapCards: { firstUseId: "mod_swap_cards", label: "Card Swap", iconSrc: "imgs/icons/mod-swapcards.svg", short: "SWAP" },
+  platformer: { firstUseId: "mod_platformer", label: "Platformer", iconSrc: "imgs/icons/mod-platformer.svg", short: "PLAT" },
+  glitch: { firstUseId: "mod_glitch", label: "Glitch", iconSrc: "imgs/icons/mod-glitch.svg", short: "GLT" },
+  fog: { firstUseId: "mod_fog", label: "Fog", iconSrc: "imgs/icons/mod-fog.svg", short: "FOG" },
+  blur: { firstUseId: "mod_blur", label: "Blur", iconSrc: "imgs/icons/mod-blur.svg", short: "BLR" },
+  ads: { firstUseId: "mod_ads", label: "Ads", iconSrc: "imgs/icons/mod-ads.svg", short: "ADS" }
+};
+const ACHIEVEMENT_MODIFIER_MAP = Object.fromEntries(
+  Object.entries(ACHIEVEMENT_MODIFIER_META).map(([key, value]) => [key, value.firstUseId])
+);
+
+function formatAchievementThresholdShort(value) {
+  const count = Number(value) || 0;
+  if (count >= 1000) {
+    return `${Math.round(count / 1000)}K`;
+  }
+  return String(count);
+}
+
+function buildCardTypeAchievementDefinitions() {
+  return Object.entries(ACHIEVEMENT_CARD_TYPE_META).flatMap(([key, meta]) =>
+    ACHIEVEMENT_CARD_TYPE_THRESHOLDS.map((threshold) => ({
+      id: `card_${key}_${threshold}`,
+      title: `${meta.label} ${formatAchievementThresholdShort(threshold)}`,
+      description: `See ${threshold} ${meta.noun}.`,
+      iconText: `${meta.short}${formatAchievementThresholdShort(threshold)}`
+    }))
+  );
+}
+
+function buildModifierVariantAchievementDefinitions() {
+  return Object.entries(ACHIEVEMENT_MODIFIER_META).flatMap(([key, meta]) =>
+    ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS.map((threshold) => ({
+      id: `mod_variants_${key}_${threshold}`,
+      title: `${meta.label} ${formatAchievementThresholdShort(threshold)}`,
+      description: `Encounter ${threshold} ${meta.label} modifier variants.`,
+      iconText: `${meta.short}${formatAchievementThresholdShort(threshold)}`
+    }))
+  );
+}
+
+const ACHIEVEMENT_DEFINITIONS = [
+  ...Object.values(ACHIEVEMENT_MODIFIER_META).map((meta) => ({
+    id: meta.firstUseId,
+    title: meta.label,
+    description: `Use the ${meta.label} modifier for the first time.`,
+    iconSrc: meta.iconSrc
+  })),
+  ...buildCardTypeAchievementDefinitions(),
+  ...buildModifierVariantAchievementDefinitions(),
+  { id: "complete_1", title: "First Clear", description: "Complete one level.", iconText: "1" },
+  { id: "complete_flash_1", title: "Flash Initiate", description: "Complete your first flash level.", iconText: "FLASH" },
+  { id: "complete_10", title: "Ten Clears", description: "Complete 10 levels.", iconText: "10" },
+  { id: "complete_all", title: "Full Clear", description: "Complete all levels.", iconText: "ALL" },
+  { id: "complete_stage_67", title: "Lucky 67", description: "Complete level 67.", iconText: "67" },
+  { id: "attempt_10", title: "Getting Started", description: "Attempt 10 levels.", iconText: "A10" },
+  { id: "attempt_100", title: "Committed", description: "Attempt 100 levels.", iconText: "A100" },
+  { id: "attempt_1000", title: "Relentless", description: "Attempt 1000 levels.", iconText: "1K" },
+  { id: "attempt_10000", title: "Endless Grind", description: "Attempt 10000 levels.", iconText: "10K" },
+  { id: "fail_1", title: "First Fall", description: "Fail 1 level.", iconText: "F1" },
+  { id: "fail_10", title: "Still Learning", description: "Fail 10 levels.", iconText: "F10" },
+  { id: "fail_100", title: "Tough Lessons", description: "Fail 100 levels.", iconText: "F100" },
+  { id: "fail_1000", title: "Impossible Odds", description: "Fail 1000 levels.", iconText: "F1K" },
+  { id: "stars_level_1", title: "First Star", description: "Collect 1 star on a level.", iconText: "1\u2605" },
+  { id: "stars_level_2", title: "Double Star", description: "Collect 2 stars on a level.", iconText: "2\u2605" },
+  { id: "stars_level_3", title: "Triple Star", description: "Collect 3 stars on a level.", iconText: "3\u2605" },
+  { id: "stars_total_10", title: "Star Collector", description: "Collect 10 stars.", iconText: "10\u2605" },
+  { id: "stars_total_25", title: "Star Seeker", description: "Collect 25 stars.", iconText: "25\u2605" },
+  { id: "stars_total_50", title: "Star Keeper", description: "Collect 50 stars.", iconText: "50\u2605" },
+  { id: "stars_total_100", title: "Star Hoard", description: "Collect 100 stars.", iconText: "100\u2605" },
+  { id: "stars_total_200", title: "Star Vault", description: "Collect 200 stars.", iconText: "200\u2605" },
+  { id: "stars_total_300", title: "Star Legend", description: "Collect 300 stars.", iconText: "300\u2605" },
+  { id: "leaderboard_top_5", title: "Top Five", description: "Get top 5 on a leaderboard.", iconText: "TOP5" },
+  { id: "leaderboard_first", title: "First Place", description: "Get first place on a leaderboard.", iconText: "#1" },
+  { id: "time_minutes_10", title: "Ten Minutes In", description: "Spend 10 total in-level minutes in game.", iconText: "10m" },
+  { id: "time_minutes_100", title: "Century Club", description: "Spend 100 total in-level minutes in game.", iconText: "100m" },
+  { id: "theme_changed", title: "Fresh Paint", description: "Change your theme.", iconText: "THEME" },
+  { id: "sandbox_played", title: "Sandbox Opened", description: "Play Sandbox.", iconText: "SBX" },
+  { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconText: "MONO" },
+  { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "4\u2605", secret: true },
+  { id: "secret_stars_total_400", title: "Hidden Galaxy", description: "Collect 400 stars.", iconText: "400\u2605", secret: true }
+];
+const ACHIEVEMENT_DEFINITION_BY_ID = Object.fromEntries(
+  ACHIEVEMENT_DEFINITIONS.map((entry) => [entry.id, entry])
+);
+
+function getAchievementDifficultyScore(definition) {
+  const id = String(definition && definition.id ? definition.id : "");
+  if (definition && definition.secret) return 98;
+  if (/^complete_all$|^leaderboard_first$|^time_minutes_100$|^fail_1000$/.test(id)) return 94;
+  if (/^attempt_10000$|^complete_stage_67$/.test(id)) return 90;
+  if (/^attempt_1000$|^fail_100$|^stars_total_300$|^stars_total_200$/.test(id)) return 82;
+  if (/^attempt_100$|^complete_flash_1$|^win_monochrome$|^leaderboard_top_5$|^time_minutes_10$/.test(id)) return 70;
+  if (/^complete_10$|^fail_10$|^stars_total_100$|^stars_total_50$|^theme_changed$/.test(id)) return 58;
+  if (/^stars_level_3$|^stars_total_25$|^stars_level_2$/.test(id)) return 48;
+  if (/^mod_variants_/.test(id)) {
+    if (/_1000$/.test(id)) return 86;
+    if (/_100$/.test(id)) return 64;
+    return 42;
+  }
+  if (/^card_/.test(id)) {
+    if (/_1000$/.test(id)) return 88;
+    if (/_100$/.test(id)) return 62;
+    if (/_10$/.test(id)) return 38;
+    return 20;
+  }
+  if (/^mod_/.test(id)) return 22;
+  if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_10$|^sandbox_played$/.test(id)) return 18;
+  return 45;
+}
+
+function getAchievementDifficultyColor(score) {
+  const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
+  const hue = Math.round(140 - (safeScore / 100) * 140);
+  return `hsl(${hue} 70% 46%)`;
+}
+const LEGACY_ACHIEVEMENT_DEFINITIONS = [
+  { id: "mod_math_ops", title: "Math Ops", description: "Use the Math ops modifier for the first time.", iconSrc: "imgs/icons/mod-mathops.svg" },
+  { id: "mod_math_ops_plus", title: "Math Ops+", description: "Use the Math ops+ modifier for the first time.", iconSrc: "imgs/icons/mod-mathopsplus.svg" },
+  { id: "mod_mislead_colors", title: "Misleading Colors", description: "Use the Misleading colors modifier for the first time.", iconSrc: "imgs/icons/mod-misleadcolors.svg" },
+  { id: "mod_background_color", title: "Background Color", description: "Use the Background color modifier for the first time.", iconSrc: "imgs/icons/mod-backgroundcolor.svg" },
+  { id: "mod_text_color", title: "Text Color", description: "Use the Text color modifier for the first time.", iconSrc: "imgs/icons/mod-textcolor.svg" },
+  { id: "mod_previous_card", title: "Previous Card", description: "Use the Previous card modifier for the first time.", iconSrc: "imgs/icons/mod-previouscard.svg" },
+  { id: "mod_rotate", title: "Rotate", description: "Use the Rotate modifier for the first time.", iconSrc: "imgs/icons/mod-rotate.svg" },
+  { id: "mod_rotate_plus", title: "Rotate+", description: "Use the Rotate+ modifier for the first time.", iconSrc: "imgs/icons/mod-rotateplus.svg" },
+  { id: "mod_swap_cards", title: "Card Swap", description: "Use the Card swap modifier for the first time.", iconSrc: "imgs/icons/mod-swapcards.svg" },
+  { id: "mod_platformer", title: "Platformer", description: "Use the Platformer modifier for the first time.", iconSrc: "imgs/icons/mod-platformer.svg" },
+  { id: "mod_glitch", title: "Glitch", description: "Use the Glitch modifier for the first time.", iconSrc: "imgs/icons/mod-glitch.svg" },
+  { id: "mod_fog", title: "Fog", description: "Use the Fog modifier for the first time.", iconSrc: "imgs/icons/mod-fog.svg" },
+  { id: "mod_blur", title: "Blur", description: "Use the Blur modifier for the first time.", iconSrc: "imgs/icons/mod-blur.svg" },
+  { id: "mod_ads", title: "Ads", description: "Use the Ads modifier for the first time.", iconSrc: "imgs/icons/mod-ads.svg" },
+  { id: "complete_1", title: "First Clear", description: "Complete one level.", iconText: "1" },
+  { id: "complete_10", title: "Ten Clears", description: "Complete 10 levels.", iconText: "10" },
+  { id: "complete_all", title: "Full Clear", description: "Complete all levels.", iconText: "ALL" },
+  { id: "attempt_10", title: "Getting Started", description: "Attempt 10 levels.", iconText: "A10" },
+  { id: "attempt_100", title: "Committed", description: "Attempt 100 levels.", iconText: "A100" },
+  { id: "attempt_1000", title: "Relentless", description: "Attempt 1000 levels.", iconText: "1K" },
+  { id: "attempt_10000", title: "Endless Grind", description: "Attempt 10000 levels.", iconText: "10K" },
+  { id: "stars_level_3", title: "Triple Star", description: "Collect 3 stars on a level.", iconText: "3★" },
+  { id: "stars_total_30", title: "Star Collector", description: "Collect 30 stars.", iconText: "30★" },
+  { id: "stars_total_100", title: "Star Hoard", description: "Collect 100 stars.", iconText: "100★" },
+  { id: "stars_total_200", title: "Star Vault", description: "Collect 200 stars.", iconText: "200★" },
+  { id: "stars_total_300", title: "Star Legend", description: "Collect 300 stars.", iconText: "300★" },
+  { id: "leaderboard_top_5", title: "Top Five", description: "Get top 5 on a leaderboard.", iconText: "TOP5" },
+  { id: "leaderboard_first", title: "First Place", description: "Get first place on a leaderboard.", iconText: "#1" },
+  { id: "time_minutes_10", title: "Ten Minutes In", description: "Spend 10 total in-level minutes in game.", iconText: "10m" },
+  { id: "time_minutes_100", title: "Century Club", description: "Spend 100 total in-level minutes in game.", iconText: "100m" },
+  { id: "theme_changed", title: "Fresh Paint", description: "Change your theme.", iconText: "THEME" },
+  { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconText: "MONO" },
+  { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "4★", secret: true },
+  { id: "secret_stars_total_400", title: "Hidden Galaxy", description: "Collect 400 stars.", iconText: "400★", secret: true }
+];
+const LEGACY_ACHIEVEMENT_MODIFIER_MAP = {
+  mathOps: "mod_math_ops",
+  mathOpsPlus: "mod_math_ops_plus",
+  misleadColors: "mod_mislead_colors",
+  backgroundColor: "mod_background_color",
+  textColor: "mod_text_color",
+  previousCard: "mod_previous_card",
+  rotate: "mod_rotate",
+  rotatePlus: "mod_rotate_plus",
+  swapCards: "mod_swap_cards",
+  platformer: "mod_platformer",
+  glitch: "mod_glitch",
+  fog: "mod_fog",
+  blur: "mod_blur",
+  ads: "mod_ads"
+};
+let achievementOverviewCache = null;
+let achievementProfileCache = null;
+const pendingAchievementUpdates = [];
 let leaderboardReadBudget = { totalReads: 0, blocked: false };
 
 function loadLeaderboardReadBudget() {
@@ -94,6 +289,8 @@ function getDefaultLeaderboardResult(overrides = {}) {
     top: [],
     me: null,
     meRank: null,
+    totalPlayers: 0,
+    averageTimeMs: null,
     fromCache: false,
     stale: false,
     errorCode: null,
@@ -125,7 +322,11 @@ function computeLeaderboardViewFromEntries(entries, limit = 5) {
   const meIndex = active.findIndex((entry) => entry && entry.player_id === playerId);
   const me = meIndex >= 0 ? active[meIndex] : null;
   const meRank = meIndex >= 0 ? meIndex + 1 : null;
-  return { top, me, meRank };
+  const totalPlayers = active.length;
+  const averageTimeMs = totalPlayers
+    ? active.reduce((sum, entry) => sum + Number(entry.best_time_ms), 0) / totalPlayers
+    : null;
+  return { top, me, meRank, totalPlayers, averageTimeMs };
 }
 
 function getCachedLeaderboard(stageId, stageVersion, limit = 5) {
@@ -218,6 +419,711 @@ function upsertCachedStatsEntry(entry) {
   });
 }
 
+function getAchievementCatalog() {
+  return ACHIEVEMENT_DEFINITIONS.map((entry) => ({ ...entry }));
+}
+
+function getDefaultAchievementTheme() {
+  const defaults = typeof window.getFlashRecallSettingsDefaults === "function"
+    ? window.getFlashRecallSettingsDefaults()
+    : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
+  const appearance = defaults && typeof defaults === "object" ? defaults.appearance || {} : {};
+  return appearance && appearance.theme ? String(appearance.theme) : "studio-light";
+}
+
+function getAchievementProfileRef() {
+  if (!firebaseDb) return null;
+  return firebaseDb.collection(ACHIEVEMENT_PROFILE_PATH).doc(playerId);
+}
+
+function getAchievementSummaryRef() {
+  if (!firebaseDb) return null;
+  return firebaseDb.doc(ACHIEVEMENT_SUMMARY_PATH);
+}
+
+function getAchievementEntryRef(achievementId) {
+  if (!firebaseDb) return null;
+  return firebaseDb.doc(`${ACHIEVEMENT_ENTRY_PATH}/${achievementId}`);
+}
+
+function getDefaultAchievementProfile() {
+  return {
+    player_id: playerId,
+    auth_uid: currentUserId,
+    player_name: "",
+    attempt_count: 0,
+    failed_count: 0,
+    completed_count: 0,
+    total_stars: 0,
+    total_time_seconds: 0,
+    max_stars_on_level: 0,
+    total_stages: 0,
+    sandbox_played: false,
+    completed_flash_level: false,
+    completed_stage_67: false,
+    theme_changed: false,
+    monochrome_win: false,
+    leaderboard_top_5: false,
+    leaderboard_first_place: false,
+    used_modifiers: {},
+    card_type_counts: {},
+    modifier_variant_counts: {},
+    unlocked: {}
+  };
+}
+
+function normalizeAchievementCounterMap(raw) {
+  const next = {};
+  const source = raw && typeof raw === "object" ? raw : {};
+  Object.keys(source).forEach((key) => {
+    const value = Math.max(0, Math.floor(Number(source[key]) || 0));
+    if (value > 0) {
+      next[key] = value;
+    }
+  });
+  return next;
+}
+
+function normalizeAchievementProfile(raw) {
+  const base = getDefaultAchievementProfile();
+  const source = raw && typeof raw === "object" ? raw : {};
+  base.player_name = source.player_name || "";
+  base.attempt_count = Math.max(0, Number(source.attempt_count) || 0);
+  base.failed_count = Math.max(0, Number(source.failed_count) || 0);
+  base.completed_count = Math.max(0, Number(source.completed_count) || 0);
+  base.total_stars = Math.max(0, Number(source.total_stars) || 0);
+  base.total_time_seconds = Math.max(0, Number(source.total_time_seconds) || 0);
+  base.max_stars_on_level = Math.max(0, Number(source.max_stars_on_level) || 0);
+  base.total_stages = Math.max(0, Number(source.total_stages) || 0);
+  base.sandbox_played = Boolean(source.sandbox_played);
+  base.completed_flash_level = Boolean(source.completed_flash_level);
+  base.completed_stage_67 = Boolean(source.completed_stage_67);
+  base.theme_changed = Boolean(source.theme_changed);
+  base.monochrome_win = Boolean(source.monochrome_win);
+  base.leaderboard_top_5 = Boolean(source.leaderboard_top_5);
+  base.leaderboard_first_place = Boolean(source.leaderboard_first_place);
+  base.used_modifiers = source.used_modifiers && typeof source.used_modifiers === "object"
+    ? { ...source.used_modifiers }
+    : {};
+  base.card_type_counts = normalizeAchievementCounterMap(source.card_type_counts);
+  base.modifier_variant_counts = normalizeAchievementCounterMap(source.modifier_variant_counts);
+  base.unlocked = source.unlocked && typeof source.unlocked === "object"
+    ? { ...source.unlocked }
+    : {};
+  return base;
+}
+
+function getLocalStatsSnapshot() {
+  const sessionStats = window.flashRecallSessionStats || {};
+  let stored = null;
+  try {
+    const raw = window.localStorage.getItem("flashRecallStats");
+    stored = raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    stored = null;
+  }
+  const totalSeconds = Math.max(
+    Number(stored && stored.totalSeconds) || 0,
+    Number(sessionStats.totalSeconds) || 0
+  );
+  const totalLevelAttempts = Math.max(
+    Number(stored && stored.totalLevelAttempts) || 0,
+    Number(sessionStats.totalLevelAttempts) || 0
+  );
+  const totalLevelSuccesses = Math.max(
+    Number(stored && stored.totalLevelSuccesses) || 0,
+    Number(sessionStats.totalLevelSuccesses) || 0
+  );
+  const failedLevelCount = Math.max(
+    Number(stored && stored.failedLevelCount) || 0,
+    Number(sessionStats.failedLevelCount) || 0
+  );
+  const sandboxPlayed = Boolean(
+    (stored && stored.sandboxPlayed) ||
+    (sessionStats && sessionStats.sandboxPlayed)
+  );
+  const cardTypeCounts = {
+    ...normalizeAchievementCounterMap(stored && stored.cardTypeCounts),
+    ...normalizeAchievementCounterMap(sessionStats && sessionStats.cardTypeCounts)
+  };
+  const modifierVariantCounts = {
+    ...normalizeAchievementCounterMap(stored && stored.modifierVariantCounts),
+    ...normalizeAchievementCounterMap(sessionStats && sessionStats.modifierVariantCounts)
+  };
+  return {
+    totalSeconds,
+    totalLevelAttempts,
+    totalLevelSuccesses,
+    failedLevelCount,
+    sandboxPlayed,
+    cardTypeCounts,
+    modifierVariantCounts
+  };
+}
+
+function getCompletedStageCount() {
+  const completed = window.stageCompleted || {};
+  return Object.keys(completed).reduce((sum, key) => sum + (completed[key] ? 1 : 0), 0);
+}
+
+function getStarProgressSnapshot() {
+  const stars = window.stageStars || {};
+  let totalStars = 0;
+  let maxStarsOnLevel = 0;
+  Object.keys(stars).forEach((key) => {
+    const value = Math.max(0, Number(stars[key]) || 0);
+    totalStars += value;
+    if (value > maxStarsOnLevel) {
+      maxStarsOnLevel = value;
+    }
+  });
+  return { totalStars, maxStarsOnLevel };
+}
+
+function getRetroactiveModifierUsage() {
+  const used = {};
+  const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+  stages.forEach((stage, index) => {
+    const stageKey = window.getStageStarsKey
+      ? window.getStageStarsKey(stage, index)
+      : (stage && stage.id ? String(stage.id) : String(index + 1));
+    if (!window.stageCompleted || !window.stageCompleted[stageKey]) return;
+    const modifiers = window.getStageModifiers
+      ? window.getStageModifiers(stage)
+      : (stage && stage.modifiers ? stage.modifiers : {});
+    Object.keys(ACHIEVEMENT_MODIFIER_MAP).forEach((modifierKey) => {
+      if (modifiers && modifiers[modifierKey]) {
+        used[modifierKey] = true;
+      }
+    });
+  });
+  return Object.keys(used);
+}
+
+function getTotalStagesCount() {
+  return Array.isArray(window.stagesConfig) ? window.stagesConfig.length : 0;
+}
+
+function getCompletedStageAchievementFlags() {
+  const completed = window.stageCompleted || {};
+  const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+  let completedFlashLevel = false;
+  let completedStage67 = false;
+  stages.forEach((stage, index) => {
+    const key = window.getStageStarsKey
+      ? window.getStageStarsKey(stage, index)
+      : (stage && stage.id ? String(stage.id) : String(index + 1));
+    if (!completed[key]) return;
+    if (String(stage && stage.stageType ? stage.stageType : "").toLowerCase() === "flash") {
+      completedFlashLevel = true;
+    }
+    if (Number(stage && stage.id) === 67 || index === 66) {
+      completedStage67 = true;
+    }
+  });
+  return { completedFlashLevel, completedStage67 };
+}
+
+function normalizeAchievementUpdate(update = {}) {
+  const base = {
+    playerName: "",
+    attemptCount: null,
+    failedCount: null,
+    completedCount: null,
+    totalStars: null,
+    totalTimeSeconds: null,
+    maxStarsOnLevel: null,
+    totalStages: null,
+    sandboxPlayed: false,
+    completedFlashLevel: false,
+    completedStage67: false,
+    themeChanged: false,
+    monochromeWin: false,
+    leaderboardTop5: false,
+    leaderboardFirstPlace: false,
+    usedModifiers: [],
+    cardTypeCounts: {},
+    modifierVariantCounts: {}
+  };
+  if (!update || typeof update !== "object") return base;
+  base.playerName = update.playerName || "";
+  base.attemptCount = Number.isFinite(Number(update.attemptCount)) ? Math.max(0, Number(update.attemptCount)) : null;
+  base.failedCount = Number.isFinite(Number(update.failedCount)) ? Math.max(0, Number(update.failedCount)) : null;
+  base.completedCount = Number.isFinite(Number(update.completedCount)) ? Math.max(0, Number(update.completedCount)) : null;
+  base.totalStars = Number.isFinite(Number(update.totalStars)) ? Math.max(0, Number(update.totalStars)) : null;
+  base.totalTimeSeconds = Number.isFinite(Number(update.totalTimeSeconds)) ? Math.max(0, Number(update.totalTimeSeconds)) : null;
+  base.maxStarsOnLevel = Number.isFinite(Number(update.maxStarsOnLevel)) ? Math.max(0, Number(update.maxStarsOnLevel)) : null;
+  base.totalStages = Number.isFinite(Number(update.totalStages)) ? Math.max(0, Number(update.totalStages)) : null;
+  base.sandboxPlayed = Boolean(update.sandboxPlayed);
+  base.completedFlashLevel = Boolean(update.completedFlashLevel);
+  base.completedStage67 = Boolean(update.completedStage67);
+  base.themeChanged = Boolean(update.themeChanged);
+  base.monochromeWin = Boolean(update.monochromeWin);
+  base.leaderboardTop5 = Boolean(update.leaderboardTop5);
+  base.leaderboardFirstPlace = Boolean(update.leaderboardFirstPlace);
+  base.usedModifiers = Array.isArray(update.usedModifiers)
+    ? Array.from(new Set(update.usedModifiers.filter((key) => typeof key === "string" && ACHIEVEMENT_MODIFIER_MAP[key])))
+    : [];
+  base.cardTypeCounts = normalizeAchievementCounterMap(update.cardTypeCounts);
+  base.modifierVariantCounts = normalizeAchievementCounterMap(update.modifierVariantCounts);
+  return base;
+}
+
+function mergeAchievementUpdateInputs(...updates) {
+  const merged = normalizeAchievementUpdate();
+  updates.forEach((input) => {
+    const update = normalizeAchievementUpdate(input);
+    if (update.playerName) {
+      merged.playerName = update.playerName;
+    }
+    if (Number.isFinite(update.attemptCount)) {
+      merged.attemptCount = Math.max(Number(merged.attemptCount) || 0, update.attemptCount);
+    }
+    if (Number.isFinite(update.failedCount)) {
+      merged.failedCount = Math.max(Number(merged.failedCount) || 0, update.failedCount);
+    }
+    if (Number.isFinite(update.completedCount)) {
+      merged.completedCount = Math.max(Number(merged.completedCount) || 0, update.completedCount);
+    }
+    if (Number.isFinite(update.totalStars)) {
+      merged.totalStars = Math.max(Number(merged.totalStars) || 0, update.totalStars);
+    }
+    if (Number.isFinite(update.totalTimeSeconds)) {
+      merged.totalTimeSeconds = Math.max(Number(merged.totalTimeSeconds) || 0, update.totalTimeSeconds);
+    }
+    if (Number.isFinite(update.maxStarsOnLevel)) {
+      merged.maxStarsOnLevel = Math.max(Number(merged.maxStarsOnLevel) || 0, update.maxStarsOnLevel);
+    }
+    if (Number.isFinite(update.totalStages)) {
+      merged.totalStages = Math.max(Number(merged.totalStages) || 0, update.totalStages);
+    }
+    merged.sandboxPlayed = merged.sandboxPlayed || update.sandboxPlayed;
+    merged.completedFlashLevel = merged.completedFlashLevel || update.completedFlashLevel;
+    merged.completedStage67 = merged.completedStage67 || update.completedStage67;
+    merged.themeChanged = merged.themeChanged || update.themeChanged;
+    merged.monochromeWin = merged.monochromeWin || update.monochromeWin;
+    merged.leaderboardTop5 = merged.leaderboardTop5 || update.leaderboardTop5;
+    merged.leaderboardFirstPlace = merged.leaderboardFirstPlace || update.leaderboardFirstPlace;
+    merged.usedModifiers = Array.from(new Set(merged.usedModifiers.concat(update.usedModifiers)));
+    merged.cardTypeCounts = {
+      ...merged.cardTypeCounts,
+      ...Object.keys(update.cardTypeCounts || {}).reduce((acc, key) => {
+        acc[key] = Math.max(Number(merged.cardTypeCounts && merged.cardTypeCounts[key]) || 0, Number(update.cardTypeCounts[key]) || 0);
+        return acc;
+      }, {})
+    };
+    merged.modifierVariantCounts = {
+      ...merged.modifierVariantCounts,
+      ...Object.keys(update.modifierVariantCounts || {}).reduce((acc, key) => {
+        acc[key] = Math.max(
+          Number(merged.modifierVariantCounts && merged.modifierVariantCounts[key]) || 0,
+          Number(update.modifierVariantCounts[key]) || 0
+        );
+        return acc;
+      }, {})
+    };
+  });
+  return merged;
+}
+
+function getLocalAchievementSyncUpdate(extra = {}) {
+  const stats = getLocalStatsSnapshot();
+  const completedCount = getCompletedStageCount();
+  const starSnapshot = getStarProgressSnapshot();
+  const completedStageFlags = getCompletedStageAchievementFlags();
+  const currentTheme = String(document.body && document.body.dataset ? document.body.dataset.theme || "" : "");
+  const themeChanged = currentTheme && currentTheme !== getDefaultAchievementTheme();
+  return mergeAchievementUpdateInputs({
+    playerName: getDisplayNameFallback(),
+    attemptCount: stats.totalLevelAttempts,
+    failedCount: stats.failedLevelCount,
+    completedCount,
+    totalStars: starSnapshot.totalStars,
+    totalTimeSeconds: stats.totalSeconds,
+    maxStarsOnLevel: starSnapshot.maxStarsOnLevel,
+    totalStages: getTotalStagesCount(),
+    sandboxPlayed: stats.sandboxPlayed,
+    completedFlashLevel: completedStageFlags.completedFlashLevel,
+    completedStage67: completedStageFlags.completedStage67,
+    themeChanged,
+    usedModifiers: getRetroactiveModifierUsage(),
+    cardTypeCounts: stats.cardTypeCounts,
+    modifierVariantCounts: stats.modifierVariantCounts
+  }, extra);
+}
+
+function mergeAchievementProfileWithUpdate(profile, update) {
+  const next = normalizeAchievementProfile(profile);
+  const normalized = normalizeAchievementUpdate(update);
+  if (normalized.playerName) {
+    next.player_name = normalized.playerName;
+  }
+  if (Number.isFinite(normalized.attemptCount)) {
+    next.attempt_count = Math.max(next.attempt_count, normalized.attemptCount);
+  }
+  if (Number.isFinite(normalized.failedCount)) {
+    next.failed_count = Math.max(next.failed_count, normalized.failedCount);
+  }
+  if (Number.isFinite(normalized.completedCount)) {
+    next.completed_count = Math.max(next.completed_count, normalized.completedCount);
+  }
+  if (Number.isFinite(normalized.totalStars)) {
+    next.total_stars = Math.max(next.total_stars, normalized.totalStars);
+  }
+  if (Number.isFinite(normalized.totalTimeSeconds)) {
+    next.total_time_seconds = Math.max(next.total_time_seconds, normalized.totalTimeSeconds);
+  }
+  if (Number.isFinite(normalized.maxStarsOnLevel)) {
+    next.max_stars_on_level = Math.max(next.max_stars_on_level, normalized.maxStarsOnLevel);
+  }
+  if (Number.isFinite(normalized.totalStages)) {
+    next.total_stages = Math.max(next.total_stages, normalized.totalStages);
+  }
+  next.sandbox_played = next.sandbox_played || normalized.sandboxPlayed;
+  next.completed_flash_level = next.completed_flash_level || normalized.completedFlashLevel;
+  next.completed_stage_67 = next.completed_stage_67 || normalized.completedStage67;
+  next.theme_changed = next.theme_changed || normalized.themeChanged;
+  next.monochrome_win = next.monochrome_win || normalized.monochromeWin;
+  next.leaderboard_top_5 = next.leaderboard_top_5 || normalized.leaderboardTop5;
+  next.leaderboard_first_place = next.leaderboard_first_place || normalized.leaderboardFirstPlace;
+  normalized.usedModifiers.forEach((modifierKey) => {
+    next.used_modifiers[modifierKey] = true;
+  });
+  Object.keys(normalized.cardTypeCounts || {}).forEach((key) => {
+    next.card_type_counts[key] = Math.max(
+      Number(next.card_type_counts[key]) || 0,
+      Number(normalized.cardTypeCounts[key]) || 0
+    );
+  });
+  Object.keys(normalized.modifierVariantCounts || {}).forEach((key) => {
+    next.modifier_variant_counts[key] = Math.max(
+      Number(next.modifier_variant_counts[key]) || 0,
+      Number(normalized.modifierVariantCounts[key]) || 0
+    );
+  });
+  return next;
+}
+
+function getAchievementUnlockIds(profile) {
+  const unlocks = [];
+  Object.keys(ACHIEVEMENT_MODIFIER_MAP).forEach((modifierKey) => {
+    if (profile.used_modifiers[modifierKey]) {
+      unlocks.push(ACHIEVEMENT_MODIFIER_MAP[modifierKey]);
+    }
+  });
+  Object.entries(ACHIEVEMENT_CARD_TYPE_META).forEach(([key]) => {
+    const value = Math.max(0, Number(profile.card_type_counts[key]) || 0);
+    ACHIEVEMENT_CARD_TYPE_THRESHOLDS.forEach((threshold) => {
+      if (value >= threshold) {
+        unlocks.push(`card_${key}_${threshold}`);
+      }
+    });
+  });
+  Object.entries(ACHIEVEMENT_MODIFIER_META).forEach(([key]) => {
+    const value = Math.max(0, Number(profile.modifier_variant_counts[key]) || 0);
+    ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS.forEach((threshold) => {
+      if (value >= threshold) {
+        unlocks.push(`mod_variants_${key}_${threshold}`);
+      }
+    });
+  });
+  if (profile.completed_count >= 1) unlocks.push("complete_1");
+  if (profile.completed_flash_level) unlocks.push("complete_flash_1");
+  if (profile.completed_count >= 10) unlocks.push("complete_10");
+  if (profile.total_stages > 0 && profile.completed_count >= profile.total_stages) unlocks.push("complete_all");
+  if (profile.completed_stage_67) unlocks.push("complete_stage_67");
+  if (profile.attempt_count >= 10) unlocks.push("attempt_10");
+  if (profile.attempt_count >= 100) unlocks.push("attempt_100");
+  if (profile.attempt_count >= 1000) unlocks.push("attempt_1000");
+  if (profile.attempt_count >= 10000) unlocks.push("attempt_10000");
+  if (profile.failed_count >= 1) unlocks.push("fail_1");
+  if (profile.failed_count >= 10) unlocks.push("fail_10");
+  if (profile.failed_count >= 100) unlocks.push("fail_100");
+  if (profile.failed_count >= 1000) unlocks.push("fail_1000");
+  if (profile.max_stars_on_level >= 1) unlocks.push("stars_level_1");
+  if (profile.max_stars_on_level >= 2) unlocks.push("stars_level_2");
+  if (profile.max_stars_on_level >= 3) unlocks.push("stars_level_3");
+  if (profile.total_stars >= 10) unlocks.push("stars_total_10");
+  if (profile.total_stars >= 25) unlocks.push("stars_total_25");
+  if (profile.total_stars >= 50) unlocks.push("stars_total_50");
+  if (profile.total_stars >= 100) unlocks.push("stars_total_100");
+  if (profile.total_stars >= 200) unlocks.push("stars_total_200");
+  if (profile.total_stars >= 300) unlocks.push("stars_total_300");
+  if (profile.leaderboard_top_5) unlocks.push("leaderboard_top_5");
+  if (profile.leaderboard_first_place) unlocks.push("leaderboard_first");
+  if (profile.total_time_seconds >= 10 * 60) unlocks.push("time_minutes_10");
+  if (profile.total_time_seconds >= 100 * 60) unlocks.push("time_minutes_100");
+  if (profile.theme_changed) unlocks.push("theme_changed");
+  if (profile.sandbox_played) unlocks.push("sandbox_played");
+  if (profile.monochrome_win) unlocks.push("win_monochrome");
+  if (profile.max_stars_on_level >= 4) unlocks.push("secret_stars_level_4");
+  if (profile.total_stars >= 400) unlocks.push("secret_stars_total_400");
+  return Array.from(new Set(unlocks));
+}
+
+function setAchievementOverviewCache(profile, totalPlayers, countsById = null) {
+  achievementProfileCache = normalizeAchievementProfile(profile);
+  if (achievementOverviewCache) {
+    achievementOverviewCache.profile = normalizeAchievementProfile(profile);
+    achievementOverviewCache.totalPlayers = Math.max(0, Number(totalPlayers) || 0);
+    if (countsById) {
+      achievementOverviewCache.countsById = { ...countsById };
+    }
+    achievementOverviewCache.loadedAtMs = Date.now();
+    return;
+  }
+  achievementOverviewCache = {
+    profile: normalizeAchievementProfile(profile),
+    totalPlayers: Math.max(0, Number(totalPlayers) || 0),
+    countsById: countsById ? { ...countsById } : {},
+    loadedAtMs: Date.now()
+  };
+}
+
+async function applyAchievementUpdate(update = {}) {
+  const normalizedUpdate = normalizeAchievementUpdate(update);
+  if (!firebaseDb || !currentUserId) {
+    pendingAchievementUpdates.push(normalizedUpdate);
+    return { profile: achievementProfileCache || getDefaultAchievementProfile(), newlyUnlocked: [] };
+  }
+  const profileRef = getAchievementProfileRef();
+  const summaryRef = getAchievementSummaryRef();
+  if (!profileRef || !summaryRef) {
+    return { profile: achievementProfileCache || getDefaultAchievementProfile(), newlyUnlocked: [] };
+  }
+
+  try {
+    const result = await firebaseDb.runTransaction(async (transaction) => {
+      const profileSnap = await transaction.get(profileRef);
+      const summarySnap = await transaction.get(summaryRef);
+      const existingProfile = normalizeAchievementProfile(profileSnap.exists ? profileSnap.data() : null);
+      const nextProfile = mergeAchievementProfileWithUpdate(existingProfile, normalizedUpdate);
+      const nextUnlockedMap = { ...existingProfile.unlocked };
+      const achievementIds = getAchievementUnlockIds(nextProfile);
+      const newlyUnlocked = achievementIds.filter((id) => !existingProfile.unlocked[id]);
+      newlyUnlocked.forEach((id) => {
+        nextUnlockedMap[id] = true;
+      });
+      nextProfile.unlocked = nextUnlockedMap;
+
+      const payload = {
+        player_id: playerId,
+        auth_uid: currentUserId,
+        player_name: nextProfile.player_name || getDisplayNameFallback(),
+        attempt_count: nextProfile.attempt_count,
+        failed_count: nextProfile.failed_count,
+        completed_count: nextProfile.completed_count,
+        total_stars: nextProfile.total_stars,
+        total_time_seconds: nextProfile.total_time_seconds,
+        max_stars_on_level: nextProfile.max_stars_on_level,
+        total_stages: nextProfile.total_stages,
+        sandbox_played: nextProfile.sandbox_played,
+        completed_flash_level: nextProfile.completed_flash_level,
+        completed_stage_67: nextProfile.completed_stage_67,
+        theme_changed: nextProfile.theme_changed,
+        monochrome_win: nextProfile.monochrome_win,
+        leaderboard_top_5: nextProfile.leaderboard_top_5,
+        leaderboard_first_place: nextProfile.leaderboard_first_place,
+        used_modifiers: nextProfile.used_modifiers,
+        card_type_counts: nextProfile.card_type_counts,
+        modifier_variant_counts: nextProfile.modifier_variant_counts,
+        unlocked: nextProfile.unlocked,
+        active: true,
+        game_version: gameVersion,
+        updated_at: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (!profileSnap.exists) {
+        payload.created_at = firebase.firestore.FieldValue.serverTimestamp();
+      }
+      transaction.set(profileRef, payload, { merge: true });
+
+      const totalPlayers = Math.max(
+        0,
+        Number(summarySnap.exists && summarySnap.data() ? summarySnap.data().total_players : 0) + (profileSnap.exists ? 0 : 1)
+      );
+      if (!profileSnap.exists) {
+        transaction.set(summaryRef, {
+          total_players: firebase.firestore.FieldValue.increment(1),
+          updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } else {
+        transaction.set(summaryRef, {
+          updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+
+      newlyUnlocked.forEach((achievementId) => {
+        const entryRef = getAchievementEntryRef(achievementId);
+        if (!entryRef) return;
+        transaction.set(entryRef, {
+          achievement_id: achievementId,
+          unlocked_count: firebase.firestore.FieldValue.increment(1),
+          updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
+
+      return {
+        profile: nextProfile,
+        newlyUnlocked,
+        totalPlayers
+      };
+    });
+
+    const countsById = achievementOverviewCache && achievementOverviewCache.countsById
+      ? { ...achievementOverviewCache.countsById }
+      : {};
+    result.newlyUnlocked.forEach((achievementId) => {
+      countsById[achievementId] = (Number(countsById[achievementId]) || 0) + 1;
+    });
+    setAchievementOverviewCache(result.profile, result.totalPlayers, countsById);
+    if (result.newlyUnlocked.length) {
+      const items = result.newlyUnlocked
+        .map((achievementId) => ACHIEVEMENT_DEFINITION_BY_ID[achievementId])
+        .filter(Boolean)
+        .map((definition) => {
+          const difficultyScore = getAchievementDifficultyScore(definition);
+          return {
+            ...definition,
+            unlocked: true,
+            difficultyScore,
+            difficultyColor: getAchievementDifficultyColor(difficultyScore)
+          };
+        });
+      window.dispatchEvent(new CustomEvent("flashrecall:achievements-unlocked", {
+        detail: { items }
+      }));
+    }
+    return result;
+  } catch (error) {
+    console.warn("Failed to update achievements", error);
+    pendingAchievementUpdates.push(normalizedUpdate);
+    return { profile: achievementProfileCache || getDefaultAchievementProfile(), newlyUnlocked: [] };
+  }
+}
+
+async function syncAchievementsFromLocal(extra = {}) {
+  const mergedUpdate = mergeAchievementUpdateInputs(getLocalAchievementSyncUpdate(), ...pendingAchievementUpdates.splice(0), extra);
+  return applyAchievementUpdate(mergedUpdate);
+}
+
+async function updateLeaderboardAchievementFlags(stageId, stageVersion, playerTimeMs) {
+  if (!Number.isFinite(Number(playerTimeMs))) return;
+  const rankData = await getPlayerRankAndPercentile(stageId, stageVersion, Number(playerTimeMs));
+  if (!rankData) return;
+  const update = {};
+  if (rankData.rank <= 5) {
+    update.leaderboardTop5 = true;
+  }
+  if (rankData.rank === 1) {
+    update.leaderboardFirstPlace = true;
+  }
+  if (Object.keys(update).length) {
+    await applyAchievementUpdate({
+      ...update,
+      playerName: getDisplayNameFallback(),
+      totalStages: getTotalStagesCount()
+    });
+  }
+}
+
+function buildAchievementOverviewResult(profile, totalPlayers, countsById, overrides = {}) {
+  const normalizedProfile = normalizeAchievementProfile(profile);
+  const safeCounts = countsById && typeof countsById === "object" ? countsById : {};
+  const safeTotalPlayers = Math.max(0, Number(totalPlayers) || 0);
+  const items = ACHIEVEMENT_DEFINITIONS.map((definition) => {
+    const unlocked = Boolean(normalizedProfile.unlocked[definition.id]);
+    const unlockedCount = Math.max(0, Number(safeCounts[definition.id]) || 0);
+    const percentUnlocked = safeTotalPlayers > 0
+      ? Math.round((unlockedCount / safeTotalPlayers) * 100)
+      : 0;
+    const difficultyScore = getAchievementDifficultyScore(definition);
+    return {
+      ...definition,
+      unlocked,
+      unlockedCount,
+      percentUnlocked,
+      difficultyScore,
+      difficultyColor: getAchievementDifficultyColor(difficultyScore)
+    };
+  });
+  return {
+    ready: Boolean(firebaseDb && currentUserId),
+    totalPlayers: safeTotalPlayers,
+    unlockedCount: items.filter((item) => item.unlocked).length,
+    totalCount: items.length,
+    profile: normalizedProfile,
+    items,
+    errorCode: null,
+    errorMessage: "",
+    ...overrides
+  };
+}
+
+async function fetchAchievementOverview(options = {}) {
+  const refresh = Boolean(options && options.refresh);
+  const syncLocal = options && Object.prototype.hasOwnProperty.call(options, "syncLocal")
+    ? Boolean(options.syncLocal)
+    : true;
+  if (syncLocal) {
+    await syncAchievementsFromLocal();
+  }
+  if (!firebaseDb || !currentUserId) {
+    return buildAchievementOverviewResult(
+      achievementProfileCache || getDefaultAchievementProfile(),
+      achievementOverviewCache ? achievementOverviewCache.totalPlayers : 0,
+      achievementOverviewCache ? achievementOverviewCache.countsById : {},
+      {
+        ready: false,
+        errorCode: "not_ready",
+        errorMessage: "Achievements are not ready yet."
+      }
+    );
+  }
+  if (
+    !refresh &&
+    achievementOverviewCache &&
+    Date.now() - achievementOverviewCache.loadedAtMs < ACHIEVEMENT_CACHE_TTL_MS
+  ) {
+    return buildAchievementOverviewResult(
+      achievementOverviewCache.profile,
+      achievementOverviewCache.totalPlayers,
+      achievementOverviewCache.countsById,
+      { ready: true }
+    );
+  }
+  try {
+    const profileRef = getAchievementProfileRef();
+    const summaryRef = getAchievementSummaryRef();
+    const [profileSnap, summarySnap, entrySnap] = await Promise.all([
+      profileRef ? profileRef.get() : Promise.resolve(null),
+      summaryRef ? summaryRef.get() : Promise.resolve(null),
+      firebaseDb.collection(ACHIEVEMENT_ENTRY_PATH).get()
+    ]);
+    const profile = normalizeAchievementProfile(profileSnap && profileSnap.exists ? profileSnap.data() : null);
+    const totalPlayers = Math.max(0, Number(summarySnap && summarySnap.exists && summarySnap.data()
+      ? summarySnap.data().total_players
+      : 0));
+    const countsById = {};
+    entrySnap.forEach((doc) => {
+      countsById[doc.id] = Math.max(0, Number(doc.data() && doc.data().unlocked_count) || 0);
+    });
+    setAchievementOverviewCache(profile, totalPlayers, countsById);
+    return buildAchievementOverviewResult(profile, totalPlayers, countsById, { ready: true });
+  } catch (error) {
+    console.warn("Failed to fetch achievements overview", error);
+    return buildAchievementOverviewResult(
+      achievementProfileCache || getDefaultAchievementProfile(),
+      achievementOverviewCache ? achievementOverviewCache.totalPlayers : 0,
+      achievementOverviewCache ? achievementOverviewCache.countsById : {},
+      {
+        ready: false,
+        errorCode: "fetch_failed",
+        errorMessage: "Could not load achievements right now."
+      }
+    );
+  }
+}
+
 function getDisplayNameFallback() {
   if (typeof window.getPlayerName === "function") {
     const name = window.getPlayerName();
@@ -276,7 +1182,12 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
     existing.best_time_ms <= bestTimeMs &&
     existing.player_name === resolvedName
   ) {
-    return;
+    await updateLeaderboardAchievementFlags(stageId, stageVersion, existing.best_time_ms);
+    return {
+      bestTimeMs: existing.best_time_ms,
+      playerName: resolvedName,
+      skipped: true
+    };
   }
   const payload = {
     player_id: playerId,
@@ -303,8 +1214,15 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
     //   }, { merge: true });
     // }
     upsertCachedLeaderboardEntry(stageId, stageVersion, payload);
+    await updateLeaderboardAchievementFlags(stageId, stageVersion, resolvedBest);
+    return {
+      bestTimeMs: resolvedBest,
+      playerName: resolvedName,
+      skipped: false
+    };
   } catch (error) {
     console.warn("Failed to update leaderboard", error);
+    return null;
   }
 }
 
@@ -986,6 +1904,7 @@ async function initializeFirebase() {
           await createNewSession();
         }
         await syncLocalBestTimesOnce();
+        await syncAchievementsFromLocal();
       } else {
         try {
           await firebase.auth().signInAnonymously();
@@ -1089,6 +2008,14 @@ async function trackLevelStart(levelNumber, metadata = {}) {
       current_level_number: normalizedLevel,
       current_level_started_at: firebase.firestore.FieldValue.serverTimestamp()
     });
+    const activeModifiers = Array.isArray(metadata.active_modifiers) ? metadata.active_modifiers : [];
+    if (activeModifiers.length) {
+      await applyAchievementUpdate({
+        playerName: getDisplayNameFallback(),
+        usedModifiers: activeModifiers,
+        totalStages: getTotalStagesCount()
+      });
+    }
   } catch (error) {
     console.error("Failed to update session on level start:", error);
   }
@@ -1184,6 +2111,16 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
       const displayName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
       window.updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, displayName);
     }
+
+    await syncAchievementsFromLocal({
+      playerName: getDisplayNameFallback(),
+      usedModifiers: activeModifiers,
+      maxStarsOnLevel: stars || 0,
+      monochromeWin: Boolean(passed && String(document.body && document.body.dataset
+        ? document.body.dataset.colorVision || ""
+        : "").toLowerCase() === "monochromacy"),
+      totalStages: getTotalStagesCount()
+    });
 
     roundsForCurrentLevel = [];
   } catch (error) {
@@ -1281,6 +2218,17 @@ window.fetchStageLeaderboard = fetchStageLeaderboard;
 window.ensureStageLeaderboardSessionCache = ensureStageLeaderboardSessionCache;
 window.fetchProgressLeaderboard = fetchProgressLeaderboard;
 window.updateProgressLeaderboardSnapshot = updateProgressLeaderboardSnapshot;
+window.fetchAchievementOverview = fetchAchievementOverview;
+window.getAchievementCatalog = getAchievementCatalog;
+window.syncAchievementsFromLocal = syncAchievementsFromLocal;
+window.recordAchievementThemeChange = async (previousTheme, nextTheme) => {
+  if (!previousTheme || !nextTheme || previousTheme === nextTheme) return;
+  await applyAchievementUpdate({
+    playerName: getDisplayNameFallback(),
+    themeChanged: true,
+    totalStages: getTotalStagesCount()
+  });
+};
 window.getLeaderboardReady = () => Boolean(firebaseDb && currentUserId);
 window.getLeaderboardPlayerId = () => playerId;
 window.getLeaderboardReadBudgetStatus = () => ({
