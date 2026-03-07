@@ -1,4 +1,52 @@
 (() => {
+  let stageRoundOverridePlan = null;
+  let stageRoundOverrideStageId = null;
+  let stageRoundOverrideLastRound = null;
+
+  function shuffleArray(list) {
+    for (let i = list.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+  }
+
+  function buildRoundOverridePlan(stage, pool) {
+    const rounds = Number(stage && stage.rounds) || pool.length;
+    const shuffled = shuffleArray(pool.slice());
+    const plan = {};
+    for (let i = 1; i <= rounds; i += 1) {
+      plan[i] = shuffled[i - 1] ?? null;
+    }
+    return plan;
+  }
+
+  window.getStageRoundOverride = function getStageRoundOverride(stage, currentRound) {
+    if (!stage || !Number.isFinite(currentRound)) return null;
+    if (stage.roundOverrides && typeof stage.roundOverrides === "object") {
+      return stage.roundOverrides[currentRound] || null;
+    }
+    const pool = Array.isArray(stage.roundOverridePool) ? stage.roundOverridePool : null;
+    if (!pool || !pool.length) return null;
+    const stageId = stage.id ?? null;
+    const shouldReset =
+      stageRoundOverrideStageId !== stageId ||
+      stageRoundOverridePlan === null ||
+      (stageRoundOverrideLastRound !== null &&
+        (currentRound < stageRoundOverrideLastRound || (currentRound === 1 && stageRoundOverrideLastRound !== 1)));
+    if (shouldReset) {
+      stageRoundOverridePlan = buildRoundOverridePlan(stage, pool);
+      stageRoundOverrideStageId = stageId;
+    }
+    stageRoundOverrideLastRound = currentRound;
+    return stageRoundOverridePlan ? stageRoundOverridePlan[currentRound] || null : null;
+  };
+
+  window.resetStageRoundOverridePlan = function resetStageRoundOverridePlan() {
+    stageRoundOverridePlan = null;
+    stageRoundOverrideStageId = null;
+    stageRoundOverrideLastRound = null;
+  };
   const progressKey = "flashRecallStageProgress";
   window.stagesConfig = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
   window.stageStars = {};
@@ -124,7 +172,7 @@
         ads: false
     };
     if (!stage || typeof stage.modifiers !== "object" || stage.modifiers === null) {
-      return { ...defaults };
+      const options = { ...defaults };
     }
     return { ...defaults, ...stage.modifiers };
   };
@@ -152,45 +200,155 @@
     };
   };
 
-  window.getStageChallengeOptions = function getStageChallengeOptions(stage) {
+  window.getStageChallengeOptions = function getStageChallengeOptions(stage, currentRound) {
     const modifiers = window.getStageModifiers(stage);
-      return {
-        enableMathOps: Boolean(modifiers.mathOps),
-        enableMathOpsPlus: Boolean(modifiers.mathOpsPlus),
-        mathChance: typeof modifiers.mathChance === "number" ? modifiers.mathChance : 0.7,
-        mathMinCount: typeof modifiers.mathMinCount === "number" ? modifiers.mathMinCount : null,
-        mathMaxCount: typeof modifiers.mathMaxCount === "number" ? modifiers.mathMaxCount : null,
-        misleadColors: Boolean(modifiers.misleadColors),
-        misleadChance: typeof modifiers.misleadChance === "number" ? modifiers.misleadChance : 0.6,
-        misleadMinCount: typeof modifiers.misleadMinCount === "number" ? modifiers.misleadMinCount : null,
-        misleadMaxCount: typeof modifiers.misleadMaxCount === "number" ? modifiers.misleadMaxCount : null,
-        enableBackgroundColor: Boolean(modifiers.backgroundColor),
-        backgroundColorChance:
-          typeof modifiers.backgroundColorChance === "number" ? modifiers.backgroundColorChance : 0.35,
-        backgroundPromptChance:
-          typeof modifiers.backgroundPromptChance === "number" ? modifiers.backgroundPromptChance : 0.5,
-        backgroundPromptMinCount:
-          typeof modifiers.backgroundPromptMinCount === "number" ? modifiers.backgroundPromptMinCount : null,
-        backgroundPromptMaxCount:
-          typeof modifiers.backgroundPromptMaxCount === "number" ? modifiers.backgroundPromptMaxCount : null,
-        enableTextColor: Boolean(modifiers.textColor),
-        textColorChance: typeof modifiers.textColorChance === "number" ? modifiers.textColorChance : 0.6,
-        textPromptChance: typeof modifiers.textPromptChance === "number" ? modifiers.textPromptChance : 0.5,
-        textPromptMinCount:
-          typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
-        textPromptMaxCount:
-          typeof modifiers.textPromptMaxCount === "number" ? modifiers.textPromptMaxCount : null,
-        enablePreviousCard: Boolean(modifiers.previousCard),
-        previousCardChance: typeof modifiers.previousCardChance === "number" ? modifiers.previousCardChance : 0.5,
-        previousPromptMinCount:
-          typeof modifiers.previousPromptMinCount === "number" ? modifiers.previousPromptMinCount : null,
-        previousPromptMaxCount:
-          typeof modifiers.previousPromptMaxCount === "number" ? modifiers.previousPromptMaxCount : null,
-        enableRotate: Boolean(modifiers.rotate),
-        enableRotatePlus: Boolean(modifiers.rotatePlus),
-        enableGlitch: Boolean(modifiers.glitch)
-      };
+    const options = {
+      enableMathOps: Boolean(modifiers.mathOps),
+      enableMathOpsPlus: Boolean(modifiers.mathOpsPlus),
+      mathChance: typeof modifiers.mathChance === "number" ? modifiers.mathChance : 0.7,
+      mathMinCount: typeof modifiers.mathMinCount === "number" ? modifiers.mathMinCount : null,
+      mathMaxCount: typeof modifiers.mathMaxCount === "number" ? modifiers.mathMaxCount : null,
+      misleadColors: Boolean(modifiers.misleadColors),
+      misleadChance: typeof modifiers.misleadChance === "number" ? modifiers.misleadChance : 0.6,
+      misleadUniqueLabelsPerRound: Boolean(modifiers.misleadUniqueLabelsPerRound),
+      misleadMinCount: typeof modifiers.misleadMinCount === "number" ? modifiers.misleadMinCount : null,
+      misleadMaxCount: typeof modifiers.misleadMaxCount === "number" ? modifiers.misleadMaxCount : null,
+      enableBackgroundColor: Boolean(modifiers.backgroundColor),
+      backgroundColorChance:
+        typeof modifiers.backgroundColorChance === "number" ? modifiers.backgroundColorChance : 0.35,
+      backgroundColorMinCount:
+        typeof modifiers.backgroundColorMinCount === "number" ? modifiers.backgroundColorMinCount : null,
+      backgroundColorMaxCount:
+        typeof modifiers.backgroundColorMaxCount === "number" ? modifiers.backgroundColorMaxCount : null,
+      backgroundPromptChance:
+        typeof modifiers.backgroundPromptChance === "number" ? modifiers.backgroundPromptChance : 0.5,
+      backgroundPromptMinCount:
+        typeof modifiers.backgroundPromptMinCount === "number" ? modifiers.backgroundPromptMinCount : null,
+      backgroundPromptMaxCount:
+        typeof modifiers.backgroundPromptMaxCount === "number" ? modifiers.backgroundPromptMaxCount : null,
+      enableTextColor: Boolean(modifiers.textColor),
+      textColorChance: typeof modifiers.textColorChance === "number" ? modifiers.textColorChance : 0.6,
+      textPromptChance: typeof modifiers.textPromptChance === "number" ? modifiers.textPromptChance : 0.5,
+      textPromptMinCount:
+        typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
+      textPromptMaxCount:
+        typeof modifiers.textPromptMaxCount === "number" ? modifiers.textPromptMaxCount : null,
+      enablePreviousCard: Boolean(modifiers.previousCard),
+      previousCardChance: typeof modifiers.previousCardChance === "number" ? modifiers.previousCardChance : 0.5,
+      previousPromptMinCount:
+        typeof modifiers.previousPromptMinCount === "number" ? modifiers.previousPromptMinCount : null,
+      previousPromptMaxCount:
+        typeof modifiers.previousPromptMaxCount === "number" ? modifiers.previousPromptMaxCount : null,
+      enableRotate: Boolean(modifiers.rotate),
+      enableRotatePlus: Boolean(modifiers.rotatePlus),
+      rotateChance: typeof modifiers.rotateChance === "number" ? modifiers.rotateChance : null,
+      rotateMinCount: typeof modifiers.rotateMinCount === "number" ? modifiers.rotateMinCount : null,
+      rotateMaxCount: typeof modifiers.rotateMaxCount === "number" ? modifiers.rotateMaxCount : null,
+      rotatePlusChance: typeof modifiers.rotatePlusChance === "number" ? modifiers.rotatePlusChance : null,
+      rotatePlusMinCount: typeof modifiers.rotatePlusMinCount === "number" ? modifiers.rotatePlusMinCount : null,
+      rotatePlusMaxCount: typeof modifiers.rotatePlusMaxCount === "number" ? modifiers.rotatePlusMaxCount : null,
+      enableGlitch: Boolean(modifiers.glitch)
     };
+
+    const roundOverride =
+      stage && Number.isFinite(currentRound) && typeof window.getStageRoundOverride === "function"
+        ? window.getStageRoundOverride(stage, currentRound)
+        : null;
+    if (roundOverride && roundOverride.prompts && typeof roundOverride.prompts === "object") {
+      const overrides = roundOverride.prompts;
+      options.mathMinCount = null;
+      options.mathMaxCount = null;
+      options.misleadMinCount = null;
+      options.misleadMaxCount = null;
+      options.backgroundPromptMinCount = null;
+      options.backgroundPromptMaxCount = null;
+      options.textPromptMinCount = null;
+      options.textPromptMaxCount = null;
+      options.previousPromptMinCount = null;
+      options.previousPromptMaxCount = null;
+      options.rotateMinCount = null;
+      options.rotateMaxCount = null;
+      options.rotatePlusMinCount = null;
+      options.rotatePlusMaxCount = null;
+
+
+      const hasMathOpsOverride = Object.prototype.hasOwnProperty.call(overrides, "mathOps");
+      const hasMathOpsPlusOverride = Object.prototype.hasOwnProperty.call(overrides, "mathOpsPlus");
+      if (hasMathOpsOverride || hasMathOpsPlusOverride) {
+        options.enableMathOps = hasMathOpsOverride;
+        options.enableMathOpsPlus = hasMathOpsPlusOverride;
+      }
+      const hasRotateOverride = Object.prototype.hasOwnProperty.call(overrides, "rotate");
+      const hasRotatePlusOverride = Object.prototype.hasOwnProperty.call(overrides, "rotatePlus");
+      if (hasRotateOverride || hasRotatePlusOverride) {
+        options.enableRotate = hasRotateOverride;
+        options.enableRotatePlus = hasRotatePlusOverride;
+      }
+
+      const getCounts = (value) => {
+        if (typeof value === "number") {
+          return { min: value, max: null };
+        }
+        if (value && typeof value === "object") {
+          const min = typeof value.min === "number" ? value.min : null;
+          const max = typeof value.max === "number" ? value.max : null;
+          return { min, max };
+        }
+        return { min: null, max: null };
+      };
+
+      if (Object.prototype.hasOwnProperty.call(overrides, "background")) {
+        const { min, max } = getCounts(overrides.background);
+        options.enableBackgroundColor = true;
+        options.backgroundPromptMinCount = min;
+        options.backgroundPromptMaxCount = max;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "textColor")) {
+        const { min, max } = getCounts(overrides.textColor);
+        options.enableTextColor = true;
+        options.textPromptMinCount = min;
+        options.textPromptMaxCount = max;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "previousCard")) {
+        const { min, max } = getCounts(overrides.previousCard);
+        options.enablePreviousCard = true;
+        options.previousPromptMinCount = min;
+        options.previousPromptMaxCount = max;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "misleadColors")) {
+        const { min, max } = getCounts(overrides.misleadColors);
+        options.misleadColors = true;
+        options.misleadMinCount = min;
+        options.misleadMaxCount = max;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "mathOps")) {
+        const { min, max } = getCounts(overrides.mathOps);
+        options.enableMathOps = true;
+        options.mathMinCount = min;
+        options.mathMaxCount = max;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "mathOpsPlus")) {
+        const { min, max } = getCounts(overrides.mathOpsPlus);
+        options.enableMathOpsPlus = true;
+        options.mathMinCount = min;
+        options.mathMaxCount = max;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "rotate")) {
+        const { min, max } = getCounts(overrides.rotate);
+        options.enableRotate = true;
+        options.rotateMinCount = min;
+        options.rotateMaxCount = max;
+      }
+      if (Object.prototype.hasOwnProperty.call(overrides, "rotatePlus")) {
+        const { min, max } = getCounts(overrides.rotatePlus);
+        options.enableRotatePlus = true;
+        options.rotatePlusMinCount = min;
+        options.rotatePlusMaxCount = max;
+      }
+    }
+
+    return options;
+  };
 
   window.getStageInstructionSlides = function getStageInstructionSlides(stage) {
     if (!stage || !Array.isArray(stage.instructions)) return { slides: [], result: [] };
