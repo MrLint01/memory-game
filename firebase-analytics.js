@@ -61,13 +61,13 @@ const ACHIEVEMENT_CACHE_TTL_MS = 60 * 1000;
 const ACHIEVEMENT_CARD_TYPE_THRESHOLDS = [1, 10, 100, 1000];
 const ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS = [10, 100, 1000];
 const ACHIEVEMENT_CARD_TYPE_META = {
-  numbers: { label: "Numbers", noun: "number cards", short: "NUM" },
-  letters: { label: "Letters", noun: "letter cards", short: "LET" },
-  shapes: { label: "Shapes", noun: "shape cards", short: "SHP" },
-  directions: { label: "Directions", noun: "direction cards", short: "DIR" },
-  colors: { label: "Colors", noun: "color cards", short: "CLR" },
-  diagonal: { label: "Diagonals", noun: "diagonal cards", short: "DIA" },
-  fruits: { label: "Fruits", noun: "fruit cards", short: "FRT" }
+  numbers: { label: "Numbers", noun: "number cards", short: "NUM", iconSrc: "imgs/icons/card-numbers.svg" },
+  letters: { label: "Letters", noun: "letter cards", short: "LET", iconSrc: "imgs/icons/card-letters.svg" },
+  shapes: { label: "Shapes", noun: "shape cards", short: "SHP", iconSrc: "imgs/icons/card-shapes.svg" },
+  directions: { label: "Directions", noun: "direction cards", short: "DIR", iconSrc: "imgs/icons/card-directions.svg" },
+  colors: { label: "Colors", noun: "color cards", short: "CLR", iconSrc: "imgs/icons/card-colors.svg" },
+  diagonal: { label: "Diagonals", noun: "diagonal cards", short: "DIA", iconSrc: "imgs/icons/card-diagonal.svg" },
+  fruits: { label: "Fruits", noun: "fruit cards", short: "FRT", iconSrc: "imgs/apple.png" }
 };
 const ACHIEVEMENT_MODIFIER_META = {
   mathOps: { firstUseId: "mod_math_ops", label: "Math Ops", iconSrc: "imgs/icons/mod-mathops.svg", short: "MATH" },
@@ -97,24 +97,31 @@ function formatAchievementThresholdShort(value) {
   return String(count);
 }
 
+function getAchievementRomanTier(index) {
+  const tiers = ["I", "II", "III", "IV", "V", "VI"];
+  return tiers[index] || String(index + 1);
+}
+
 function buildCardTypeAchievementDefinitions() {
   return Object.entries(ACHIEVEMENT_CARD_TYPE_META).flatMap(([key, meta]) =>
-    ACHIEVEMENT_CARD_TYPE_THRESHOLDS.map((threshold) => ({
+    ACHIEVEMENT_CARD_TYPE_THRESHOLDS.map((threshold, tierIndex) => ({
       id: `card_${key}_${threshold}`,
       title: `${meta.label} ${formatAchievementThresholdShort(threshold)}`,
       description: `See ${threshold} ${meta.noun}.`,
-      iconText: `${meta.short}${formatAchievementThresholdShort(threshold)}`
+      iconSrc: meta.iconSrc,
+      iconBadge: getAchievementRomanTier(tierIndex)
     }))
   );
 }
 
 function buildModifierVariantAchievementDefinitions() {
   return Object.entries(ACHIEVEMENT_MODIFIER_META).flatMap(([key, meta]) =>
-    ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS.map((threshold) => ({
+    ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS.map((threshold, tierIndex) => ({
       id: `mod_variants_${key}_${threshold}`,
       title: `${meta.label} ${formatAchievementThresholdShort(threshold)}`,
       description: `Encounter ${threshold} ${meta.label} modifier variants.`,
-      iconText: `${meta.short}${formatAchievementThresholdShort(threshold)}`
+      iconSrc: meta.iconSrc,
+      iconBadge: getAchievementRomanTier(tierIndex)
     }))
   );
 }
@@ -155,8 +162,12 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "time_minutes_10", title: "Ten Minutes In", description: "Spend 10 total in-level minutes in game.", iconText: "10m" },
   { id: "time_minutes_100", title: "Century Club", description: "Spend 100 total in-level minutes in game.", iconText: "100m" },
   { id: "theme_changed", title: "Fresh Paint", description: "Change your theme.", iconText: "THEME" },
-  { id: "sandbox_played", title: "Sandbox Opened", description: "Play Sandbox.", iconText: "SBX" },
+  { id: "sandbox_complete_1", title: "Sandbox Clear I", description: "Complete 1 Sandbox level.", iconText: "SBX", iconBadge: "I" },
+  { id: "sandbox_complete_10", title: "Sandbox Clear II", description: "Complete 10 Sandbox levels.", iconText: "SBX", iconBadge: "II" },
+  { id: "sandbox_complete_100", title: "Sandbox Clear III", description: "Complete 100 Sandbox levels.", iconText: "SBX", iconBadge: "III" },
+  { id: "sandbox_complete_1000", title: "Sandbox Clear IV", description: "Complete 1000 Sandbox levels.", iconText: "SBX", iconBadge: "IV" },
   { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconText: "MONO" },
+  { id: "secret_any_key", title: "Any Key Means Enter", description: "Type 'Any Key' on the splash screen, then press Enter.", iconText: "KEY", secret: true },
   { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "4\u2605", secret: true },
   { id: "secret_stars_total_400", title: "Hidden Galaxy", description: "Collect 400 stars.", iconText: "400\u2605", secret: true }
 ];
@@ -185,14 +196,21 @@ function getAchievementDifficultyScore(definition) {
     return 20;
   }
   if (/^mod_/.test(id)) return 22;
-  if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_10$|^sandbox_played$/.test(id)) return 18;
+  if (/^sandbox_complete_1000$/.test(id)) return 92;
+  if (/^sandbox_complete_100$/.test(id)) return 80;
+  if (/^sandbox_complete_10$/.test(id)) return 58;
+  if (/^sandbox_complete_1$/.test(id)) return 20;
+  if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_10$/.test(id)) return 18;
   return 45;
 }
 
 function getAchievementDifficultyColor(score) {
   const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
-  const hue = Math.round(140 - (safeScore / 100) * 140);
-  return `hsl(${hue} 70% 46%)`;
+  if (safeScore >= 96) return "#7c3aed";
+  if (safeScore >= 76) return "#dc2626";
+  if (safeScore >= 51) return "#f97316";
+  if (safeScore >= 26) return "#2563eb";
+  return "#16a34a";
 }
 const LEGACY_ACHIEVEMENT_DEFINITIONS = [
   { id: "mod_math_ops", title: "Math Ops", description: "Use the Math ops modifier for the first time.", iconSrc: "imgs/icons/mod-mathops.svg" },
@@ -389,7 +407,7 @@ function upsertCachedLeaderboardEntry(stageId, stageVersion, entry) {
 }
 
 function isValidStatsMetric(metric) {
-  return metric === "stars_earned" || metric === "stages_cleared";
+  return metric === "stars_earned" || metric === "stages_cleared" || metric === "achievements_unlocked";
 }
 
 function computeStatsLeaderboardView(entries, metric, limit = 5) {
@@ -431,7 +449,7 @@ function setCachedStatsLeaderboard(metric, entries) {
 
 function upsertCachedStatsEntry(entry) {
   if (!entry || !entry.player_id) return;
-  ["stars_earned", "stages_cleared"].forEach((metric) => {
+  ["stars_earned", "stages_cleared", "achievements_unlocked"].forEach((metric) => {
     const cached = statsLeaderboardSessionCache.get(metric);
     if (!cached || !Array.isArray(cached.entries)) return;
     const nextEntries = cached.entries.slice();
@@ -480,6 +498,8 @@ function getDefaultAchievementProfile() {
     attempt_count: 0,
     failed_count: 0,
     completed_count: 0,
+    sandbox_completed_count: 0,
+    any_key_secret: false,
     total_stars: 0,
     total_time_seconds: 0,
     max_stars_on_level: 0,
@@ -517,6 +537,8 @@ function normalizeAchievementProfile(raw) {
   base.attempt_count = Math.max(0, Number(source.attempt_count) || 0);
   base.failed_count = Math.max(0, Number(source.failed_count) || 0);
   base.completed_count = Math.max(0, Number(source.completed_count) || 0);
+  base.sandbox_completed_count = Math.max(0, Number(source.sandbox_completed_count) || 0);
+  base.any_key_secret = Boolean(source.any_key_secret);
   base.total_stars = Math.max(0, Number(source.total_stars) || 0);
   base.total_time_seconds = Math.max(0, Number(source.total_time_seconds) || 0);
   base.max_stars_on_level = Math.max(0, Number(source.max_stars_on_level) || 0);
@@ -560,6 +582,10 @@ function getLocalStatsSnapshot() {
     Number(stored && stored.totalLevelSuccesses) || 0,
     Number(sessionStats.totalLevelSuccesses) || 0
   );
+  const sandboxCompletedCount = Math.max(
+    Number(stored && stored.sandboxCompletedCount) || 0,
+    Number(sessionStats.sandboxCompletedCount) || 0
+  );
   const failedLevelCount = Math.max(
     Number(stored && stored.failedLevelCount) || 0,
     Number(sessionStats.failedLevelCount) || 0
@@ -580,6 +606,7 @@ function getLocalStatsSnapshot() {
     totalSeconds,
     totalLevelAttempts,
     totalLevelSuccesses,
+    sandboxCompletedCount,
     failedLevelCount,
     sandboxPlayed,
     cardTypeCounts,
@@ -656,6 +683,8 @@ function normalizeAchievementUpdate(update = {}) {
     attemptCount: null,
     failedCount: null,
     completedCount: null,
+    sandboxCompletedCount: null,
+    anyKeySecret: false,
     totalStars: null,
     totalTimeSeconds: null,
     maxStarsOnLevel: null,
@@ -676,6 +705,10 @@ function normalizeAchievementUpdate(update = {}) {
   base.attemptCount = Number.isFinite(Number(update.attemptCount)) ? Math.max(0, Number(update.attemptCount)) : null;
   base.failedCount = Number.isFinite(Number(update.failedCount)) ? Math.max(0, Number(update.failedCount)) : null;
   base.completedCount = Number.isFinite(Number(update.completedCount)) ? Math.max(0, Number(update.completedCount)) : null;
+  base.sandboxCompletedCount = Number.isFinite(Number(update.sandboxCompletedCount))
+    ? Math.max(0, Number(update.sandboxCompletedCount))
+    : null;
+  base.anyKeySecret = Boolean(update.anyKeySecret);
   base.totalStars = Number.isFinite(Number(update.totalStars)) ? Math.max(0, Number(update.totalStars)) : null;
   base.totalTimeSeconds = Number.isFinite(Number(update.totalTimeSeconds)) ? Math.max(0, Number(update.totalTimeSeconds)) : null;
   base.maxStarsOnLevel = Number.isFinite(Number(update.maxStarsOnLevel)) ? Math.max(0, Number(update.maxStarsOnLevel)) : null;
@@ -711,6 +744,12 @@ function mergeAchievementUpdateInputs(...updates) {
     if (Number.isFinite(update.completedCount)) {
       merged.completedCount = Math.max(Number(merged.completedCount) || 0, update.completedCount);
     }
+    if (Number.isFinite(update.sandboxCompletedCount)) {
+      merged.sandboxCompletedCount = Math.max(
+        Number(merged.sandboxCompletedCount) || 0,
+        update.sandboxCompletedCount
+      );
+    }
     if (Number.isFinite(update.totalStars)) {
       merged.totalStars = Math.max(Number(merged.totalStars) || 0, update.totalStars);
     }
@@ -724,6 +763,7 @@ function mergeAchievementUpdateInputs(...updates) {
       merged.totalStages = Math.max(Number(merged.totalStages) || 0, update.totalStages);
     }
     merged.sandboxPlayed = merged.sandboxPlayed || update.sandboxPlayed;
+    merged.anyKeySecret = merged.anyKeySecret || update.anyKeySecret;
     merged.completedFlashLevel = merged.completedFlashLevel || update.completedFlashLevel;
     merged.completedStage67 = merged.completedStage67 || update.completedStage67;
     merged.themeChanged = merged.themeChanged || update.themeChanged;
@@ -764,6 +804,7 @@ function getLocalAchievementSyncUpdate(extra = {}) {
     attemptCount: stats.totalLevelAttempts,
     failedCount: stats.failedLevelCount,
     completedCount,
+    sandboxCompletedCount: stats.sandboxCompletedCount,
     totalStars: starSnapshot.totalStars,
     totalTimeSeconds: stats.totalSeconds,
     maxStarsOnLevel: starSnapshot.maxStarsOnLevel,
@@ -793,6 +834,10 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   if (Number.isFinite(normalized.completedCount)) {
     next.completed_count = Math.max(next.completed_count, normalized.completedCount);
   }
+  if (Number.isFinite(normalized.sandboxCompletedCount)) {
+    next.sandbox_completed_count = Math.max(next.sandbox_completed_count, normalized.sandboxCompletedCount);
+  }
+  next.any_key_secret = next.any_key_secret || normalized.anyKeySecret;
   if (Number.isFinite(normalized.totalStars)) {
     next.total_stars = Math.max(next.total_stars, normalized.totalStars);
   }
@@ -854,6 +899,11 @@ function getAchievementUnlockIds(profile) {
     });
   });
   if (profile.completed_count >= 1) unlocks.push("complete_1");
+  if (profile.sandbox_completed_count >= 1) unlocks.push("sandbox_complete_1");
+  if (profile.sandbox_completed_count >= 10) unlocks.push("sandbox_complete_10");
+  if (profile.sandbox_completed_count >= 100) unlocks.push("sandbox_complete_100");
+  if (profile.sandbox_completed_count >= 1000) unlocks.push("sandbox_complete_1000");
+  if (profile.any_key_secret) unlocks.push("secret_any_key");
   if (profile.completed_flash_level) unlocks.push("complete_flash_1");
   if (profile.completed_count >= 10) unlocks.push("complete_10");
   if (profile.total_stages > 0 && profile.completed_count >= profile.total_stages) unlocks.push("complete_all");
@@ -880,7 +930,6 @@ function getAchievementUnlockIds(profile) {
   if (profile.total_time_seconds >= 10 * 60) unlocks.push("time_minutes_10");
   if (profile.total_time_seconds >= 100 * 60) unlocks.push("time_minutes_100");
   if (profile.theme_changed) unlocks.push("theme_changed");
-  if (profile.sandbox_played) unlocks.push("sandbox_played");
   if (profile.monochrome_win) unlocks.push("win_monochrome");
   if (profile.max_stars_on_level >= 4) unlocks.push("secret_stars_level_4");
   if (profile.total_stars >= 400) unlocks.push("secret_stars_total_400");
@@ -939,6 +988,8 @@ async function applyAchievementUpdate(update = {}) {
         attempt_count: nextProfile.attempt_count,
         failed_count: nextProfile.failed_count,
         completed_count: nextProfile.completed_count,
+        sandbox_completed_count: nextProfile.sandbox_completed_count,
+        any_key_secret: nextProfile.any_key_secret,
         total_stars: nextProfile.total_stars,
         total_time_seconds: nextProfile.total_time_seconds,
         max_stars_on_level: nextProfile.max_stars_on_level,
@@ -1002,6 +1053,12 @@ async function applyAchievementUpdate(update = {}) {
       countsById[achievementId] = (Number(countsById[achievementId]) || 0) + 1;
     });
     setAchievementOverviewCache(result.profile, result.totalPlayers, countsById);
+    updateProgressLeaderboardSnapshot(
+      result.profile.completed_count,
+      result.profile.total_stars,
+      result.profile.player_name || getDisplayNameFallback(),
+      Object.keys(result.profile.unlocked || {}).length
+    );
     if (result.newlyUnlocked.length) {
       const items = result.newlyUnlocked
         .map((achievementId) => ACHIEVEMENT_DEFINITION_BY_ID[achievementId])
@@ -1348,17 +1405,24 @@ async function ensureStageLeaderboardSessionCache(stageId, stageVersion) {
   return fetchStageLeaderboard(stageId, stageVersion, 5);
 }
 
-async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, playerName) {
+async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, playerName, achievementsUnlocked = null) {
   if (!firebaseDb || !currentUserId) return;
   if (!areLeaderboardsEnabled()) return;
   const safeStagesCleared = Math.max(0, Number(stagesCleared) || 0);
   const safeStarsEarned = Math.max(0, Number(starsEarned) || 0);
+  const cachedAchievementsUnlocked = achievementProfileCache && achievementProfileCache.unlocked
+    ? Object.keys(achievementProfileCache.unlocked).length
+    : 0;
+  const safeAchievementsUnlocked = Number.isFinite(Number(achievementsUnlocked))
+    ? Math.max(0, Number(achievementsUnlocked))
+    : cachedAchievementsUnlocked;
   const payload = {
     player_id: playerId,
     auth_uid: currentUserId,
     player_name: playerName || getDisplayNameFallback(),
     stages_cleared: safeStagesCleared,
     stars_earned: safeStarsEarned,
+    achievements_unlocked: safeAchievementsUnlocked,
     active: true,
     game_version: gameVersion,
     updated_at: firebase.firestore.FieldValue.serverTimestamp()

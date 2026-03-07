@@ -79,6 +79,7 @@ const revealInput = document.getElementById("revealTime");
       const statsLeaderboardTitle = document.getElementById("statsLeaderboardTitle");
       const statsLeaderboardTabStars = document.getElementById("statsLeaderboardTabStars");
       const statsLeaderboardTabStages = document.getElementById("statsLeaderboardTabStages");
+      const statsLeaderboardTabAchievements = document.getElementById("statsLeaderboardTabAchievements");
       const statsLeaderboardClose = document.getElementById("statsLeaderboardClose");
       const playerNameModal = document.getElementById("playerNameModal");
       const playerNameInput = document.getElementById("playerNameInput");

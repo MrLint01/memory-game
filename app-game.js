@@ -835,6 +835,7 @@
           totalLevelSuccesses: 0,
           failedLevelCount: 0,
           sandboxPlayed: false,
+          sandboxCompletedCount: 0,
           cardTypeCounts: {},
           modifierVariantCounts: {}
         };
@@ -872,6 +873,7 @@
         window.flashRecallSessionStats.totalLevelSuccesses = Number(window.flashRecallSessionStats.totalLevelSuccesses) || 0;
         window.flashRecallSessionStats.failedLevelCount = Number(window.flashRecallSessionStats.failedLevelCount) || 0;
         window.flashRecallSessionStats.sandboxPlayed = Boolean(window.flashRecallSessionStats.sandboxPlayed);
+        window.flashRecallSessionStats.sandboxCompletedCount = Number(window.flashRecallSessionStats.sandboxCompletedCount) || 0;
         window.flashRecallSessionStats.cardTypeCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.cardTypeCounts);
         window.flashRecallSessionStats.modifierVariantCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.modifierVariantCounts);
       }
@@ -889,6 +891,7 @@
           payload.totalLevelSuccesses = Number(parsed.totalLevelSuccesses) || 0;
           payload.failedLevelCount = Number(parsed.failedLevelCount) || 0;
           payload.sandboxPlayed = Boolean(parsed.sandboxPlayed);
+          payload.sandboxCompletedCount = Number(parsed.sandboxCompletedCount) || 0;
           payload.cardTypeCounts = normalizeStatsCounterMap(parsed.cardTypeCounts);
           payload.modifierVariantCounts = normalizeStatsCounterMap(parsed.modifierVariantCounts);
           return payload;
@@ -965,6 +968,14 @@
           payload.sandboxPlayed = true;
           saveStoredStatsPayload(payload);
         }
+      }
+
+      function recordSandboxCompletionStat() {
+        ensureSessionStatsObject();
+        window.flashRecallSessionStats.sandboxCompletedCount += 1;
+        const payload = loadStoredStatsPayload();
+        payload.sandboxCompletedCount = (Number(payload.sandboxCompletedCount) || 0) + 1;
+        saveStoredStatsPayload(payload);
       }
 
       function recordLevelAttemptStats(success, options = {}) {
@@ -1105,6 +1116,12 @@
             }
             startRound();
             return;
+          }
+          if (gameMode === "practice") {
+            recordSandboxCompletionStat();
+            if (typeof window.syncAchievementsFromLocal === "function") {
+              window.syncAchievementsFromLocal();
+            }
           }
           streak += 1;
           updateScore();

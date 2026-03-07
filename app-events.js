@@ -520,8 +520,10 @@
       let splashAutoStartTimer = null;
       let splashAutoStartInterval = null;
       let splashStartInProgress = false;
-      let bootSplashAutoStartPending = true;
+      let splashAnyKeyProgress = 0;
+      let splashAnyKeyAwaitingEnter = false;
       const SPLASH_AUTO_START_MS = 5000;
+      const SPLASH_ANY_KEY_SEQUENCE = "any key";
 
       function updateSplashAutoStartLabel(remainingMs = SPLASH_AUTO_START_MS) {
         if (!splashAutoStartMessage) return;
@@ -544,12 +546,24 @@
         }
       }
 
+      function resetSplashAnyKeySequence() {
+        splashAnyKeyProgress = 0;
+        splashAnyKeyAwaitingEnter = false;
+      }
+
+      function getSplashSequenceKey(event) {
+        if (!event || typeof event.key !== "string") return "";
+        if (event.key === " ") return " ";
+        if (event.key === "Spacebar") return " ";
+        return event.key.length === 1 ? event.key.toLowerCase() : "";
+      }
+
       function scheduleSplashAutoStart() {
         clearSplashAutoStart();
         if (document.body.classList.contains("loading-overlay")) return;
         if (document.body.dataset.view !== "splash") return;
         if (splashReturnToHome) return;
-        if (!bootSplashAutoStartPending && !shouldShowSplashScreen()) return;
+        if (!shouldShowSplashScreen()) return;
         const startedAt = Date.now();
         if (splashAutoStartMessage) {
           updateSplashAutoStartLabel(SPLASH_AUTO_START_MS);
@@ -573,7 +587,7 @@
           if (document.body.classList.contains("loading-overlay")) return;
           if (document.body.dataset.view !== "splash") return;
           if (splashReturnToHome) return;
-          if (!bootSplashAutoStartPending && !shouldShowSplashScreen()) return;
+          if (!shouldShowSplashScreen()) return;
           startFromSplash();
         }, SPLASH_AUTO_START_MS);
       }
@@ -585,9 +599,51 @@
         splashStartListener = (event) => {
           if (document.body.classList.contains("loading-overlay") || document.body.dataset.view === "loading") return;
           if (document.body.dataset.view !== "splash") return;
+          if (event.type === "pointerdown") {
+            window.removeEventListener("keydown", splashStartListener);
+            window.removeEventListener("pointerdown", splashStartListener);
+            splashStartListener = null;
+            resetSplashAnyKeySequence();
+            startFromSplash();
+            return;
+          }
+          const key = getSplashSequenceKey(event);
+          if (splashAnyKeyAwaitingEnter) {
+            if (event.key === "Enter") {
+              window.removeEventListener("keydown", splashStartListener);
+              window.removeEventListener("pointerdown", splashStartListener);
+              splashStartListener = null;
+              resetSplashAnyKeySequence();
+              if (typeof window.syncAchievementsFromLocal === "function") {
+                window.syncAchievementsFromLocal({ anyKeySecret: true });
+              }
+              startFromSplash();
+            }
+            return;
+          }
+          if (key) {
+            const expected = SPLASH_ANY_KEY_SEQUENCE.charAt(splashAnyKeyProgress);
+            if (key === expected) {
+              splashAnyKeyProgress += 1;
+              clearSplashAutoStart();
+              if (splashAnyKeyProgress >= SPLASH_ANY_KEY_SEQUENCE.length) {
+                splashAnyKeyAwaitingEnter = true;
+              }
+              return;
+            }
+            if (splashAnyKeyProgress > 0) {
+              window.removeEventListener("keydown", splashStartListener);
+              window.removeEventListener("pointerdown", splashStartListener);
+              splashStartListener = null;
+              resetSplashAnyKeySequence();
+              startFromSplash();
+              return;
+            }
+          }
           window.removeEventListener("keydown", splashStartListener);
           window.removeEventListener("pointerdown", splashStartListener);
           splashStartListener = null;
+          resetSplashAnyKeySequence();
           startFromSplash();
         };
         window.addEventListener("keydown", splashStartListener);
@@ -1722,6 +1778,7 @@ function runFlashCountdown(onComplete) {
 
       function openSplashScreen() {
         clearSplashAutoStart();
+        resetSplashAnyKeySequence();
         if (splashScreen) {
           if (document.body.classList.contains("loading-overlay")) {
             pendingSplashReveal = true;
@@ -1741,6 +1798,7 @@ function runFlashCountdown(onComplete) {
 
       function closeSplashScreen() {
         clearSplashAutoStart();
+        resetSplashAnyKeySequence();
         if (splashScreen) {
           splashScreen.setAttribute("aria-hidden", "true");
           splashScreen.setAttribute("hidden", "");
@@ -1868,8 +1926,8 @@ function runFlashCountdown(onComplete) {
         }
         splashStartInProgress = true;
         clearSplashAutoStart();
-        bootSplashAutoStartPending = false;
-        const shouldCountdownToFirstStage = shouldShowSplashScreen() && !splashReturnToHome;
+        const isFirstPlay = shouldShowSplashScreen();
+        const shouldCountdownToFirstStage = isFirstPlay && !splashReturnToHome;
         if (splashReturnToHome) {
           splashReturnToHome = false;
           closeSplashScreen();
@@ -1901,7 +1959,8 @@ function runFlashCountdown(onComplete) {
           splashStartInProgress = false;
           return;
         }
-        startStage(0, { skipIntro: true });
+        document.body.dataset.view = "home";
+        triggerHomeFadeIn();
         splashStartInProgress = false;
       }
 
@@ -2872,7 +2931,7 @@ function runFlashCountdown(onComplete) {
         const listEl = document.getElementById(listId);
         const emptyEl = document.getElementById(emptyId);
         if (!listEl) return;
-        const getLocalProgress = () => {
+        const getLocalProgress = async () => {
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const stagesCleared = stages.reduce((sum, stage, index) => {
             const stageKey = window.getStageStarsKey
@@ -2886,7 +2945,14 @@ function runFlashCountdown(onComplete) {
               : (stage && stage.id ? String(stage.id) : String(index + 1));
             return sum + (window.stageStars && window.stageStars[stageKey] ? window.stageStars[stageKey] : 0);
           }, 0);
-          return { stagesCleared, starsEarned };
+          let achievementsUnlocked = 0;
+          if (typeof window.fetchAchievementOverview === "function") {
+            try {
+              const achievementOverview = await window.fetchAchievementOverview({ refresh: false });
+              achievementsUnlocked = Number(achievementOverview && achievementOverview.unlockedCount) || 0;
+            } catch (error) {}
+          }
+          return { stagesCleared, starsEarned, achievementsUnlocked };
         };
         const headerRow = document.createElement("div");
         headerRow.className = "leaderboard-row";
@@ -2901,12 +2967,21 @@ function runFlashCountdown(onComplete) {
           listEl.replaceChildren(headerRow, loadingRow);
           return;
         }
-        const localProgress = getLocalProgress();
+        const localProgress = await getLocalProgress();
         if (typeof window.updateProgressLeaderboardSnapshot === "function") {
           const name = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
-          window.updateProgressLeaderboardSnapshot(localProgress.stagesCleared, localProgress.starsEarned, name);
+          window.updateProgressLeaderboardSnapshot(
+            localProgress.stagesCleared,
+            localProgress.starsEarned,
+            name,
+            localProgress.achievementsUnlocked
+          );
         }
-        const localValue = metric === "stages_cleared" ? localProgress.stagesCleared : localProgress.starsEarned;
+        const localValue = metric === "stages_cleared"
+          ? localProgress.stagesCleared
+          : metric === "achievements_unlocked"
+            ? localProgress.achievementsUnlocked
+            : localProgress.starsEarned;
         try {
           let result = null;
           let attempts = 0;
@@ -2972,7 +3047,8 @@ function runFlashCountdown(onComplete) {
       }
       const statsLeaderboardTabs = {
         stars_earned: { title: "Stars leaderboard", valueLabel: "Stars" },
-        stages_cleared: { title: "Stages cleared leaderboard", valueLabel: "Stages" }
+        stages_cleared: { title: "Stages cleared leaderboard", valueLabel: "Stages" },
+        achievements_unlocked: { title: "Achievements leaderboard", valueLabel: "Achievements" }
       };
       let activeStatsLeaderboardTab = "stars_earned";
 
@@ -2994,11 +3070,24 @@ function runFlashCountdown(onComplete) {
         if (isSecretLocked) {
           return '<span class="achievement-icon__text">?</span>';
         }
+        const badgeMarkup = item && item.iconBadge
+          ? `<span class="achievement-icon__badge">${escapeAchievementHtml(item.iconBadge)}</span>`
+          : "";
         if (item && item.iconSrc) {
-          return `<img class="achievement-icon__img" src="${item.iconSrc}" alt="" />`;
+          return `
+            <span class="achievement-icon__art">
+              <img class="achievement-icon__img" src="${item.iconSrc}" alt="" />
+              ${badgeMarkup}
+            </span>
+          `;
         }
         const text = item && item.iconText ? String(item.iconText) : "?";
-        return `<span class="achievement-icon__text">${text}</span>`;
+        return `
+          <span class="achievement-icon__art">
+            <span class="achievement-icon__text">${text}</span>
+            ${badgeMarkup}
+          </span>
+        `;
       }
 
       function getAchievementDisplayTitle(item) {
@@ -3103,6 +3192,9 @@ function runFlashCountdown(onComplete) {
           .sort((left, right) => {
             const unlockedDelta = Number(Boolean(right.item.unlocked)) - Number(Boolean(left.item.unlocked));
             if (unlockedDelta !== 0) return unlockedDelta;
+            const difficultyDelta =
+              (Number(left.item.difficultyScore) || 0) - (Number(right.item.difficultyScore) || 0);
+            if (difficultyDelta !== 0) return difficultyDelta;
             return left.index - right.index;
           })
           .forEach(({ item }) => {
@@ -3155,6 +3247,9 @@ function runFlashCountdown(onComplete) {
           .sort((left, right) => {
             const unlockedDelta = Number(Boolean(right.item.unlocked)) - Number(Boolean(left.item.unlocked));
             if (unlockedDelta !== 0) return unlockedDelta;
+            const difficultyDelta =
+              (Number(left.item.difficultyScore) || 0) - (Number(right.item.difficultyScore) || 0);
+            if (difficultyDelta !== 0) return difficultyDelta;
             return left.index - right.index;
           })
           .map(({ item }) => item);
@@ -3215,7 +3310,7 @@ function runFlashCountdown(onComplete) {
         if (statsLeaderboardTitle) {
           statsLeaderboardTitle.textContent = statsLeaderboardTabs[nextTab].title;
         }
-        [statsLeaderboardTabStars, statsLeaderboardTabStages].forEach((button) => {
+        [statsLeaderboardTabStars, statsLeaderboardTabStages, statsLeaderboardTabAchievements].forEach((button) => {
           if (!button) return;
           const isActive = button.getAttribute("data-stats-leaderboard-tab") === nextTab;
           button.classList.toggle("is-active", isActive);
@@ -3275,6 +3370,12 @@ function runFlashCountdown(onComplete) {
                 const achievementOverview = await window.fetchAchievementOverview({ refresh: false });
                 unlockedValue = Number(achievementOverview && achievementOverview.unlockedCount) || 0;
                 totalValue = Number(achievementOverview && achievementOverview.totalCount) || totalValue;
+                if (typeof window.updateProgressLeaderboardSnapshot === "function") {
+                  const name = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+                  const stagesCleared = Number(stagesClearedEl && stagesClearedEl.textContent) || 0;
+                  const starsEarned = Number(starsEarnedEl && starsEarnedEl.textContent) || 0;
+                  window.updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, name, unlockedValue);
+                }
               } catch (error) {}
             }
             if (achievementsUnlockedEl) achievementsUnlockedEl.textContent = String(unlockedValue);
@@ -3384,7 +3485,7 @@ function runFlashCountdown(onComplete) {
           openStatsLeaderboard(activeStatsLeaderboardTab);
         });
       }
-      [statsLeaderboardTabStars, statsLeaderboardTabStages].forEach((button) => {
+      [statsLeaderboardTabStars, statsLeaderboardTabStages, statsLeaderboardTabAchievements].forEach((button) => {
         if (!button) return;
         button.addEventListener("click", () => {
           const tab = button.getAttribute("data-stats-leaderboard-tab");
@@ -3395,7 +3496,7 @@ function runFlashCountdown(onComplete) {
       if (statsLeaderboardModal) {
         statsLeaderboardModal.addEventListener("keydown", (event) => {
           if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-          const order = ["stars_earned", "stages_cleared"];
+          const order = ["stars_earned", "stages_cleared", "achievements_unlocked"];
           const idx = order.indexOf(activeStatsLeaderboardTab);
           const nextIdx = event.key === "ArrowRight"
             ? (idx + 1) % order.length
