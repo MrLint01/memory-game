@@ -1670,6 +1670,8 @@ async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, pla
   if (safeStagesCleared <= 0 && safeStarsEarned <= 0 && safeAchievementsUnlocked <= 0) {
     return;
   }
+  const progressEntryId = String(currentUserId || "").trim();
+  if (!progressEntryId) return;
   const payload = {
     player_id: playerId,
     auth_uid: currentUserId,
@@ -1683,7 +1685,7 @@ async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, pla
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
   };
   try {
-    await firebaseDb.doc(`${PROGRESS_LEADERBOARD_PATH}/${playerId}`).set(payload, { merge: true });
+    await firebaseDb.doc(`${PROGRESS_LEADERBOARD_PATH}/${progressEntryId}`).set(payload, { merge: true });
     upsertCachedStatsEntry(payload);
   } catch (error) {
     console.warn("Failed to update progress leaderboard snapshot", error);
