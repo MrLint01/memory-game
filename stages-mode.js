@@ -232,6 +232,7 @@
       textPromptChance: typeof modifiers.textPromptChance === "number" ? modifiers.textPromptChance : 0.5,
       textColorUniqueLabelsPerRound: Boolean(modifiers.textColorUniqueLabelsPerRound),
       textColorAvoidCardBackground: Boolean(modifiers.textColorAvoidCardBackground),
+      textColorNoAdjacent: Boolean(modifiers.textColorNoAdjacent),
       textPromptMinCount:
         typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
       textPromptMaxCount:
@@ -244,6 +245,8 @@
         typeof modifiers.previousPromptMaxCount === "number" ? modifiers.previousPromptMaxCount : null,
       enableRotate: Boolean(modifiers.rotate),
       enableRotatePlus: Boolean(modifiers.rotatePlus),
+      rotateUniqueDegreesPerRound: Boolean(modifiers.rotateUniqueDegreesPerRound),
+      rotateNoRepeatPromptsAcrossRounds: Boolean(modifiers.rotateNoRepeatPromptsAcrossRounds),
       rotateChance: typeof modifiers.rotateChance === "number" ? modifiers.rotateChance : null,
       rotateMinCount: typeof modifiers.rotateMinCount === "number" ? modifiers.rotateMinCount : null,
       rotateMaxCount: typeof modifiers.rotateMaxCount === "number" ? modifiers.rotateMaxCount : null,

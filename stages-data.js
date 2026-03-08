@@ -513,7 +513,8 @@
         misleadUniqueLabelsPerRound: true,
         textColor: true,
         textColorChance: 1.0,
-        textColorAvoidCardBackground: true
+        textColorAvoidCardBackground: true,
+        textColorUniqueLabelsPerRound: true
       },
       starTimes: { platinum: 4, gold: 5, silver: 6, bronze: 10 },
       instructions: window.stageInstructions[24] || []
@@ -546,9 +547,11 @@
         misleadUniqueLabelsPerRound: true,
         textColor: true,
         textColorChance: 1.0,
-        textColorAvoidCardBackground: true
+        textColorAvoidCardBackground: true,
+        textColorNoAdjacent: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      noDuplicateAnswerInitialsPerRound: true,
+      starTimes: { platinum: 4, gold: 5, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[25] || []
     },
     {
@@ -565,9 +568,11 @@
       categories: ["directions"],
       cardCounts: {},
       modifiers: {
-        rotate: true
+        rotate: true,
+        rotateUniqueDegreesPerRound: true,
+        rotateNoRepeatPromptsAcrossRounds: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 3, gold: 4, silver: 6, bronze: 10 },
       instructions: window.stageInstructions[26] || []
     },
     {
@@ -583,9 +588,11 @@
       categories: ["directions", "diagonal"],
       cardCounts: {},
       modifiers: {
-        rotate: true
+        rotate: true,
+        rotateUniqueDegreesPerRound: true,
+        rotateNoRepeatPromptsAcrossRounds: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 6, gold: 7, silver: 10, bronze: 12 },
       instructions: window.stageInstructions[27] || []
     },
     {
@@ -601,9 +608,10 @@
       categories: ["directions", "diagonal"],
       cardCounts: {},
       modifiers: {
-        rotate: true
+        rotate: true,
+        rotateUniqueDegreesPerRound: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 6, gold: 7, silver: 10, bronze: 12 },
       instructions: window.stageInstructions[28] || []
     },
     {
@@ -647,7 +655,7 @@
       cardCounts: {},
       roundOverridePool: [
         { prompts: { background: { min: 1, max: 1 } } },
-        null,
+        { prompts: { rotate: { min: 1, max: 1 } } },
         null
       ],
       modifiers: {
@@ -655,7 +663,7 @@
         backgroundColorChance: 1.0,
         rotate: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 2.5, gold: 3, silver: 6, bronze: 10 },
       instructions: window.stageInstructions[30] || []
     },
     {

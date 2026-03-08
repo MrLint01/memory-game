@@ -329,6 +329,8 @@ const revealInput = document.getElementById("revealTime");
       let lastRoundStageId = null;
       let lastAnswerInitials = null;
       let lastAnswerInitialsStageId = null;
+      let rotatePromptHistory = null;
+      let rotatePromptHistoryStageId = null;
       let priorRoundItems = null;
       let priorRoundStageId = null;
       let lastBackgroundColorLabel = null;
@@ -1145,6 +1147,90 @@ const revealInput = document.getElementById("revealTime");
         const degreesBase = enableRotate ? [45, 90, 180] : [];
         const degreesPlus = enableRotatePlus ? [135, 225, 270, 315, 360] : [];
         if (!degreesBase.length && !degreesPlus.length) return items;
+        const promptHistory = options && options._rotatePromptHistory instanceof Set
+          ? options._rotatePromptHistory
+          : null;
+        const roundPromptSeen = new Set();
+        const buildPromptKey = (degree, direction) => `${degree}-${direction}`;
+        const getPromptSymbol = (direction) => (direction === "ccw" ? "\u21ba" : "\u21bb");
+        const enforceUniqueRotateDegrees = (rotatedItems, rotatedEntries) => {
+          if (!options || !options.rotateUniqueDegreesPerRound || rotatedEntries.length <= 1) {
+            return;
+          }
+          const usedDegrees = new Set();
+          rotatedEntries.forEach((entry) => {
+            if (!entry || typeof entry.degree !== "number") return;
+            if (!usedDegrees.has(entry.degree)) {
+              usedDegrees.add(entry.degree);
+              return;
+            }
+            const available = Array.isArray(entry.degrees) ? entry.degrees : [];
+            if (!available.length) return;
+            let candidates = available.filter((value) => value !== entry.degree && !usedDegrees.has(value));
+            if (promptHistory || roundPromptSeen.size) {
+              candidates = candidates.filter((value) => {
+                const key = buildPromptKey(value, entry.direction);
+                if (promptHistory && promptHistory.has(key)) return false;
+                if (roundPromptSeen.has(key)) return false;
+                return true;
+              });
+            }
+            if (!candidates.length) {
+              candidates = available.filter((value) => value !== entry.degree && !usedDegrees.has(value));
+            }
+            if (!candidates.length) return;
+            const nextDegree = candidates[Math.floor(Math.random() * candidates.length)];
+            const nextKey = buildPromptKey(nextDegree, entry.direction);
+            const rotatedKey = getRotatedCompassKey(entry.baseKey, nextDegree, entry.direction);
+            const answerLabel = formatCompassLabel(rotatedKey);
+            const answerCategory =
+              ["up", "right", "down", "left"].includes(rotatedKey) ? "directions" : "diagonal";
+            const symbol = getPromptSymbol(entry.direction);
+            const current = rotatedItems[entry.index];
+            if (current) {
+              rotatedItems[entry.index] = {
+                ...current,
+                answer: answerLabel,
+                answerCategory,
+                recallHint: `${nextDegree}\u00b0 ${symbol}`
+              };
+            }
+            if (entry.promptKey) {
+              roundPromptSeen.delete(entry.promptKey);
+            }
+            entry.degree = nextDegree;
+            entry.promptKey = nextKey;
+            roundPromptSeen.add(nextKey);
+            usedDegrees.add(nextDegree);
+          });
+        };
+        const pickRotationPrompt = (degreesList) => {
+          if (!Array.isArray(degreesList) || !degreesList.length) return null;
+          const candidates = [];
+          degreesList.forEach((degree) => {
+            candidates.push({
+              degree,
+              direction: "cw",
+              key: buildPromptKey(degree, "cw"),
+              symbol: getPromptSymbol("cw")
+            });
+            candidates.push({
+              degree,
+              direction: "ccw",
+              key: buildPromptKey(degree, "ccw"),
+              symbol: getPromptSymbol("ccw")
+            });
+          });
+          const filtered = candidates.filter((candidate) => {
+            if (promptHistory && promptHistory.has(candidate.key)) return false;
+            if (roundPromptSeen.has(candidate.key)) return false;
+            return true;
+          });
+          const pool = filtered.length ? filtered : candidates;
+          const picked = pool[Math.floor(Math.random() * pool.length)];
+          roundPromptSeen.add(picked.key);
+          return picked;
+        };
 
         const rotateMin = typeof options.rotateMinCount === "number" ? Math.max(0, Math.floor(options.rotateMinCount)) : null;
         const rotateMax = typeof options.rotateMaxCount === "number" ? Math.max(0, Math.floor(options.rotateMaxCount)) : null;
@@ -1166,20 +1252,30 @@ const revealInput = document.getElementById("revealTime");
 
         if (!hasConstraints) {
           const degrees = [...degreesBase, ...degreesPlus];
-          return items.map((item) => {
+          const rotatedEntries = [];
+          const rotatedItems = items.map((item, index) => {
             if (!item || item.recallHint) return item;
             if (item.category !== "directions" && item.category !== "diagonal") {
               return item;
             }
             const baseKey = normalizeCompassKey(item.label);
             if (!baseKey) return item;
-            const degree = degrees[Math.floor(Math.random() * degrees.length)];
-            const direction = Math.random() < 0.5 ? "cw" : "ccw";
+            const prompt = pickRotationPrompt(degrees);
+            if (!prompt) return item;
+            const { degree, direction, symbol, key } = prompt;
             const rotatedKey = getRotatedCompassKey(baseKey, degree, direction);
             const answerLabel = formatCompassLabel(rotatedKey);
             const answerCategory =
               ["up", "right", "down", "left"].includes(rotatedKey) ? "directions" : "diagonal";
-            const symbol = direction === "ccw" ? "↺" : "↻";
+            rotatedEntries.push({
+              index,
+              baseKey,
+              degrees,
+              direction,
+              degree,
+              modifierKey: "rotate",
+              promptKey: key
+            });
             return {
               ...item,
               answer: answerLabel,
@@ -1187,6 +1283,13 @@ const revealInput = document.getElementById("revealTime");
               recallHint: `${degree}° ${symbol}`
             };
           });
+          enforceUniqueRotateDegrees(rotatedItems, rotatedEntries);
+          if (promptHistory && rotatedEntries.length) {
+            rotatedEntries.forEach((entry) => {
+              if (entry.promptKey) promptHistory.add(entry.promptKey);
+            });
+          }
+          return rotatedItems;
         }
 
         const rotateChanceValue = rotateChance !== null ? rotateChance : (hasRotateConstraints ? 1 : 0);
@@ -1215,42 +1318,113 @@ const revealInput = document.getElementById("revealTime");
           }
         }
 
-        return items.map((item, index) => {
-          if (!item || item.recallHint) return item;
+        const rotatedEntries = [];
+        const rotatedItems = items.map((item, index) => {
+          const isSelected = selectedPlus.has(index) || selectedBase.has(index);
+          if (!item) return item;
+          if (item.recallHint && !isSelected) return item;
           if (item.category !== "directions" && item.category !== "diagonal") {
             return item;
           }
           const baseKey = normalizeCompassKey(item.label);
           if (!baseKey) return item;
           let degrees = null;
+          let modifierKey = null;
           if (selectedPlus.has(index)) {
             degrees = degreesPlus.length ? degreesPlus : degreesBase;
+            modifierKey = "rotatePlus";
           } else if (selectedBase.has(index)) {
             degrees = degreesBase.length ? degreesBase : degreesPlus;
+            modifierKey = "rotate";
           }
-          if (!degrees || !degrees.length) return item;
-          const degree = degrees[Math.floor(Math.random() * degrees.length)];
-          const direction = Math.random() < 0.5 ? "cw" : "ccw";
+          if (!degrees || !degrees.length || !modifierKey) return item;
+          const prompt = pickRotationPrompt(degrees);
+          if (!prompt) return item;
+          const { degree, direction, symbol, key } = prompt;
           const rotatedKey = getRotatedCompassKey(baseKey, degree, direction);
           const answerLabel = formatCompassLabel(rotatedKey);
           const answerCategory =
             ["up", "right", "down", "left"].includes(rotatedKey) ? "directions" : "diagonal";
-          const symbol = direction === "ccw" ? "\u21ba" : "\u21bb";
           const achievementModifiers = Array.isArray(item.achievementModifiers)
             ? item.achievementModifiers.slice()
             : [];
-          const modifierKey = enableRotatePlus ? "rotatePlus" : "rotate";
           if (!achievementModifiers.includes(modifierKey)) {
             achievementModifiers.push(modifierKey);
           }
-          return {
+          const rotated = {
             ...item,
             answer: answerLabel,
             answerCategory,
             recallHint: `${degree}\u00b0 ${symbol}`,
             achievementModifiers
           };
+          rotatedEntries.push({
+            index,
+            baseKey,
+            degrees,
+            direction,
+            degree,
+            modifierKey,
+            promptKey: key
+          });
+          return rotated;
         });
+
+        if (
+          options &&
+          options.rotateUniqueDegreesPerRound &&
+          rotatedEntries.length > 1
+        ) {
+          const unique = new Set(rotatedEntries.map((entry) => entry.degree));
+          if (unique.size <= 1) {
+            const target = rotatedEntries.find((entry) => entry.degrees.length > 1) || rotatedEntries[1];
+            if (target && target.degrees.length > 1) {
+              const alternatives = target.degrees.filter((value) => value !== target.degree);
+              if (alternatives.length) {
+                const direction = target.direction;
+                const filtered = alternatives.filter((value) => {
+                  const key = buildPromptKey(value, direction);
+                  if (promptHistory && promptHistory.has(key)) return false;
+                  if (roundPromptSeen.has(key)) return false;
+                  return true;
+                });
+                const pool = filtered.length ? filtered : alternatives;
+                const nextDegree = pool[Math.floor(Math.random() * pool.length)];
+                const nextKey = buildPromptKey(nextDegree, direction);
+                const rotatedKey = getRotatedCompassKey(target.baseKey, nextDegree, target.direction);
+                const answerLabel = formatCompassLabel(rotatedKey);
+                const answerCategory =
+                  ["up", "right", "down", "left"].includes(rotatedKey) ? "directions" : "diagonal";
+                const symbol = getPromptSymbol(direction);
+                const current = rotatedItems[target.index];
+                if (current) {
+                  rotatedItems[target.index] = {
+                    ...current,
+                    answer: answerLabel,
+                    answerCategory,
+                    recallHint: `${nextDegree}\u00b0 ${symbol}`
+                  };
+                }
+                if (target.promptKey) {
+                  roundPromptSeen.delete(target.promptKey);
+                }
+                target.degree = nextDegree;
+                target.promptKey = nextKey;
+                roundPromptSeen.add(nextKey);
+              }
+            }
+          }
+        }
+
+        enforceUniqueRotateDegrees(rotatedItems, rotatedEntries);
+
+        if (promptHistory && rotatedEntries.length) {
+          rotatedEntries.forEach((entry) => {
+            if (entry.promptKey) promptHistory.add(entry.promptKey);
+          });
+        }
+
+        return rotatedItems;
       }
 
       function isCorrectAnswer(item, actualValue) {
@@ -1851,8 +2025,17 @@ const revealInput = document.getElementById("revealTime");
         const stage = gameMode === "stages" && window.getStageConfig
           ? window.getStageConfig(stageState.index)
           : null;
+        if (gameMode === "stages" && stage && options && options.rotateNoRepeatPromptsAcrossRounds) {
+          if (rotatePromptHistoryStageId !== stage.id || round === 1) {
+            rotatePromptHistory = new Set();
+            rotatePromptHistoryStageId = stage.id;
+          }
+          options._rotatePromptHistory = rotatePromptHistory;
+        }
         const enforceAnswerInitials =
           gameMode === "stages" && stage && stage.noRepeatAnswerInitialsAcrossRounds === true;
+        const enforceUniqueInitials =
+          gameMode === "stages" && stage && stage.noDuplicateAnswerInitialsPerRound === true;
         const previousAnswerInitials =
           enforceAnswerInitials && lastAnswerInitialsStageId === stage.id ? lastAnswerInitials : null;
         const roundOverride =
@@ -2174,10 +2357,72 @@ const revealInput = document.getElementById("revealTime");
             used.add(next);
           });
         }
+        if (options && options.textColorNoAdjacent && Array.isArray(built) && built.length > 1) {
+          const maxAttempts = 5;
+          for (let i = 1; i < built.length; i += 1) {
+            const current = built[i];
+            const previous = built[i - 1];
+            if (!current || !previous) continue;
+            if (!current.textColorLabel || !previous.textColorLabel) continue;
+            const prevLabel = String(previous.textColorLabel).toLowerCase();
+            const currentLabel = String(current.textColorLabel).toLowerCase();
+            if (!prevLabel || !currentLabel || prevLabel !== currentLabel) continue;
+            const usedLabels =
+              options.textColorUniqueLabelsPerRound && options._textColorUsedLabels
+                ? options._textColorUsedLabels
+                : null;
+            const tempSet = usedLabels || new Set();
+            let addedPrev = false;
+            if (!tempSet.has(prevLabel)) {
+              tempSet.add(prevLabel);
+              addedPrev = true;
+            }
+            const avoidHex = options.textColorAvoidCardBackground
+              ? (current.color || current.backgroundColorHex || getCardBackgroundHex())
+              : "";
+            let replacement = null;
+            for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+              const next = pickTextColor(tempSet, avoidHex);
+              if (!next || !next.label) continue;
+              const nextLabel = String(next.label).toLowerCase();
+              if (!nextLabel || nextLabel === prevLabel) continue;
+              replacement = next;
+              if (usedLabels) {
+                if (current._textColorUsedLabel) {
+                  usedLabels.delete(current._textColorUsedLabel);
+                }
+                usedLabels.add(nextLabel);
+                current._textColorUsedLabel = nextLabel;
+              }
+              break;
+            }
+            if (replacement) {
+              current.textColorLabel = replacement.label;
+              current.textColorHex = replacement.color;
+            }
+            if (addedPrev && !usedLabels) {
+              tempSet.delete(prevLabel);
+            }
+          }
+        }
         const rotated = applyRotationChallenges(built, options);
         const result = applyNumberChallenges(rotated, options);
-        if (enforceAnswerInitials && Array.isArray(result)) {
+        if ((enforceAnswerInitials || enforceUniqueInitials) && Array.isArray(result)) {
           const currentInitials = result.map(buildAnswerInitial);
+          if (enforceUniqueInitials) {
+            const seen = new Set();
+            let duplicate = false;
+            currentInitials.forEach((value) => {
+              if (!value) return;
+              if (seen.has(value)) {
+                duplicate = true;
+              }
+              seen.add(value);
+            });
+            if (duplicate && attempt < 8) {
+              return pickItems(attempt + 1);
+            }
+          }
           const limit = Array.isArray(previousAnswerInitials)
             ? Math.min(currentInitials.length, previousAnswerInitials.length)
             : 0;
@@ -2248,13 +2493,13 @@ const revealInput = document.getElementById("revealTime");
               fillCue = getAccessibleColorEntry(item.label, item.color);
               card.style.background = fillCue.color;
               if (!item.textColorHex) {
-                card.style.color = getReadableCardInk(fillCue.color);
+                card.style.color = "#000";
               }
             } else if (item.backgroundColorHex) {
               fillCue = getAccessibleColorEntry(item.backgroundColorLabel, item.backgroundColorHex);
               card.style.background = fillCue.color;
               if (!item.textColorHex) {
-                card.style.color = getReadableCardInk(fillCue.color);
+                card.style.color = "#000";
               }
               card.classList.add("background-color");
             }
