@@ -2,6 +2,7 @@ window.sandboxUnlockCosts = {
   cardTypes: {
     numbers: 1,
     letters: 1,
+    greekLetters: 1,
     shapes: 1,
     directions: 3,
     colors: 1,

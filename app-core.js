@@ -1065,6 +1065,8 @@ const revealInput = document.getElementById("revealTime");
             return "Number";
           case "letters":
             return "Letter";
+          case "greekLetters":
+            return "Greek letter";
           case "colors":
             return "Color";
           case "directions":
@@ -1524,6 +1526,11 @@ const revealInput = document.getElementById("revealTime");
           const initial = expected.charAt(0);
           return actual === expected || actual === initial;
         }
+        if (category === "greekLetters") {
+          const initial = expected.charAt(0);
+          const symbol = item.symbol ? normalize(String(item.symbol)) : "";
+          return actual === expected || actual === initial || (symbol && actual === symbol);
+        }
         if (category === "shapes") {
           if (expected === "square") {
             return actual === "square" || actual === "s" || actual === "rectangle" || actual === "r";
@@ -1561,6 +1568,7 @@ const revealInput = document.getElementById("revealTime");
           addKey(previousItem.textLabel);
           addKey(previousItem.label);
           addKey(previousItem.answer);
+          addKey(previousItem.symbol);
           const prevCategory = previousItem.answerCategory || previousItem.category;
           const baseValue =
             previousItem.answer ?? previousItem.textLabel ?? previousItem.label ?? "";
@@ -1640,7 +1648,7 @@ const revealInput = document.getElementById("revealTime");
             challenge.previousAnswerKeys = collectPreviousAnswerKeys(previousItem);
           }
         }
-        const canUseTextColor = ["numbers", "letters", "colors"].includes(item.category);
+        const canUseTextColor = ["numbers", "letters", "greekLetters", "colors"].includes(item.category);
         const applyTextColor =
           Boolean(options && options.enableTextColor) &&
           canUseTextColor &&
@@ -1948,7 +1956,9 @@ const revealInput = document.getElementById("revealTime");
           if (min !== null || max !== null) {
             options._useTextPromptPlan = true;
             const eligible = items
-              .map((item, index) => (["numbers", "letters", "colors"].includes(item.category) ? index : null))
+              .map((item, index) =>
+                (["numbers", "letters", "greekLetters", "colors"].includes(item.category) ? index : null)
+              )
               .filter((index) => index !== null);
             const selected = selectModifierIndices(eligible, options.textPromptChance, min, max);
             selected.forEach((index) => {
@@ -2646,6 +2656,9 @@ const revealInput = document.getElementById("revealTime");
                   style="transform: rotate(${rotation}deg);"
                 />
               `;
+            } else if (item.category === "greekLetters") {
+              const symbol = item.symbol || item.label;
+              card.innerHTML = `${symbol}`;
             } else if (item.category === "shapes") {
               card.innerHTML = `${renderShapeSVG(item.shape)}`;
             } else if (item.category === "fruits") {

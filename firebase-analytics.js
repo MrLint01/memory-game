@@ -111,6 +111,7 @@ const WORLD_CLASS_CLIMBER_NAMES = new Set([
 const ACHIEVEMENT_CARD_TYPE_META = {
   numbers: { label: "Numbers", noun: "number cards", short: "NUM", iconSrc: "imgs/icons/card-numbers.svg" },
   letters: { label: "Letters", noun: "letter cards", short: "LET", iconSrc: "imgs/icons/card-letters.svg" },
+  greekLetters: { label: "Greek letters", noun: "greek letter cards", short: "GRK", iconSrc: "imgs/icons/card-greekletters.svg" },
   shapes: { label: "Shapes", noun: "shape cards", short: "SHP", iconSrc: "imgs/icons/card-shapes.svg" },
   directions: { label: "Directions", noun: "direction cards", short: "DIR", iconSrc: "imgs/icons/card-directions.svg" },
   colors: { label: "Colors", noun: "color cards", short: "CLR", iconSrc: "imgs/icons/card-colors.svg" },

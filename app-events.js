@@ -1647,6 +1647,7 @@ function runFlashCountdown(onComplete) {
           numbers: { label: "Numbers", src: "imgs/icons/card-numbers.svg" },
           colors: { label: "Colors", src: "imgs/icons/card-colors.svg" },
           letters: { label: "Letters", src: "imgs/icons/card-letters.svg" },
+          greekLetters: { label: "Greek letters", src: "imgs/icons/card-greekletters.svg" },
           directions: { label: "Directions", src: "imgs/icons/card-directions.svg" },
           diagonal: { label: "Diagonal", src: "imgs/icons/card-diagonal.svg" },
           shapes: { label: "Shapes", src: "imgs/icons/card-shapes.svg" },
@@ -5389,8 +5390,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
 
 
 
