@@ -59,7 +59,7 @@ const LEADERBOARDS_ENABLED_KEY = "flashRecallLeaderboardsEnabled";
 const leaderboardSessionCache = new Map();
 const statsLeaderboardSessionCache = new Map();
 const STATS_LEADERBOARD_CACHE_TTL_MS = 60 * 1000;
-const PROGRESS_LEADERBOARD_PATH = `leaderboards_global/progress_versions/${progressLeaderboardVersion}/entries`;
+const PROGRESS_LEADERBOARD_PATH = `leaderboards_global/progress/versions/${progressLeaderboardVersion}/entries`;
 const ACHIEVEMENT_PROFILE_PATH = "achievement_profiles";
 const ACHIEVEMENT_SUMMARY_PATH = "achievements_global/summary";
 const ACHIEVEMENT_ENTRY_PATH = `${ACHIEVEMENT_SUMMARY_PATH}/entries`;
@@ -1670,6 +1670,8 @@ async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, pla
   if (safeStagesCleared <= 0 && safeStarsEarned <= 0 && safeAchievementsUnlocked <= 0) {
     return;
   }
+  const progressEntryId = String(currentUserId || "").trim();
+  if (!progressEntryId) return;
   const payload = {
     player_id: playerId,
     auth_uid: currentUserId,
@@ -1683,7 +1685,7 @@ async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, pla
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
   };
   try {
-    await firebaseDb.doc(`${PROGRESS_LEADERBOARD_PATH}/${playerId}`).set(payload, { merge: true });
+    await firebaseDb.doc(`${PROGRESS_LEADERBOARD_PATH}/${progressEntryId}`).set(payload, { merge: true });
     upsertCachedStatsEntry(payload);
   } catch (error) {
     console.warn("Failed to update progress leaderboard snapshot", error);

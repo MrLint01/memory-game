@@ -490,6 +490,18 @@ body[data-theme="prism-parade"]::before {
   }
 }
 
+@keyframes prismHomePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(138, 85, 195, 0.16), 0 0 0 0 rgba(255, 95, 151, 0.14);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(88, 183, 255, 0.2), 0 0 30px 4px rgba(255, 159, 28, 0.18);
+    transform: translateY(-1px);
+  }
+}
+
 body[data-theme="prism-parade"][data-view="stages"] {
   background:
     radial-gradient(circle at 12% 18%, rgba(255, 122, 158, 0.34), transparent 24%),
@@ -500,7 +512,9 @@ body[data-theme="prism-parade"][data-view="stages"] {
 }
 
 body[data-theme="prism-parade"][data-view="stages"] main {
-  border: 2px solid var(--border);
+  border: 2px solid rgba(138, 85, 195, 0.78);
+  box-shadow: none;
+  animation: prismOutlineShiftFlat 14s linear infinite;
 }
 
 body[data-theme="prism-parade"][data-view="stages"] main::before,
@@ -524,15 +538,20 @@ body[data-theme="prism-parade"][data-view="stages"] main::before {
 }
 
 body[data-theme="prism-parade"][data-view="stages"] .stage-board {
-  animation: prismRainbowShift 18s ease-in-out infinite alternate, prismOutlineShiftFlat 14s linear infinite;
+  border: none;
+  box-shadow: none;
+  animation: prismRainbowShift 18s ease-in-out infinite alternate;
 }
 
-body[data-theme="prism-parade"][data-view="stages"] main,
 body[data-theme="prism-parade"][data-view="stages"] .stages-progress,
 body[data-theme="prism-parade"][data-view="stages"] .stages-total,
 body[data-theme="prism-parade"][data-view="stages"] #stagesBack,
 body[data-theme="prism-parade"][data-view="stages"] .stages-footer {
   animation: prismOutlineShiftFlat 14s linear infinite;
+}
+
+body[data-theme="prism-parade"][data-view="stages"] main::before {
+  inset: 2px;
 }
 
 body[data-theme="prism-parade"][data-view="stages"] .stages-page-next,
@@ -551,6 +570,17 @@ body[data-theme="prism-parade"][data-view="stages"] .stage-card--animate {
 
 body[data-theme="prism-parade"][data-view="stages"] .stage-card--fadein {
   animation: stageCardFadeIn 220ms ease-out both, prismOutlineShiftRaised 14s linear infinite;
+}
+
+body[data-theme="prism-parade"][data-view="home"] main {
+  animation: prismHomePulse 3.8s ease-in-out infinite, prismOutlineShiftFlat 14s linear infinite;
+}
+
+body[data-theme="prism-parade"][data-view="home"].home-anim main {
+  animation:
+    homePanelFade 400ms ease-out both,
+    prismHomePulse 3.8s ease-in-out infinite,
+    prismOutlineShiftFlat 14s linear infinite;
 }
 
 body[data-theme] .stage-intro-chip,
@@ -2921,10 +2951,12 @@ body[data-state="paused"] .hud-pause {
   right: 0.9rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 68px;
-  height: 88px;
+  width: 34px;
+  height: 44px;
   z-index: 6;
   background: transparent;
+  background-color: transparent;
+  background-image: none;
   border: none;
   padding: 0;
   cursor: pointer;
@@ -2942,10 +2974,12 @@ body[data-state="paused"] .hud-pause {
   left: 0.9rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 68px;
-  height: 88px;
+  width: 34px;
+  height: 44px;
   z-index: 6;
   background: transparent;
+  background-color: transparent;
+  background-image: none;
   border: none;
   padding: 0;
   cursor: pointer;
@@ -2964,17 +2998,15 @@ body[data-state="paused"] .hud-pause {
   display: block;
   width: 0;
   height: 0;
-  border-top: 22px solid transparent;
-  border-bottom: 22px solid transparent;
+  border-top: 18px solid transparent;
+  border-bottom: 18px solid transparent;
   transition: transform 160ms ease, opacity 160ms ease;
 }
 .stages-page-next::before {
-  border-left: 26px solid currentColor;
-  margin-left: 6px;
+  border-left: 22px solid currentColor;
 }
 .stages-page-prev::before {
-  border-right: 26px solid currentColor;
-  margin-right: 6px;
+  border-right: 22px solid currentColor;
 }
 .stages-page-next::after,
 .stages-page-prev::after {
