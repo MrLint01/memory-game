@@ -148,6 +148,10 @@
           clearTimeout(swapTimeoutId);
           swapTimeoutId = null;
           swapStartTime = null;
+          if (swapStagePauseStart) {
+            swapStagePauseAccumulated += performance.now() - swapStagePauseStart;
+            swapStagePauseStart = null;
+          }
         }
         if (successAnimationActive) {
           pauseSuccessAnimation();
@@ -205,7 +209,9 @@
         }
         restorePausedEffects(remainingSeconds);
         if (gameMode === "stages" && stageState.active) {
-          if (successAnimationActive) {
+          if (pausedState.swapRemaining && swapStartRecall) {
+            swapStagePauseStart = performance.now();
+          } else if (successAnimationActive) {
             resumeSuccessAnimation();
           } else {
             startStageStopwatch();
@@ -1480,11 +1486,25 @@
           swapStartRecall = startRecall;
           swapRemaining = swapAnimationDuration + 200;
           swapStartTime = performance.now();
+          if (gameMode === "stages" && stageState.active) {
+            stopStageStopwatch();
+            swapStagePauseStart = swapStartTime;
+            swapStagePauseAccumulated = 0;
+          }
           swapTimeoutId = setTimeout(() => {
             swapTimeoutId = null;
             swapStartTime = null;
             swapRemaining = null;
             swapStartRecall = null;
+            if (gameMode === "stages" && stageState.active && typeof stageState.startTime === "number") {
+              const swapElapsed = swapStagePauseStart
+                ? performance.now() - swapStagePauseStart
+                : 0;
+              stageState.startTime += swapStagePauseAccumulated + swapElapsed;
+              swapStagePauseStart = null;
+              swapStagePauseAccumulated = 0;
+              startStageStopwatch();
+            }
             if (swapCleanup) {
               swapCleanup();
               swapCleanup = null;

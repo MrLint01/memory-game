@@ -3914,9 +3914,12 @@ function runFlashCountdown(onComplete) {
         });
       }
 
-      interruptClose.addEventListener("click", () => {
-        hideAd();
-        if (pendingSkipAfterAd) {
+      interruptModal.addEventListener("click", (event) => {
+        const closeButton = event.target.closest(".interrupt-close");
+        if (!closeButton) return;
+        const card = closeButton.closest(".interrupt-card");
+        hideAd(card || null);
+        if (pendingSkipAfterAd && !adActive) {
           pendingSkipAfterAd = false;
           beginRecallPhase();
         }
@@ -4785,7 +4788,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
 
 
 
