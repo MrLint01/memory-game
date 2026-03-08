@@ -60,6 +60,22 @@ const ACHIEVEMENT_ENTRY_PATH = `${ACHIEVEMENT_SUMMARY_PATH}/entries`;
 const ACHIEVEMENT_CACHE_TTL_MS = 60 * 1000;
 const ACHIEVEMENT_CARD_TYPE_THRESHOLDS = [1, 10, 100, 1000];
 const ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS = [10, 100, 1000];
+const AUTO_NAME_WORD_BANK = {
+  b: { adjectives: ["Bold", "Brisk", "Bright"], animals: ["Bear", "Bee", "Bunny"] },
+  c: { adjectives: ["Calm", "Clever", "Cosmic"], animals: ["Cat", "Crane", "Crow"] },
+  d: { adjectives: ["Daring", "Dizzy", "Dapper"], animals: ["Dolphin", "Duck", "Deer"] },
+  f: { adjectives: ["Fancy", "Fierce", "Fleet"], animals: ["Fox", "Frog", "Falcon"] },
+  g: { adjectives: ["Gentle", "Golden", "Grand"], animals: ["Goose", "Gecko", "Gorilla"] },
+  h: { adjectives: ["Happy", "Hyper", "Humble"], animals: ["Hedgehog", "Heron", "Hamster"] },
+  j: { adjectives: ["Jolly", "Jaunty", "Jazzy"], animals: ["Jaguar", "Jay", "Jackal"] },
+  l: { adjectives: ["Lucky", "Lively", "Lofty"], animals: ["Lion", "Llama", "Lynx"] },
+  m: { adjectives: ["Merry", "Mighty", "Mellow"], animals: ["Moose", "Moth", "Mouse"] },
+  p: { adjectives: ["Plucky", "Proud", "Puzzled"], animals: ["Panda", "Penguin", "Panther"] },
+  r: { adjectives: ["Rapid", "Royal", "Rosy"], animals: ["Rabbit", "Raven", "Raccoon"] },
+  s: { adjectives: ["Sunny", "Swift", "Stellar"], animals: ["Seal", "Shark", "Swan"] },
+  t: { adjectives: ["Tidy", "Tiny", "Thunder"], animals: ["Tiger", "Turtle", "Toucan"] },
+  w: { adjectives: ["Witty", "Wild", "Warm"], animals: ["Wolf", "Whale", "Wombat"] }
+};
 const LEVEL_PROGRESS_ICON_SRC = "imgs/icons/level-completed-acheivements.svg";
 const RETRY_ICON_SRC = "imgs/icons/retry-level-icon.svg";
 const PAINT_ICON_SRC = "imgs/icons/paint-roller-bucket-icon.svg";
@@ -70,6 +86,13 @@ const SANDBOX_ICON_SRC = "imgs/icons/sand-icon.svg";
 const CONTRAST_ICON_SRC = "imgs/icons/contrast-icon.svg";
 const DOOR_KEY_ICON_SRC = "imgs/icons/door-key-icon.svg";
 const CAT_ICON_SRC = "imgs/icons/cat-animal-icon.svg";
+const STAIRS_ICON_SRC = "imgs/icons/stairs-icon.svg";
+const ROCK_CLIMBER_ICON_SRC = "imgs/icons/rock-climber-icon.svg";
+const WORLD_CLASS_CLIMBER_NAMES = new Set([
+  "alex honnold",
+  "adam ondra",
+  "janja garnbret"
+]);
 const ACHIEVEMENT_CARD_TYPE_META = {
   numbers: { label: "Numbers", noun: "number cards", short: "NUM", iconSrc: "imgs/icons/card-numbers.svg" },
   letters: { label: "Letters", noun: "letter cards", short: "LET", iconSrc: "imgs/icons/card-letters.svg" },
@@ -110,6 +133,14 @@ function formatAchievementThresholdShort(value) {
 function getAchievementRomanTier(index) {
   const tiers = ["I", "II", "III", "IV", "V", "VI"];
   return tiers[index] || String(index + 1);
+}
+
+function normalizeAchievementPlayerName(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function isWorldClassClimberName(name) {
+  return WORLD_CLASS_CLIMBER_NAMES.has(normalizeAchievementPlayerName(name));
 }
 
 function buildCardTypeAchievementDefinitions() {
@@ -163,6 +194,7 @@ const ACHIEVEMENT_DEFINITIONS = [
   })),
   ...buildCardTypeAchievementDefinitions(),
   ...buildModifierVariantAchievementDefinitions(),
+  { id: "first_steps", title: "First Steps", description: "Log into the game for the first time.", iconSrc: STAIRS_ICON_SRC },
   { id: "complete_1", title: "First Clear", description: "Complete one level.", iconSrc: LEVEL_PROGRESS_ICON_SRC, iconBadge: "I" },
   { id: "complete_10", title: "Ten Clears", description: "Complete 10 levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC, iconBadge: "II" },
   { id: "complete_all", title: "Full Clear", description: "Complete all levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC, iconBadge: "III" },
@@ -213,6 +245,7 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconSrc: CONTRAST_ICON_SRC },
   { id: "secret_any_key", title: "Any Key Means Enter", description: "Type 'Any Key' on the splash screen, then press Enter.", iconSrc: DOOR_KEY_ICON_SRC, secret: true },
   { id: "secret_cat", title: "Cat", description: "Find a rare cat card.", iconSrc: CAT_ICON_SRC, secret: true },
+  { id: "secret_world_class_climber", title: "World Class Climber", description: "Name yourself Alex Honnold, Adam Ondra, or Janja Garnbret.", iconSrc: ROCK_CLIMBER_ICON_SRC, secret: true },
   { id: "secret_prism_parade", title: "Prism Parade", description: "Find the hidden rainbow theme through Shuffle Theme.", iconSrc: RAINBOW_ICON_SRC, secret: true },
   { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "\u2605\u2605\u2605\u2605", secret: true },
   { id: "secret_stars_total_200", title: "Hidden Galaxy", description: "Collect 200 stars.", iconText: "200\u2605", secret: true }
@@ -246,6 +279,7 @@ function getAchievementDifficultyScore(definition) {
   if (/^sandbox_complete_100$/.test(id)) return 80;
   if (/^sandbox_complete_10$/.test(id)) return 58;
   if (/^sandbox_complete_1$/.test(id)) return 20;
+  if (/^first_steps$/.test(id)) return 10;
   if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_50$|^complete_(flash|tutorial|challenge)_1$/.test(id)) return 18;
   return 45;
 }
@@ -549,7 +583,9 @@ function getDefaultAchievementProfile() {
     flash_completed_count: 0,
     tutorial_completed_count: 0,
     challenge_completed_count: 0,
+    first_steps: false,
     any_key_secret: false,
+    world_class_climber: false,
     prism_parade_found: false,
     cat_found: false,
     total_stars: 0,
@@ -594,7 +630,9 @@ function normalizeAchievementProfile(raw) {
   base.flash_completed_count = Math.max(0, Number(source.flash_completed_count) || 0);
   base.tutorial_completed_count = Math.max(0, Number(source.tutorial_completed_count) || 0);
   base.challenge_completed_count = Math.max(0, Number(source.challenge_completed_count) || 0);
+  base.first_steps = Boolean(source.first_steps);
   base.any_key_secret = Boolean(source.any_key_secret);
+  base.world_class_climber = Boolean(source.world_class_climber);
   base.prism_parade_found = Boolean(source.prism_parade_found);
   base.cat_found = Boolean(source.cat_found);
   base.total_stars = Math.max(0, Number(source.total_stars) || 0);
@@ -761,7 +799,9 @@ function normalizeAchievementUpdate(update = {}) {
     flashCompletedCount: null,
     tutorialCompletedCount: null,
     challengeCompletedCount: null,
+    firstSteps: false,
     anyKeySecret: false,
+    worldClassClimber: false,
     prismParadeFound: false,
     catFound: false,
     totalStars: null,
@@ -797,7 +837,9 @@ function normalizeAchievementUpdate(update = {}) {
   base.challengeCompletedCount = Number.isFinite(Number(update.challengeCompletedCount))
     ? Math.max(0, Number(update.challengeCompletedCount))
     : null;
+  base.firstSteps = Boolean(update.firstSteps);
   base.anyKeySecret = Boolean(update.anyKeySecret);
+  base.worldClassClimber = Boolean(update.worldClassClimber);
   base.prismParadeFound = Boolean(update.prismParadeFound);
   base.catFound = Boolean(update.catFound);
   base.totalStars = Number.isFinite(Number(update.totalStars)) ? Math.max(0, Number(update.totalStars)) : null;
@@ -881,7 +923,9 @@ function mergeAchievementUpdateInputs(...updates) {
       merged.totalStages = Math.max(Number(merged.totalStages) || 0, update.totalStages);
     }
     merged.sandboxPlayed = merged.sandboxPlayed || update.sandboxPlayed;
+    merged.firstSteps = merged.firstSteps || update.firstSteps;
     merged.anyKeySecret = merged.anyKeySecret || update.anyKeySecret;
+    merged.worldClassClimber = merged.worldClassClimber || update.worldClassClimber;
     merged.prismParadeFound = merged.prismParadeFound || update.prismParadeFound;
     merged.catFound = merged.catFound || update.catFound;
     merged.completedFlashLevel = merged.completedFlashLevel || update.completedFlashLevel;
@@ -969,7 +1013,11 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   if (Number.isFinite(normalized.challengeCompletedCount)) {
     next.challenge_completed_count = Math.max(next.challenge_completed_count, normalized.challengeCompletedCount);
   }
+  next.first_steps = next.first_steps || normalized.firstSteps;
   next.any_key_secret = next.any_key_secret || normalized.anyKeySecret;
+  next.world_class_climber = next.world_class_climber
+    || normalized.worldClassClimber
+    || isWorldClassClimberName(normalized.playerName || next.player_name);
   next.prism_parade_found = next.prism_parade_found || normalized.prismParadeFound;
   next.cat_found = next.cat_found || normalized.catFound;
   if (Number.isFinite(normalized.totalStars)) {
@@ -1037,12 +1085,14 @@ function getAchievementUnlockIds(profile) {
       }
     });
   });
+  if (profile.first_steps) unlocks.push("first_steps");
   if (profile.completed_count >= 1) unlocks.push("complete_1");
   if (profile.sandbox_completed_count >= 1) unlocks.push("sandbox_complete_1");
   if (profile.sandbox_completed_count >= 10) unlocks.push("sandbox_complete_10");
   if (profile.sandbox_completed_count >= 100) unlocks.push("sandbox_complete_100");
   if (profile.sandbox_completed_count >= 1000) unlocks.push("sandbox_complete_1000");
   if (profile.any_key_secret) unlocks.push("secret_any_key");
+  if (profile.world_class_climber) unlocks.push("secret_world_class_climber");
   if (profile.cat_found) unlocks.push("secret_cat");
   if (profile.prism_parade_found) unlocks.push("secret_prism_parade");
   if (profile.flash_completed_count >= 1) unlocks.push("complete_flash_1");
@@ -1108,8 +1158,9 @@ function setAchievementOverviewCache(profile, totalPlayers, countsById = null) {
   };
 }
 
-async function applyAchievementUpdate(update = {}) {
+async function applyAchievementUpdate(update = {}, options = {}) {
   const normalizedUpdate = normalizeAchievementUpdate(update);
+  const suppressNotifications = Boolean(options && options.suppressNotifications);
   if (!firebaseDb || !currentUserId) {
     pendingAchievementUpdates.push(normalizedUpdate);
     return { profile: achievementProfileCache || getDefaultAchievementProfile(), newlyUnlocked: [] };
@@ -1145,7 +1196,9 @@ async function applyAchievementUpdate(update = {}) {
         flash_completed_count: nextProfile.flash_completed_count,
         tutorial_completed_count: nextProfile.tutorial_completed_count,
         challenge_completed_count: nextProfile.challenge_completed_count,
+        first_steps: nextProfile.first_steps,
         any_key_secret: nextProfile.any_key_secret,
+        world_class_climber: nextProfile.world_class_climber,
         prism_parade_found: nextProfile.prism_parade_found,
         cat_found: nextProfile.cat_found,
         total_stars: nextProfile.total_stars,
@@ -1218,7 +1271,7 @@ async function applyAchievementUpdate(update = {}) {
       result.profile.player_name || getDisplayNameFallback(),
       Object.keys(result.profile.unlocked || {}).length
     );
-    if (result.newlyUnlocked.length) {
+    if (result.newlyUnlocked.length && !suppressNotifications) {
       const items = result.newlyUnlocked
         .map((achievementId) => ACHIEVEMENT_DEFINITION_BY_ID[achievementId])
         .filter(Boolean)
@@ -1243,12 +1296,12 @@ async function applyAchievementUpdate(update = {}) {
   }
 }
 
-async function syncAchievementsFromLocal(extra = {}) {
+async function syncAchievementsFromLocal(extra = {}, options = {}) {
   const mergedUpdate = mergeAchievementUpdateInputs(getLocalAchievementSyncUpdate(), ...pendingAchievementUpdates.splice(0), extra);
-  return applyAchievementUpdate(mergedUpdate);
+  return applyAchievementUpdate(mergedUpdate, options);
 }
 
-async function updateLeaderboardAchievementFlags(stageId, stageVersion, playerTimeMs) {
+async function updateLeaderboardAchievementFlags(stageId, stageVersion, playerTimeMs, options = {}) {
   if (!Number.isFinite(Number(playerTimeMs))) return;
   const rankData = await getPlayerRankAndPercentile(stageId, stageVersion, Number(playerTimeMs));
   if (!rankData) return;
@@ -1267,7 +1320,7 @@ async function updateLeaderboardAchievementFlags(stageId, stageVersion, playerTi
       ...update,
       playerName: getDisplayNameFallback(),
       totalStages: getTotalStagesCount()
-    });
+    }, options);
   }
 }
 
@@ -1374,7 +1427,27 @@ function getDisplayNameFallback() {
     const name = window.getPlayerName();
     if (name) return name;
   }
-  return `Player ${playerId}`;
+  const groups = Object.entries(AUTO_NAME_WORD_BANK);
+  if (!groups.length) {
+    return `Player ${playerId}`;
+  }
+  let hash = 0;
+  const source = String(playerId || "player");
+  for (let i = 0; i < source.length; i += 1) {
+    hash = ((hash * 31) + source.charCodeAt(i)) >>> 0;
+  }
+  const [letter, words] = groups[hash % groups.length];
+  const safeWords = words && typeof words === "object" ? words : { adjectives: ["Brave"], animals: ["Bear"] };
+  const adjectives = Array.isArray(safeWords.adjectives) && safeWords.adjectives.length
+    ? safeWords.adjectives
+    : ["Brave"];
+  const animals = Array.isArray(safeWords.animals) && safeWords.animals.length
+    ? safeWords.animals
+    : ["Bear"];
+  const adjective = adjectives[Math.floor(hash / groups.length) % adjectives.length];
+  const animal = animals[Math.floor(hash / (groups.length * Math.max(1, adjectives.length))) % animals.length];
+  const fallback = `${adjective} ${animal}`.trim();
+  return fallback || `${letter.toUpperCase()} Player`;
 }
 
 loadLeaderboardReadBudget();
@@ -1406,7 +1479,7 @@ async function fetchLeaderboardDoc(path, id) {
   }
 }
 
-async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, playerName) {
+async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, playerName, options = {}) {
   if (!firebaseDb || !currentUserId) return;
   if (!areLeaderboardsEnabled()) return;
   const bestTimeMs = Number.isFinite(timeSeconds) ? Math.round(timeSeconds * 1000) : null;
@@ -1427,7 +1500,7 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
     existing.best_time_ms <= bestTimeMs &&
     existing.player_name === resolvedName
   ) {
-    await updateLeaderboardAchievementFlags(stageId, stageVersion, existing.best_time_ms);
+    await updateLeaderboardAchievementFlags(stageId, stageVersion, existing.best_time_ms, options);
     return {
       bestTimeMs: existing.best_time_ms,
       playerName: resolvedName,
@@ -1459,7 +1532,7 @@ async function updateStageLeaderboard(stageId, stageVersion, timeSeconds, player
     //   }, { merge: true });
     // }
     upsertCachedLeaderboardEntry(stageId, stageVersion, payload);
-    await updateLeaderboardAchievementFlags(stageId, stageVersion, resolvedBest);
+    await updateLeaderboardAchievementFlags(stageId, stageVersion, resolvedBest, options);
     return {
       bestTimeMs: resolvedBest,
       playerName: resolvedName,
@@ -1687,7 +1760,7 @@ async function fetchProgressLeaderboard(metric, limit = 5, options = {}) {
   }
 }
 
-async function syncLocalBestTimesOnce(force = false) {
+async function syncLocalBestTimesOnce(force = false, options = {}) {
   if (!firebaseDb || !currentUserId) return;
   if (!areLeaderboardsEnabled()) return;
   try {
@@ -1701,7 +1774,7 @@ async function syncLocalBestTimesOnce(force = false) {
       const stageVersion = Number(match[2]) || 1;
       const timeSeconds = Number(value);
       if (!Number.isFinite(timeSeconds)) return;
-      writes.push(updateStageLeaderboard(stageId, stageVersion, timeSeconds, getDisplayNameFallback()));
+      writes.push(updateStageLeaderboard(stageId, stageVersion, timeSeconds, getDisplayNameFallback(), options));
     });
     await Promise.all(writes);
     window.localStorage.setItem(leaderboardSyncKey, "1");
@@ -2155,8 +2228,8 @@ async function initializeFirebase() {
         if (!DISABLE_TELEMETRY_ON_LOCALHOST) {
           await createNewSession();
         }
-        await syncLocalBestTimesOnce();
-        await syncAchievementsFromLocal();
+        await syncLocalBestTimesOnce(false, { suppressNotifications: true });
+        await syncAchievementsFromLocal({ firstSteps: true }, { suppressNotifications: true });
       } else {
         try {
           await firebase.auth().signInAnonymously();
