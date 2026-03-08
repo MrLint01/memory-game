@@ -221,6 +221,7 @@
         typeof modifiers.backgroundColorMinCount === "number" ? modifiers.backgroundColorMinCount : null,
       backgroundColorMaxCount:
         typeof modifiers.backgroundColorMaxCount === "number" ? modifiers.backgroundColorMaxCount : null,
+      backgroundColorUniqueLabelsPerRound: Boolean(modifiers.backgroundColorUniqueLabelsPerRound),
       backgroundPromptChance:
         typeof modifiers.backgroundPromptChance === "number" ? modifiers.backgroundPromptChance : 0.5,
       backgroundPromptMinCount:
@@ -233,6 +234,7 @@
       textColorUniqueLabelsPerRound: Boolean(modifiers.textColorUniqueLabelsPerRound),
       textColorAvoidCardBackground: Boolean(modifiers.textColorAvoidCardBackground),
       textColorNoAdjacent: Boolean(modifiers.textColorNoAdjacent),
+      textColorMatchCardBackground: Boolean(modifiers.textColorMatchCardBackground),
       textPromptMinCount:
         typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
       textPromptMaxCount:

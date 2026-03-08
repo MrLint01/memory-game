@@ -1216,19 +1216,6 @@ function runFlashCountdown(onComplete) {
       }
 
       function startFlashRound() {
-        const warmupDelay =
-          stageState && typeof stageState.flashStartDelayMs === "number"
-            ? Math.max(0, stageState.flashStartDelayMs)
-            : 0;
-        if (warmupDelay > 0) {
-          stageState.flashStartDelayMs = 0;
-          window.setTimeout(() => {
-            runFlashCountdown(() => {
-              startRound({ advanceRound: true, __flashOverride: true });
-            });
-          }, warmupDelay);
-          return;
-        }
         runFlashCountdown(() => {
           startRound({ advanceRound: true, __flashOverride: true });
         });
@@ -2064,7 +2051,6 @@ function runFlashCountdown(onComplete) {
         clearResultAutoActionCountdown();
         const stage = window.getStageConfig ? window.getStageConfig(index) : null;
         const isFlashStage = stage && String(stage.stageType).toLowerCase() === "flash";
-        stageState.flashStartDelayMs = isFlashStage && deferStartRound ? 200 : 0;
         if (isFlashStage && flashWarningEnabled && !skipFlashWarningPrompt && skipIntro) {
           openFlashStagePrompt(index);
           return;
@@ -4744,8 +4730,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
 
 
 

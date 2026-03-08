@@ -1695,13 +1695,23 @@ const revealInput = document.getElementById("revealTime");
           const shouldApplyBackground =
             forceBackground || (!useBackgroundPlan && Math.random() < bgChance);
           if (shouldApplyBackground) {
-            const backgroundColor = noRepeatBackgroundAcrossRounds
+            const usedLabels =
+              options && options.backgroundColorUniqueLabelsPerRound && options._backgroundColorUsedLabels
+                ? options._backgroundColorUsedLabels
+                : null;
+            const backgroundColor = pickBackgroundColorWithUsed(
+              usedLabels,
+              noRepeatBackgroundAcrossRounds ? previousBackgroundLabel : null
+            ) || (noRepeatBackgroundAcrossRounds
               ? (pickBackgroundColorAvoiding(previousBackgroundLabel) || pickBackgroundColor())
-              : pickBackgroundColor();
+              : pickBackgroundColor());
             challenge.backgroundColorLabel = backgroundColor.label;
             challenge.backgroundColorHex = backgroundColor.color;
             if (!challenge.achievementModifiers.includes("backgroundColor")) {
               challenge.achievementModifiers.push("backgroundColor");
+            }
+            if (usedLabels && backgroundColor.label) {
+              usedLabels.add(String(backgroundColor.label).toLowerCase());
             }
             if (noRepeatBackgroundAcrossRounds && backgroundColor.label && stage) {
               lastBackgroundColorLabel = backgroundColor.label;
@@ -1747,6 +1757,40 @@ const revealInput = document.getElementById("revealTime");
               challenge.recallHint = "Background color";
             }
           }
+        }
+        if (options && options.textColorMatchCardBackground) {
+          const matchLabel = item.category === "colors"
+            ? item.label
+            : (challenge.backgroundColorLabel || item.backgroundColorLabel);
+          const matchHex = item.category === "colors"
+            ? item.color
+            : (challenge.backgroundColorHex || item.backgroundColorHex);
+          if (matchLabel && matchHex) {
+            const usedLabels =
+              options.textColorUniqueLabelsPerRound && options._textColorUsedLabels
+                ? options._textColorUsedLabels
+                : null;
+            if (usedLabels && challenge._textColorUsedLabel) {
+              usedLabels.delete(challenge._textColorUsedLabel);
+              challenge._textColorUsedLabel = null;
+            }
+            if (usedLabels) {
+              const key = String(matchLabel).toLowerCase();
+              usedLabels.add(key);
+              challenge._textColorUsedLabel = key;
+            }
+            challenge.textColorLabel = matchLabel;
+            challenge.textColorHex = matchHex;
+            if (!challenge.achievementModifiers.includes("textColor")) {
+              challenge.achievementModifiers.push("textColor");
+            }
+            if (challenge.recallHint === "Text color") {
+              challenge.answer = matchLabel;
+            }
+          }
+        }
+        if (challenge.recallHint === "Text color" && challenge.textColorLabel) {
+          challenge.answer = challenge.textColorLabel;
         }
         return challenge;
       }
@@ -1871,6 +1915,7 @@ const revealInput = document.getElementById("revealTime");
               plan[index].forceTextPrompt = true;
               selectedTextPromptIndices.add(index);
             });
+            options._textPromptSelectedIndices = selectedTextPromptIndices;
           }
         }
         if (options && options.enableBackgroundColor) {
@@ -2014,6 +2059,37 @@ const revealInput = document.getElementById("revealTime");
         return filtered[Math.floor(Math.random() * filtered.length)];
       }
 
+      function pickBackgroundColorWithUsed(usedLabels, avoidLabel) {
+        const list = Array.isArray(backgroundColors) ? backgroundColors : [];
+        if (!list.length) return null;
+        const normalizeLabel = (value) => String(value || "").trim().toLowerCase();
+        const avoidValue = normalizeLabel(avoidLabel);
+        let pool = list;
+        if (usedLabels && usedLabels.size) {
+          const filtered = pool.filter((entry) => {
+            if (!entry || !entry.label) return false;
+            return !usedLabels.has(normalizeLabel(entry.label));
+          });
+          if (filtered.length) {
+            pool = filtered;
+          }
+        }
+        if (avoidValue) {
+          const filtered = pool.filter((entry) => {
+            if (!entry || !entry.label) return false;
+            return normalizeLabel(entry.label) !== avoidValue;
+          });
+          if (filtered.length) {
+            pool = filtered;
+          }
+        }
+        const choice = pool[Math.floor(Math.random() * pool.length)];
+        if (typeof window.getAccessibleColorEntry === "function") {
+          return window.getAccessibleColorEntry(choice.label, choice.color);
+        }
+        return choice;
+      }
+
       function pickItems(attempt = 0) {
         const options = getChallengeOptions(round);
         if (options && (options.misleadUniqueLabelsPerRound || options.textLabelUniquePerRound)) {
@@ -2021,6 +2097,9 @@ const revealInput = document.getElementById("revealTime");
         }
         if (options && options.textColorUniqueLabelsPerRound) {
           options._textColorUsedLabels = new Set();
+        }
+        if (options && options.backgroundColorUniqueLabelsPerRound) {
+          options._backgroundColorUsedLabels = new Set();
         }
         const stage = gameMode === "stages" && window.getStageConfig
           ? window.getStageConfig(stageState.index)
@@ -2355,6 +2434,41 @@ const revealInput = document.getElementById("revealTime");
               item.answer = next;
             }
             used.add(next);
+          });
+        }
+        if (options && options.textColorUniqueLabelsPerRound && Array.isArray(built)) {
+          const usedLabels =
+            options._textColorUsedLabels instanceof Set ? options._textColorUsedLabels : new Set();
+          usedLabels.clear();
+          const normalizeLabel = (value) => String(value || "").trim().toLowerCase();
+          const maxAttempts = 6;
+          built.forEach((item) => {
+            if (!item || !item.textColorLabel) return;
+            const currentLabel = normalizeLabel(item.textColorLabel);
+            if (!currentLabel) return;
+            if (!usedLabels.has(currentLabel)) {
+              usedLabels.add(currentLabel);
+              return;
+            }
+            const avoidHex = options.textColorAvoidCardBackground
+              ? (item.color || item.backgroundColorHex || getCardBackgroundHex())
+              : "";
+            let replacement = null;
+            for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+              const next = pickTextColor(usedLabels, avoidHex);
+              if (!next || !next.label) continue;
+              const nextLabel = normalizeLabel(next.label);
+              if (!nextLabel || usedLabels.has(nextLabel)) continue;
+              replacement = next;
+              break;
+            }
+            if (replacement) {
+              item.textColorLabel = replacement.label;
+              item.textColorHex = replacement.color;
+              usedLabels.add(normalizeLabel(replacement.label));
+            } else {
+              usedLabels.add(currentLabel);
+            }
           });
         }
         if (options && options.textColorNoAdjacent && Array.isArray(built) && built.length > 1) {
