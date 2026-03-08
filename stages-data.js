@@ -416,7 +416,7 @@
         mathMinCount: 1,
         mathMaxCount: 1,
       },
-      starTimes: { platinum: 5, gold: 7, silver: 10, bronze: 16 },
+      starTimes: { platinum: 6, gold: 7, silver: 10, bronze: 16 },
       instructions: window.stageInstructions[20] || []
     },
     {
