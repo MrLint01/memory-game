@@ -39,6 +39,7 @@
       const AUDIO_MUSIC_KEY = "flashRecallAudioMusicVolume";
       const AUDIO_EFFECTS_KEY = "flashRecallAudioEffectsVolume";
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
+      const SANDBOX_UNLOCK_CONFIRM_KEY = "flashRecallSandboxUnlockConfirm";
       const LEADERBOARDS_ENABLED_STORAGE_KEY = "flashRecallLeaderboardsEnabled";
       const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
       const ADAPTIVE_PROFILE_KEY = "flashRecallAdaptiveProfile";
@@ -245,6 +246,26 @@
 
       function isKnownAppearanceTheme(theme) {
         return ALL_APPEARANCE_THEMES.includes(theme);
+      }
+
+      function shouldConfirmSandboxUnlock() {
+        try {
+          return window.localStorage.getItem(SANDBOX_UNLOCK_CONFIRM_KEY) !== "skip";
+        } catch {
+          return true;
+        }
+      }
+
+      function setSandboxUnlockConfirmPreference(shouldAsk) {
+        try {
+          if (shouldAsk) {
+            window.localStorage.removeItem(SANDBOX_UNLOCK_CONFIRM_KEY);
+          } else {
+            window.localStorage.setItem(SANDBOX_UNLOCK_CONFIRM_KEY, "skip");
+          }
+        } catch {
+          // ignore storage errors
+        }
       }
 
       function syncAppearanceThemeControl(theme) {
@@ -4138,6 +4159,13 @@ function runFlashCountdown(onComplete) {
       const contentResetModal = document.getElementById("contentResetModal");
       const contentResetClose = document.getElementById("contentResetClose");
       const contentResetAcknowledge = document.getElementById("contentResetAcknowledge");
+      const sandboxUnlockModal = document.getElementById("sandboxUnlockModal");
+      const sandboxUnlockCopy = document.getElementById("sandboxUnlockCopy");
+      const sandboxUnlockClose = document.getElementById("sandboxUnlockClose");
+      const sandboxUnlockCancel = document.getElementById("sandboxUnlockCancel");
+      const sandboxUnlockConfirm = document.getElementById("sandboxUnlockConfirm");
+      const sandboxUnlockSkip = document.getElementById("sandboxUnlockSkip");
+      let pendingSandboxUnlockResolver = null;
       const closeContentResetNotice = (source) => {
         if (!contentResetModal) return;
         logUiInteraction("content_reset_notice_close", {
@@ -4161,6 +4189,63 @@ function runFlashCountdown(onComplete) {
         contentResetModal.addEventListener("click", (event) => {
           if (event.target === contentResetModal) {
             closeContentResetNotice("backdrop");
+          }
+        });
+      }
+
+      function resolveSandboxUnlockPrompt(confirmed) {
+        if (!pendingSandboxUnlockResolver) return;
+        const resolver = pendingSandboxUnlockResolver;
+        pendingSandboxUnlockResolver = null;
+        resolver(Boolean(confirmed));
+      }
+
+      function closeSandboxUnlockModal(confirmed) {
+        if (sandboxUnlockSkip) {
+          setSandboxUnlockConfirmPreference(!sandboxUnlockSkip.checked);
+        }
+        if (sandboxUnlockModal) {
+          setModalState(sandboxUnlockModal, false);
+        }
+        resolveSandboxUnlockPrompt(confirmed);
+      }
+
+      function promptSandboxUnlock(itemLabel, cost) {
+        if (!shouldConfirmSandboxUnlock()) {
+          return Promise.resolve(true);
+        }
+        if (!(sandboxUnlockModal && sandboxUnlockCopy)) {
+          return Promise.resolve(window.confirm(`Unlock ${itemLabel} for ${cost} stars?`));
+        }
+        if (sandboxUnlockSkip) {
+          sandboxUnlockSkip.checked = false;
+        }
+        sandboxUnlockCopy.textContent = `Unlock ${itemLabel} for ${cost} stars?`;
+        setModalState(sandboxUnlockModal, true);
+        return new Promise((resolve) => {
+          pendingSandboxUnlockResolver = resolve;
+        });
+      }
+
+      if (sandboxUnlockClose && sandboxUnlockModal) {
+        sandboxUnlockClose.addEventListener("click", () => {
+          closeSandboxUnlockModal(false);
+        });
+      }
+      if (sandboxUnlockCancel && sandboxUnlockModal) {
+        sandboxUnlockCancel.addEventListener("click", () => {
+          closeSandboxUnlockModal(false);
+        });
+      }
+      if (sandboxUnlockConfirm && sandboxUnlockModal) {
+        sandboxUnlockConfirm.addEventListener("click", () => {
+          closeSandboxUnlockModal(true);
+        });
+      }
+      if (sandboxUnlockModal) {
+        sandboxUnlockModal.addEventListener("click", (event) => {
+          if (event.target === sandboxUnlockModal) {
+            closeSandboxUnlockModal(false);
           }
         });
       }
@@ -4244,7 +4329,7 @@ function runFlashCountdown(onComplete) {
       }
 
       if (practiceModal) {
-        practiceModal.addEventListener("change", (event) => {
+        practiceModal.addEventListener("change", async (event) => {
           const target = event.target;
           if (!(target && target.matches("input[type=\"checkbox\"]"))) return;
           const error = document.getElementById("practiceTypeError");
@@ -4278,7 +4363,7 @@ function runFlashCountdown(onComplete) {
                 ? target.closest("label").querySelector(".label").textContent
                 : target.value || target.id;
             const itemLabel = String(labelSource || unlockKey || "this item").trim();
-            const confirmed = window.confirm(`Unlock ${itemLabel} for ${cost} stars?`);
+            const confirmed = await promptSandboxUnlock(itemLabel, cost);
             if (!confirmed) {
               target.checked = false;
               return;

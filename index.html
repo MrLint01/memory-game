@@ -482,6 +482,23 @@
         </div>
       </div>
     </div>
+    <div class="modal" id="sandboxUnlockModal" aria-hidden="true">
+      <div class="modal-card modal-card--muted modal-card--sandbox-unlock">
+        <button class="interrupt-close icon-button modal-close" id="sandboxUnlockClose" type="button" aria-label="Close">
+          <img class="action-icon" src="imgs/x_button.png" alt="" />
+        </button>
+        <h3>Unlock Sandbox Item</h3>
+        <p class="modal-note" id="sandboxUnlockCopy">Unlock this item for 0 stars?</p>
+        <label class="checkbox-inline sandbox-unlock-optout">
+          <input id="sandboxUnlockSkip" type="checkbox" />
+          Don't ask again
+        </label>
+        <div class="modal-actions">
+          <button id="sandboxUnlockCancel" class="secondary" type="button">Cancel</button>
+          <button id="sandboxUnlockConfirm" type="button">Unlock</button>
+        </div>
+      </div>
+    </div>
     <div class="flash-countdown" id="flashCountdown" aria-hidden="true">
       <div class="flash-countdown__num">3</div>
     </div>
