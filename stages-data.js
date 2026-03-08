@@ -388,7 +388,7 @@
       categories: ["diagonal"],
       cardCounts: {},
       modifiers: {},
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4, gold: 5, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[19] || []
     },
     {
@@ -396,23 +396,27 @@
       version: 1,
       name: "Stage 20",
       stageType: "challenge",
-      rounds: 2,
+      rounds: 1,
       cards: 4,
       uniqueCardTypesPerRound: true,
       noRepeatAcrossRounds: true,
       revealSeconds: 10,
       recallSeconds: 30,
       categories: ["numbers", "letters", "shapes", "colors", "diagonal"],
-      cardCounts: { diagonal: 1 },
+      cardCounts: { diagonal: 1, numbers: 1 },
       modifiers: {
         backgroundColor: true,
         backgroundColorChance: 1.0,
         backgroundColorMinCount: 2,
         backgroundColorMaxCount: 2,
         backgroundPromptMinCount: 1,
-        backgroundPromptMaxCount: 2
+        backgroundPromptMaxCount: 2,
+        mathOps: true,
+        mathChance: 1.0,
+        mathMinCount: 1,
+        mathMaxCount: 1,
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 5, gold: 7, silver: 10, bronze: 16 },
       instructions: window.stageInstructions[20] || []
     },
     {
