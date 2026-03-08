@@ -4368,6 +4368,15 @@ body.stage-fail .rotation-icon {
   object-fit: contain;
   display: block;
 }
+.cat-image {
+  width: 100%;
+  height: 100%;
+  max-width: 108px;
+  max-height: 108px;
+  object-fit: cover;
+  display: block;
+  border-radius: 0.7rem;
+}
 .ref-fruit img {
   width: 45px;
   height: 45px;

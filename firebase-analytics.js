@@ -69,6 +69,7 @@ const CHALLENGE_ICON_SRC = "imgs/icons/challenge-icon.svg";
 const SANDBOX_ICON_SRC = "imgs/icons/sand-icon.svg";
 const CONTRAST_ICON_SRC = "imgs/icons/contrast-icon.svg";
 const DOOR_KEY_ICON_SRC = "imgs/icons/door-key-icon.svg";
+const CAT_ICON_SRC = "imgs/icons/cat-animal-icon.svg";
 const ACHIEVEMENT_CARD_TYPE_META = {
   numbers: { label: "Numbers", noun: "number cards", short: "NUM", iconSrc: "imgs/icons/card-numbers.svg" },
   letters: { label: "Letters", noun: "letter cards", short: "LET", iconSrc: "imgs/icons/card-letters.svg" },
@@ -211,6 +212,7 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "sandbox_complete_1000", title: "Sandbox Clear IV", description: "Complete 1000 Sandbox levels.", iconSrc: SANDBOX_ICON_SRC, iconBadge: "IV" },
   { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconSrc: CONTRAST_ICON_SRC },
   { id: "secret_any_key", title: "Any Key Means Enter", description: "Type 'Any Key' on the splash screen, then press Enter.", iconSrc: DOOR_KEY_ICON_SRC, secret: true },
+  { id: "secret_cat", title: "Cat", description: "Find a rare cat card.", iconSrc: CAT_ICON_SRC, secret: true },
   { id: "secret_prism_parade", title: "Prism Parade", description: "Find the hidden rainbow theme through Shuffle Theme.", iconSrc: RAINBOW_ICON_SRC, secret: true },
   { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "\u2605\u2605\u2605\u2605", secret: true },
   { id: "secret_stars_total_200", title: "Hidden Galaxy", description: "Collect 200 stars.", iconText: "200\u2605", secret: true }
@@ -549,6 +551,7 @@ function getDefaultAchievementProfile() {
     challenge_completed_count: 0,
     any_key_secret: false,
     prism_parade_found: false,
+    cat_found: false,
     total_stars: 0,
     total_time_seconds: 0,
     max_stars_on_level: 0,
@@ -593,6 +596,7 @@ function normalizeAchievementProfile(raw) {
   base.challenge_completed_count = Math.max(0, Number(source.challenge_completed_count) || 0);
   base.any_key_secret = Boolean(source.any_key_secret);
   base.prism_parade_found = Boolean(source.prism_parade_found);
+  base.cat_found = Boolean(source.cat_found);
   base.total_stars = Math.max(0, Number(source.total_stars) || 0);
   base.total_time_seconds = Math.max(0, Number(source.total_time_seconds) || 0);
   base.max_stars_on_level = Math.max(0, Number(source.max_stars_on_level) || 0);
@@ -759,6 +763,7 @@ function normalizeAchievementUpdate(update = {}) {
     challengeCompletedCount: null,
     anyKeySecret: false,
     prismParadeFound: false,
+    catFound: false,
     totalStars: null,
     totalTimeSeconds: null,
     maxStarsOnLevel: null,
@@ -794,6 +799,7 @@ function normalizeAchievementUpdate(update = {}) {
     : null;
   base.anyKeySecret = Boolean(update.anyKeySecret);
   base.prismParadeFound = Boolean(update.prismParadeFound);
+  base.catFound = Boolean(update.catFound);
   base.totalStars = Number.isFinite(Number(update.totalStars)) ? Math.max(0, Number(update.totalStars)) : null;
   base.totalTimeSeconds = Number.isFinite(Number(update.totalTimeSeconds)) ? Math.max(0, Number(update.totalTimeSeconds)) : null;
   base.maxStarsOnLevel = Number.isFinite(Number(update.maxStarsOnLevel)) ? Math.max(0, Number(update.maxStarsOnLevel)) : null;
@@ -877,6 +883,7 @@ function mergeAchievementUpdateInputs(...updates) {
     merged.sandboxPlayed = merged.sandboxPlayed || update.sandboxPlayed;
     merged.anyKeySecret = merged.anyKeySecret || update.anyKeySecret;
     merged.prismParadeFound = merged.prismParadeFound || update.prismParadeFound;
+    merged.catFound = merged.catFound || update.catFound;
     merged.completedFlashLevel = merged.completedFlashLevel || update.completedFlashLevel;
     merged.completedStage67 = merged.completedStage67 || update.completedStage67;
     merged.themeChanged = merged.themeChanged || update.themeChanged;
@@ -964,6 +971,7 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   }
   next.any_key_secret = next.any_key_secret || normalized.anyKeySecret;
   next.prism_parade_found = next.prism_parade_found || normalized.prismParadeFound;
+  next.cat_found = next.cat_found || normalized.catFound;
   if (Number.isFinite(normalized.totalStars)) {
     next.total_stars = Math.max(next.total_stars, normalized.totalStars);
   }
@@ -1035,6 +1043,7 @@ function getAchievementUnlockIds(profile) {
   if (profile.sandbox_completed_count >= 100) unlocks.push("sandbox_complete_100");
   if (profile.sandbox_completed_count >= 1000) unlocks.push("sandbox_complete_1000");
   if (profile.any_key_secret) unlocks.push("secret_any_key");
+  if (profile.cat_found) unlocks.push("secret_cat");
   if (profile.prism_parade_found) unlocks.push("secret_prism_parade");
   if (profile.flash_completed_count >= 1) unlocks.push("complete_flash_1");
   if (profile.flash_completed_count >= 10) unlocks.push("complete_flash_10");
@@ -1138,6 +1147,7 @@ async function applyAchievementUpdate(update = {}) {
         challenge_completed_count: nextProfile.challenge_completed_count,
         any_key_secret: nextProfile.any_key_secret,
         prism_parade_found: nextProfile.prism_parade_found,
+        cat_found: nextProfile.cat_found,
         total_stars: nextProfile.total_stars,
         total_time_seconds: nextProfile.total_time_seconds,
         max_stars_on_level: nextProfile.max_stars_on_level,
@@ -2508,6 +2518,13 @@ window.recordSecretRainbowThemeFound = async () => {
   await applyAchievementUpdate({
     playerName: getDisplayNameFallback(),
     prismParadeFound: true,
+    totalStages: getTotalStagesCount()
+  });
+};
+window.recordCatSecretFound = async () => {
+  await applyAchievementUpdate({
+    playerName: getDisplayNameFallback(),
+    catFound: true,
     totalStages: getTotalStagesCount()
   });
 };

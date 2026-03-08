@@ -257,6 +257,12 @@
       }
 
       function buildExpectedLabel(item) {
+        if (item && item.specialType === "cat") {
+          return {
+            label: "Cat",
+            answer: "cat"
+          };
+        }
         if (item.category === "numbers" && item.recallHint) {
           return {
             label: item.recallHint,
