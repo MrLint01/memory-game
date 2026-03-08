@@ -886,7 +886,7 @@ body.resetting .splash-loading__text {
   display: none !important;
 }
       .control-group label {
-        font-weight: 600;
+        font-weight: 700;
         font-size: 0.92rem;
         color: var(--ink);
       }
@@ -2090,8 +2090,8 @@ body[data-state="paused"] .hud-pause {
         place-items: center;
         text-align: center;
         font-size: 2.2rem;
-        font-weight: 400;
-        font-family: var(--font-display);
+        font-weight: 700;
+        font-family: "Anton", var(--font-display), "Trebuchet MS", sans-serif;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: var(--card-ink);

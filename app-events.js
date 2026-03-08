@@ -73,7 +73,8 @@
           : fallbackAppearance.colorVisionModes,
         layouts: Array.isArray(defaultAppearance.layouts) && defaultAppearance.layouts.length
           ? defaultAppearance.layouts
-          : fallbackAppearance.layouts
+          : fallbackAppearance.layouts,
+        
       };
       const defaultKeybinds = {
         retry: "r",
@@ -4679,14 +4680,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
-
-
-
-
-
-
 
 
 
