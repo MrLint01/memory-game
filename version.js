@@ -1,5 +1,6 @@
 (function () {
   var version = "2026.03.0";
+  var contentResetVersion = "2026.03.0-stage-reset-1";
   var host = String(window.location.hostname || "").toLowerCase();
   var channel = "custom";
 
@@ -14,4 +15,6 @@
   window.FLASH_RECALL_VERSION = version;
   window.FLASH_RECALL_RELEASE_CHANNEL = channel;
   window.FLASH_RECALL_BUILD_ID = version + "-" + channel;
+  window.FLASH_RECALL_CONTENT_RESET_VERSION = contentResetVersion;
+  window.FLASH_RECALL_PROGRESS_LEADERBOARD_VERSION = contentResetVersion;
 })();

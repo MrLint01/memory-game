@@ -155,6 +155,23 @@ def add_player_id_to_attempts(attempts: pd.DataFrame, sessions: pd.DataFrame) ->
     return out
 
 
+def add_player_id_to_events(events: pd.DataFrame, sessions: pd.DataFrame) -> pd.DataFrame:
+    out = add_session_key(events.copy())
+    out["player_id_norm"] = pd.NA
+    e_player_col = pick_player_column(out)
+    if e_player_col is not None:
+        out["player_id_norm"] = out[e_player_col].astype(str)
+    if out["player_id_norm"].isna().all():
+        s_player_col = pick_player_column(sessions)
+        if s_player_col is not None and not sessions.empty:
+            s_map = add_session_key(sessions.copy())
+            s_map = s_map.dropna(subset=["session_key", s_player_col]).drop_duplicates(subset=["session_key"])
+            lookup = s_map.set_index("session_key")[s_player_col].astype(str)
+            out["player_id_norm"] = out["session_key"].map(lookup)
+    out["player_id_norm"] = out["player_id_norm"].replace({"nan": pd.NA, "none": pd.NA, "null": pd.NA, "": pd.NA})
+    return out
+
+
 def infer_currently_playing_players(sessions: pd.DataFrame, stale_minutes: int = 30) -> pd.Series:
     """Infer players likely still in-progress from their latest session row."""
     pcol = pick_player_column(sessions)
@@ -277,6 +294,300 @@ def save_hist_values(values: pd.Series, path: Path, title: str, xlabel: str, bin
     plt.tight_layout()
     plt.savefig(path, dpi=120)
     plt.close()
+
+
+def save_stacked_bar(frame: pd.DataFrame, path: Path, title: str, xlabel: str, ylabel: str) -> None:
+    if frame.empty:
+        return
+    plt.figure(figsize=(10, 6))
+    frame.plot(kind="bar", stacked=True, ax=plt.gca())
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.tight_layout()
+    plt.savefig(path, dpi=120)
+    plt.close()
+
+
+def save_grouped_bar(frame: pd.DataFrame, path: Path, title: str, xlabel: str, ylabel: str, ylim: Optional[tuple[float, float]] = None) -> None:
+    if frame.empty:
+        return
+    plt.figure(figsize=(10, 6))
+    frame.plot(kind="bar", ax=plt.gca())
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.tight_layout()
+    plt.savefig(path, dpi=120)
+    plt.close()
+
+
+def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataFrame, events: pd.DataFrame, outdir: Path, summary: list[str]) -> None:
+    if events.empty and sessions.empty:
+        return
+
+    feature_dir = outdir / "feature_usage"
+    feature_dir.mkdir(parents=True, exist_ok=True)
+
+    events_with_player = add_player_id_to_events(events, sessions) if not events.empty else pd.DataFrame()
+    total_players = 0
+    player_sets: list[set[str]] = []
+    for df in [attempts_with_player, events_with_player, sessions]:
+        pcol = "player_id_norm" if "player_id_norm" in df.columns else pick_player_column(df)
+        if pcol and not df.empty:
+            player_sets.append(set(df[pcol].dropna().astype(str).tolist()))
+    if player_sets:
+        total_players = len(set().union(*player_sets))
+    summary.append(f"feature_usage_total_players: {int(total_players)}")
+
+    if not events_with_player.empty and "event_type" in events_with_player.columns:
+        events_with_player["event_type_norm"] = events_with_player["event_type"].astype(str).str.strip().str.lower()
+        event_time = pd.to_numeric(events_with_player.get("client_timestamp_ms"), errors="coerce")
+        if "event_timestamp" in events_with_player.columns:
+            fallback = pd.to_datetime(events_with_player["event_timestamp"], utc=True, errors="coerce")
+            event_time = event_time.fillna((fallback.astype("int64") / 1_000_000).where(fallback.notna(), np.nan))
+        events_with_player["event_time_ms"] = event_time
+
+        ui = events_with_player[events_with_player["event_type_norm"] == "ui_interaction"].copy()
+        if not ui.empty:
+            home = ui[ui["area"].astype(str) == "home_menu"].copy() if "area" in ui.columns else pd.DataFrame()
+            if not home.empty and "target" in home.columns:
+                home_counts = home.groupby("target")["player_id_norm"].nunique().sort_values(ascending=False)
+                save_bar(home_counts, feature_dir / "home_menu_feature_usage.png", "Home Menu Feature Usage", "Button", "Unique Players")
+                home_counts.rename("unique_players").to_csv(feature_dir / "home_menu_feature_usage.csv")
+
+            if "target" in ui.columns:
+                ui_counts_all = ui.groupby("target")["player_id_norm"].nunique().sort_values(ascending=False)
+                ui_counts_all.rename("unique_players").to_csv(feature_dir / "ui_feature_usage.csv")
+                ui_counts = ui_counts_all.head(20)
+                save_bar(ui_counts, feature_dir / "ui_feature_usage_top20.png", "UI Feature Usage (Top 20)", "Target", "Unique Players")
+
+                major_targets = [
+                    "play_start",
+                    "practice_start",
+                    "stages_open",
+                    "settings_open",
+                    "achievements_open",
+                    "stats_open",
+                    "stats_leaderboard_open",
+                    "reference_open",
+                    "stage_leaderboard_open",
+                    "fullscreen_toggle",
+                ]
+                major_counts = ui_counts_all.reindex([t for t in major_targets if t in ui_counts_all.index]).dropna()
+                if not major_counts.empty:
+                    save_bar(
+                        major_counts,
+                        feature_dir / "major_feature_usage.png",
+                        "Major Feature Usage",
+                        "Feature",
+                        "Unique Players",
+                    )
+
+            stats_tabs = ui[ui["target"].astype(str).isin(["stats_leaderboard_view", "stats_leaderboard_tab_view"])].copy()
+            if not stats_tabs.empty and "leaderboard_metric" in stats_tabs.columns:
+                tab_counts = stats_tabs.groupby("leaderboard_metric")["player_id_norm"].nunique().sort_values(ascending=False)
+                save_bar(tab_counts, feature_dir / "stats_leaderboard_tab_usage.png", "Stats Leaderboard Tabs Viewed", "Leaderboard", "Unique Players")
+                tab_counts.rename("unique_players").to_csv(feature_dir / "stats_leaderboard_tab_usage.csv")
+
+        settings_events = events_with_player[events_with_player["event_type_norm"] == "settings_change"].copy()
+        if not settings_events.empty and "setting_name" in settings_events.columns:
+            settings_use = settings_events.groupby("setting_name")["player_id_norm"].nunique().sort_values(ascending=False)
+            save_bar(settings_use, feature_dir / "settings_change_usage.png", "Players Who Changed Each Setting", "Setting", "Unique Players")
+            settings_use.rename("unique_players").to_csv(feature_dir / "settings_change_usage.csv")
+
+        settings_snapshots = events_with_player[events_with_player["event_type_norm"] == "settings_snapshot"].copy()
+        if not settings_snapshots.empty:
+            settings_snapshots = settings_snapshots.dropna(subset=["player_id_norm"]).sort_values("event_time_ms", na_position="last")
+            latest_settings = settings_snapshots.groupby("player_id_norm", as_index=False).tail(1)
+            latest_settings.to_csv(feature_dir / "latest_player_settings.csv", index=False)
+            bool_cols = [
+                "fullscreen_enabled",
+                "success_animation_enabled",
+                "flash_countdown_enabled",
+                "auto_advance_next_enabled",
+                "auto_start_stage_preview_enabled",
+                "enter_to_next_enabled",
+                "flash_warning_enabled",
+                "leaderboards_enabled",
+            ]
+            available_bool_cols = [col for col in bool_cols if col in latest_settings.columns]
+            if available_bool_cols:
+                bool_pct = pd.Series(
+                    {
+                        col: float(bool_series(latest_settings[col]).mean() * 100.0)
+                        for col in available_bool_cols
+                    }
+                ).sort_values(ascending=False)
+                save_bar(bool_pct, feature_dir / "settings_enabled_percent.png", "Percent of Players With Each Setting Enabled", "Setting", "Percent Enabled", (0, 100))
+                bool_pct.rename("percent_enabled").to_csv(feature_dir / "settings_enabled_percent.csv")
+
+            if "theme_id" in latest_settings.columns:
+                theme_counts = latest_settings["theme_id"].astype(str).replace({"": pd.NA, "nan": pd.NA}).dropna().value_counts().head(15)
+                save_bar(theme_counts.sort_values(ascending=False), feature_dir / "theme_usage.png", "Theme Usage", "Theme", "Players")
+                theme_counts.rename("players").to_csv(feature_dir / "theme_usage.csv")
+
+            if "color_vision_mode" in latest_settings.columns:
+                cv_counts = latest_settings["color_vision_mode"].astype(str).replace({"": pd.NA, "nan": pd.NA}).dropna().value_counts()
+                save_bar(cv_counts.sort_values(ascending=False), feature_dir / "color_vision_usage.png", "Color Vision Mode Usage", "Mode", "Players")
+                cv_counts.rename("players").to_csv(feature_dir / "color_vision_usage.csv")
+
+            for keybind_col in [
+                "keybind_retry",
+                "keybind_stage_next",
+                "keybind_stage_quit",
+                "keybind_practice_home",
+                "keybind_practice_settings",
+                "keybind_fullscreen",
+            ]:
+                if keybind_col in latest_settings.columns:
+                    keybind_counts = latest_settings[keybind_col].astype(str).replace({"": pd.NA, "nan": pd.NA}).dropna().value_counts()
+                    save_bar(
+                        keybind_counts.sort_values(ascending=False),
+                        feature_dir / f"{keybind_col}_usage.png",
+                        f"{keybind_col.replace('_', ' ').title()} Usage",
+                        "Key",
+                        "Players",
+                    )
+                    keybind_counts.rename("players").to_csv(feature_dir / f"{keybind_col}_usage.csv")
+
+        autoplay = events_with_player[events_with_player["event_type_norm"] == "autoplay_event"].copy()
+        if not autoplay.empty and {"target", "autoplay_mode"} <= set(autoplay.columns):
+            autoplay["label"] = autoplay["target"].astype(str) + " | " + autoplay["autoplay_mode"].astype(str)
+            autoplay_counts = autoplay.groupby("label")["player_id_norm"].nunique().sort_values(ascending=False)
+            save_bar(autoplay_counts, feature_dir / "autoplay_usage.png", "Autoplay Interaction Usage", "Autoplay Event", "Unique Players")
+            autoplay_counts.rename("unique_players").to_csv(feature_dir / "autoplay_usage.csv")
+            autoplay_event_counts = autoplay["label"].value_counts().sort_values(ascending=False)
+            save_bar(autoplay_event_counts, feature_dir / "autoplay_event_counts.png", "Autoplay Event Counts", "Autoplay Event", "Event Count")
+            autoplay_event_counts.rename("event_count").to_csv(feature_dir / "autoplay_event_counts.csv")
+
+        quit_events = events_with_player[events_with_player["event_type_norm"] == "quit_reason"].copy()
+        if not quit_events.empty:
+            quit_events = add_session_key(quit_events)
+            quit_latest = quit_events.sort_values("event_time_ms", na_position="last").groupby("session_key", as_index=False).tail(1)
+            bucket_col = "quit_bucket" if "quit_bucket" in quit_latest.columns else "reason"
+            quit_counts = quit_latest[bucket_col].astype(str).replace({"": pd.NA, "nan": pd.NA}).dropna().value_counts()
+            save_bar(quit_counts, feature_dir / "quit_bucket_distribution.png", "Quit Distribution", "Quit Bucket", "Sessions")
+            quit_counts.rename("sessions").to_csv(feature_dir / "quit_bucket_distribution.csv")
+
+            if "adaptive_group" in quit_latest.columns:
+                adaptive_quit = (
+                    quit_latest[quit_latest["adaptive_group"].astype(str).isin(["A", "B"])]
+                    .groupby(["adaptive_group", bucket_col])
+                    .size()
+                    .unstack(fill_value=0)
+                    .sort_index()
+                )
+                save_stacked_bar(
+                    adaptive_quit,
+                    feature_dir / "adaptive_group_quit_buckets.png",
+                    "Quit Buckets by Adaptive Group",
+                    "Adaptive Group",
+                    "Sessions",
+                )
+
+    if not sessions.empty:
+        if {"fullscreen_total_seconds", "total_playtime_seconds"} <= set(sessions.columns):
+            total = pd.to_numeric(sessions["total_playtime_seconds"], errors="coerce")
+            fullscreen = pd.to_numeric(sessions["fullscreen_total_seconds"], errors="coerce")
+            ratio = ((fullscreen / total.replace(0, np.nan)) * 100.0).replace([np.inf, -np.inf], np.nan).dropna()
+            save_hist_values(
+                ratio,
+                feature_dir / "fullscreen_time_share_hist.png",
+                "Percent of Playtime Spent in Fullscreen",
+                "Fullscreen Share (%)",
+                bins=20,
+            )
+
+        if "adaptive_group" in sessions.columns:
+            adaptive_sessions = sessions[sessions["adaptive_group"].astype(str).isin(["A", "B"])].copy()
+            if not adaptive_sessions.empty:
+                avg_playtime = adaptive_sessions.groupby("adaptive_group")["total_playtime_seconds"].mean().sort_index()
+                save_bar(avg_playtime, feature_dir / "adaptive_group_avg_playtime.png", "Average Playtime by Adaptive Group", "Adaptive Group", "Seconds")
+                avg_level = adaptive_sessions.groupby("adaptive_group")["last_level_completed"].mean().sort_index()
+                save_bar(avg_level, feature_dir / "adaptive_group_avg_last_level.png", "Average Last Level Completed by Adaptive Group", "Adaptive Group", "Level")
+                avg_playtime.rename("avg_playtime_seconds").to_csv(feature_dir / "adaptive_group_avg_playtime.csv")
+                avg_level.rename("avg_last_level_completed").to_csv(feature_dir / "adaptive_group_avg_last_level.csv")
+
+                player_col = pick_player_column(adaptive_sessions)
+                if player_col:
+                    adaptive_sessions["reached_level_3"] = pd.to_numeric(adaptive_sessions["last_level_completed"], errors="coerce").fillna(0) >= 3
+                    level3_pct = adaptive_sessions.groupby("adaptive_group")["reached_level_3"].mean().mul(100.0).sort_index()
+                    save_bar(level3_pct, feature_dir / "adaptive_group_reached_level3_percent.png", "Percent Reaching Level 3 by Adaptive Group", "Adaptive Group", "Percent", (0, 100))
+                    level3_pct.rename("percent").to_csv(feature_dir / "adaptive_group_reached_level3_percent.csv")
+
+                    adaptive_ts = pd.Series(pd.NaT, index=adaptive_sessions.index, dtype="datetime64[ns, UTC]")
+                    for col in ["started_at", "created_at", "updated_at"]:
+                        if col in adaptive_sessions.columns:
+                            adaptive_ts = adaptive_ts.combine_first(pd.to_datetime(adaptive_sessions[col], utc=True, errors="coerce"))
+                    if player_col and adaptive_ts.notna().any():
+                        adaptive_sessions = adaptive_sessions.copy()
+                        adaptive_sessions["player_id_norm"] = adaptive_sessions[player_col].astype(str)
+                        adaptive_sessions["session_ts"] = adaptive_ts
+                        adaptive_sessions = adaptive_sessions.dropna(subset=["player_id_norm", "session_ts"]).sort_values("session_ts")
+
+                        first_group = adaptive_sessions.groupby("player_id_norm", as_index=False).head(1).copy()
+                        first_group = first_group[["player_id_norm", "adaptive_group", "session_ts"]]
+                        first_group = first_group.rename(columns={"session_ts": "group_assigned_ts"})
+
+                        all_sessions = sessions.copy()
+                        all_player_col = pick_player_column(all_sessions)
+                        all_ts = pd.Series(pd.NaT, index=all_sessions.index, dtype="datetime64[ns, UTC]")
+                        for col in ["started_at", "created_at", "updated_at"]:
+                            if col in all_sessions.columns:
+                                all_ts = all_ts.combine_first(pd.to_datetime(all_sessions[col], utc=True, errors="coerce"))
+                        if all_player_col and all_ts.notna().any():
+                            all_sessions["player_id_norm"] = all_sessions[all_player_col].astype(str)
+                            all_sessions["session_ts"] = all_ts
+                            all_sessions = all_sessions.dropna(subset=["player_id_norm", "session_ts"]).copy()
+
+                            player_summary = first_group.copy()
+                            merged = all_sessions.merge(first_group, on="player_id_norm", how="inner")
+                            merged["day_delta"] = (
+                                merged["session_ts"].dt.floor("D") - merged["group_assigned_ts"].dt.floor("D")
+                            ).dt.days
+                            merged["is_return_session"] = merged["day_delta"] >= 1
+
+                            player_summary["sessions_after_assignment"] = player_summary["player_id_norm"].map(
+                                merged[merged["is_return_session"]].groupby("player_id_norm").size()
+                            ).fillna(0).astype(int)
+                            for days in [1, 3, 7]:
+                                returned = (
+                                    merged[(merged["day_delta"] >= 1) & (merged["day_delta"] <= days)]
+                                    .groupby("player_id_norm")
+                                    .size()
+                                    .gt(0)
+                                )
+                                player_summary[f"returned_within_{days}d"] = player_summary["player_id_norm"].map(returned).fillna(False)
+
+                            player_summary.to_csv(feature_dir / "adaptive_group_player_retention.csv", index=False)
+
+                            retention_rows: list[dict[str, Any]] = []
+                            for group, group_rows in player_summary.groupby("adaptive_group"):
+                                denom = len(group_rows)
+                                if denom <= 0:
+                                    continue
+                                for days in [1, 3, 7]:
+                                    returned_pct = float(group_rows[f"returned_within_{days}d"].mean() * 100.0)
+                                    retention_rows.append({
+                                        "adaptive_group": group,
+                                        "window": f"within_{days}d",
+                                        "percent": returned_pct,
+                                    })
+                            if retention_rows:
+                                retention_df = pd.DataFrame(retention_rows)
+                                retention_df.to_csv(feature_dir / "adaptive_group_retention_windows.csv", index=False)
+                                retention_plot = retention_df.pivot(index="window", columns="adaptive_group", values="percent").sort_index()
+                                save_grouped_bar(
+                                    retention_plot,
+                                    feature_dir / "adaptive_group_retention_windows.png",
+                                    "Adaptive Group Return Within N Days",
+                                    "Window",
+                                    "Percent of Players",
+                                    (0, 100),
+                                )
 
 
 def attempts_before_first_pass(passed_series: pd.Series) -> int:
@@ -1668,6 +1979,7 @@ def main() -> None:
         summary.append("sandbox_time_seconds_observed: n/a")
     # Add after the sandbox analysis and before the final summary write
     analyze_level_dropoff_metrics(attempts_with_player, player_highest_completed, args.outdir)
+    analyze_feature_usage(sessions, attempts_with_player, events, args.outdir, summary)
 
     (args.outdir / "summary.txt").write_text("\n".join(summary) + "\n", encoding="utf-8")
     if not sessions.empty:

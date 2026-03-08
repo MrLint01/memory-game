@@ -48,10 +48,127 @@
     stageRoundOverrideLastRound = null;
   };
   const progressKey = "flashRecallStageProgress";
+  const statsKey = "flashRecallStats";
+  const playerNameKey = "flashRecallPlayerName";
+  const playerNamePromptKey = "flashRecallPlayerNamePrompted";
+  const splashSeenKey = "flashRecallSplashSeen";
+  const contentResetVersion = window.FLASH_RECALL_CONTENT_RESET_VERSION || "";
+  const contentResetStorageKey = "flashRecallContentResetVersion";
   window.stagesConfig = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
   window.stageStars = {};
   window.stageBestTimes = {};
   window.stageCompleted = {};
+
+  function safeGetStorageItem(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function safeSetStorageItem(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function safeRemoveStorageItem(key) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {}
+  }
+
+  function clearStorageKeysWithPrefix(prefix) {
+    try {
+      const keys = [];
+      for (let i = 0; i < window.localStorage.length; i += 1) {
+        const key = window.localStorage.key(i);
+        if (key && key.indexOf(prefix) === 0) {
+          keys.push(key);
+        }
+      }
+      keys.forEach((key) => {
+        window.localStorage.removeItem(key);
+      });
+    } catch (error) {}
+  }
+
+  function parseJsonStorage(key) {
+    const raw = safeGetStorageItem(key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function hasMeaningfulStageProgress(payload) {
+    if (!payload || typeof payload !== "object") return false;
+    const stars = payload.stars && typeof payload.stars === "object" ? payload.stars : {};
+    const completed = payload.completed && typeof payload.completed === "object" ? payload.completed : {};
+    const bestTimes = payload.bestTimes && typeof payload.bestTimes === "object" ? payload.bestTimes : {};
+    return Object.values(stars).some((value) => Number(value) > 0)
+      || Object.values(completed).some(Boolean)
+      || Object.values(bestTimes).some((value) => Number.isFinite(Number(value)));
+  }
+
+  function hasMeaningfulLifetimeStats(payload) {
+    if (!payload || typeof payload !== "object") return false;
+    return [
+      payload.totalSeconds,
+      payload.totalCards,
+      payload.totalLevelAttempts,
+      payload.totalLevelSuccesses,
+      payload.failedLevelCount,
+      payload.sandboxCompletedCount,
+      payload.flashCompletedCount,
+      payload.tutorialCompletedCount,
+      payload.challengeCompletedCount
+    ].some((value) => Number(value) > 0);
+  }
+
+  function applyContentResetIfNeeded() {
+    if (!contentResetVersion) return;
+    const storedResetVersion = safeGetStorageItem(contentResetStorageKey);
+    if (storedResetVersion === contentResetVersion) {
+      return;
+    }
+
+    const storedProgress = parseJsonStorage(progressKey);
+    const storedStats = parseJsonStorage(statsKey);
+    const storedPlayerName = safeGetStorageItem(playerNameKey);
+    const wasPromptedForName = safeGetStorageItem(playerNamePromptKey) === "1";
+    const hadSeenSplash = safeGetStorageItem(splashSeenKey) === "1";
+    const isReturningPlayer = hasMeaningfulStageProgress(storedProgress)
+      || hasMeaningfulLifetimeStats(storedStats)
+      || Boolean(storedPlayerName)
+      || wasPromptedForName
+      || hadSeenSplash;
+
+    if (!isReturningPlayer) {
+      safeSetStorageItem(contentResetStorageKey, contentResetVersion);
+      return;
+    }
+
+    window.stageStars = {};
+    window.stageBestTimes = {};
+    window.stageCompleted = {};
+    safeRemoveStorageItem(progressKey);
+    safeRemoveStorageItem(statsKey);
+    clearStorageKeysWithPrefix("flashRecallLeaderboardSynced_");
+    clearStorageKeysWithPrefix("flashRecallLeaderboardReadBudget_");
+    safeSetStorageItem(contentResetStorageKey, contentResetVersion);
+
+    window.__flashRecallContentResetNotice = {
+      resetVersion: contentResetVersion,
+      playerName: String(storedPlayerName || "")
+    };
+  }
 
   function loadStageProgress() {
     try {
@@ -122,9 +239,15 @@
       console.warn("Failed to save stage progress", error);
     }
   }
+  applyContentResetIfNeeded();
   loadStageProgress();
 
   window.saveStageProgress = saveStageProgress;
+  window.consumeContentResetNotice = function consumeContentResetNotice() {
+    const notice = window.__flashRecallContentResetNotice || null;
+    window.__flashRecallContentResetNotice = null;
+    return notice;
+  };
 
   window.getStageVersion = function getStageVersion(stage) {
     const version = stage && Number(stage.version);

@@ -457,6 +457,36 @@
         }
       }
 
+      function getPreferredPlayerDisplayName(preferredName = "") {
+        const direct = normalizePlayerName(preferredName);
+        if (direct) return direct;
+        const local = getPlayerName();
+        if (local) return local;
+        if (typeof window.getLeaderboardDisplayName === "function") {
+          const fallback = normalizePlayerName(window.getLeaderboardDisplayName());
+          if (fallback) return fallback;
+        }
+        return "Player";
+      }
+
+      function showContentResetNoticeIfNeeded() {
+        if (typeof window.consumeContentResetNotice !== "function") return;
+        const notice = window.consumeContentResetNotice();
+        if (!notice) return;
+        const modal = document.getElementById("contentResetModal");
+        const titleEl = document.getElementById("contentResetTitle");
+        if (!modal) return;
+        const playerName = getPreferredPlayerDisplayName(notice && notice.playerName ? notice.playerName : "");
+        if (titleEl) {
+          titleEl.textContent = `Hey ${playerName}!`;
+        }
+        logUiInteraction("content_reset_notice_open", {
+          area: "content_reset_modal",
+          action: "open"
+        });
+        setModalState(modal, true);
+      }
+
       function closePlayerNameModal() {
         setModalState(playerNameModal, false);
         clearPlayerNameDelay();
@@ -517,6 +547,118 @@
         if (!row) return;
         if (shouldShowPlayerNameSetting()) row.removeAttribute("hidden");
       }
+
+      function getTelemetrySettingsSnapshot() {
+        return {
+          theme_id: String(document.body && document.body.dataset ? document.body.dataset.theme || "" : ""),
+          color_vision_mode: String(document.body && document.body.dataset ? document.body.dataset.colorVision || "" : ""),
+          layout_mode: String(document.body && document.body.dataset ? document.body.dataset.layout || "" : "classic"),
+          fullscreen_enabled: Boolean(document.fullscreenElement),
+          success_animation_enabled: Boolean(successAnimationEnabled),
+          flash_countdown_enabled: Boolean(flashCountdownEnabled),
+          auto_advance_next_enabled: Boolean(autoAdvanceNextEnabled),
+          auto_start_stage_preview_enabled: Boolean(stageIntroAutoStartEnabled),
+          enter_to_next_enabled: Boolean(enterToNextEnabled),
+          flash_warning_enabled: Boolean(flashWarningEnabled),
+          leaderboards_enabled: Boolean(leaderboardsEnabled),
+          keybind_retry: keybinds.retry || defaultKeybinds.retry,
+          keybind_stage_next: keybinds.stageNext || defaultKeybinds.stageNext,
+          keybind_stage_quit: keybinds.stageQuit || defaultKeybinds.stageQuit,
+          keybind_practice_home: keybinds.practiceHome || defaultKeybinds.practiceHome,
+          keybind_practice_settings: keybinds.practiceSettings || defaultKeybinds.practiceSettings,
+          keybind_fullscreen: keybinds.fullscreen || defaultKeybinds.fullscreen
+        };
+      }
+
+      function getTelemetryUiContext() {
+        const activeContext = typeof window.getActiveLevelContext === "function"
+          ? window.getActiveLevelContext()
+          : null;
+        const hasStageIndex = stageState && Number.isFinite(stageState.index);
+        const view = String(document.body && document.body.dataset ? document.body.dataset.view || "" : "");
+        const state = String(document.body && document.body.dataset ? document.body.dataset.state || phase || "" : phase || "");
+        const isReferenceOpen = Boolean(referenceModal && referenceModal.classList.contains("show"));
+        const isStagePreviewOpen = Boolean(stageIntroModal && stageIntroModal.classList.contains("show"));
+        const isStageLeaderboardOpen = Boolean(leaderboardModal && leaderboardModal.classList.contains("show"));
+        const isSettingsOpen = Boolean(settingsModal && settingsModal.classList.contains("show"));
+        const isStatsOpen = Boolean(statsModal && statsModal.classList.contains("show"));
+        const isAchievementsOpen = Boolean(achievementsModal && achievementsModal.classList.contains("show"));
+        const isStatsLeaderboardOpen = Boolean(statsLeaderboardModal && statsLeaderboardModal.classList.contains("show"));
+        let quitBucket = "elsewhere";
+        if (view === "splash") {
+          quitBucket = "before_first_level_countdown";
+        } else if (flashCountdownActive && !activeContext) {
+          quitBucket = "first_level_countdown";
+        } else if (isStagePreviewOpen) {
+          quitBucket = "stage_preview";
+        } else if (isStageLeaderboardOpen) {
+          quitBucket = "stage_leaderboard";
+        } else if (isSettingsOpen) {
+          quitBucket = "settings";
+        } else if (isStatsLeaderboardOpen) {
+          quitBucket = "stats_leaderboard";
+        } else if (isStatsOpen) {
+          quitBucket = "stats";
+        } else if (isAchievementsOpen) {
+          quitBucket = "achievements";
+        } else if (isReferenceOpen) {
+          quitBucket = "reference";
+        } else if (activeContext && Number(activeContext.level_number) === 1) {
+          quitBucket = "first_level";
+        } else if (activeContext) {
+          quitBucket = "later_level";
+        } else if (view === "home") {
+          quitBucket = "home_menu";
+        } else if (view === "stages") {
+          quitBucket = "stage_select";
+        } else if (view === "loading") {
+          quitBucket = "loading";
+        }
+        return {
+          ui_view: view || null,
+          ui_state: state || null,
+          quit_bucket: quitBucket,
+          current_level_number: hasStageIndex ? stageState.index + 1 : null,
+          current_stage_failed: hasStageIndex ? Boolean(stageState.failed) : null,
+          current_stage_completed: hasStageIndex ? Boolean(stageState.completed) : null,
+          flash_countdown_active: Boolean(flashCountdownActive),
+          reference_modal_open: isReferenceOpen,
+          stage_preview_open: isStagePreviewOpen,
+          stage_leaderboard_open: isStageLeaderboardOpen,
+          settings_modal_open: isSettingsOpen,
+          stats_modal_open: isStatsOpen,
+          achievements_modal_open: isAchievementsOpen,
+          stats_leaderboard_modal_open: isStatsLeaderboardOpen,
+          ...activeContext
+        };
+      }
+
+      function logUiInteraction(target, metadata = {}, options = {}) {
+        if (typeof window.trackUiInteraction === "function") {
+          window.trackUiInteraction(target, metadata, options);
+        }
+      }
+
+      function logSettingChange(settingName, value, metadata = {}, options = {}) {
+        if (typeof window.trackSettingsChange === "function") {
+          window.trackSettingsChange(settingName, value, metadata, options);
+        }
+      }
+
+      function logSettingsSnapshot(source, metadata = {}, options = {}) {
+        if (typeof window.trackSettingsSnapshot === "function") {
+          window.trackSettingsSnapshot(getTelemetrySettingsSnapshot(), { source, ...metadata }, options);
+        }
+      }
+
+      function logAutoplayEvent(target, metadata = {}, options = {}) {
+        if (typeof window.trackAutoplayEvent === "function") {
+          window.trackAutoplayEvent(target, metadata, options);
+        }
+      }
+
+      window.getTelemetrySettingsSnapshot = getTelemetrySettingsSnapshot;
+      window.getTelemetryUiContext = getTelemetryUiContext;
 
       function setSettingsTab(tabName) {
         if (!settingsModal) return;
@@ -751,7 +893,11 @@
           if (document.body.dataset.view !== "splash") return;
           if (splashReturnToHome) return;
           if (!shouldShowSplashScreen()) return;
-          startFromSplash();
+          logAutoplayEvent("splash_start", {
+            autoplay_mode: "auto",
+            trigger_source: "splash_timer"
+          }, { immediate: true });
+          startFromSplash("auto", { trigger_source: "splash_timer" });
         }, SPLASH_AUTO_START_MS);
       }
 
@@ -767,7 +913,11 @@
             window.removeEventListener("pointerdown", splashStartListener);
             splashStartListener = null;
             resetSplashAnyKeySequence();
-            startFromSplash();
+            logAutoplayEvent("splash_start", {
+              autoplay_mode: "manual",
+              trigger_source: "pointerdown"
+            }, { immediate: true });
+            startFromSplash("manual", { trigger_source: "pointerdown" });
             return;
           }
           const key = getSplashSequenceKey(event);
@@ -780,7 +930,11 @@
               if (typeof window.syncAchievementsFromLocal === "function") {
                 window.syncAchievementsFromLocal({ anyKeySecret: true });
               }
-              startFromSplash();
+              logAutoplayEvent("splash_start", {
+                autoplay_mode: "manual",
+                trigger_source: "any_key_enter"
+              }, { immediate: true });
+              startFromSplash("manual", { trigger_source: "any_key_enter" });
             }
             return;
           }
@@ -799,7 +953,11 @@
               window.removeEventListener("pointerdown", splashStartListener);
               splashStartListener = null;
               resetSplashAnyKeySequence();
-              startFromSplash();
+              logAutoplayEvent("splash_start", {
+                autoplay_mode: "manual",
+                trigger_source: "keyboard_interrupt"
+              }, { immediate: true });
+              startFromSplash("manual", { trigger_source: "keyboard_interrupt" });
               return;
             }
           }
@@ -807,7 +965,11 @@
           window.removeEventListener("pointerdown", splashStartListener);
           splashStartListener = null;
           resetSplashAnyKeySequence();
-          startFromSplash();
+          logAutoplayEvent("splash_start", {
+            autoplay_mode: "manual",
+            trigger_source: "keyboard"
+          }, { immediate: true });
+          startFromSplash("manual", { trigger_source: "keyboard" });
         };
         window.addEventListener("keydown", splashStartListener);
         window.addEventListener("pointerdown", splashStartListener);
@@ -1072,8 +1234,13 @@
       let stageIntroPendingIndex = null;
       let stageIntroOriginEl = null;
       let stageIntroAnimationMode = null;
+      let stageIntroOpenSource = "stage_card";
+      let stageIntroStartSource = "manual";
       window.setStageIntroAnimationMode = function setStageIntroAnimationMode(mode) {
         stageIntroAnimationMode = mode;
+      };
+      window.setStageIntroOpenSource = function setStageIntroOpenSource(source) {
+        stageIntroOpenSource = source || "stage_card";
       };
       let flashStagePendingIndex = null;
       let flashCountdownTimers = [];
@@ -1323,7 +1490,14 @@ function runFlashCountdown(onComplete) {
         }
       }
 
-      function cancelStageIntroAutoStartBar() {
+      function cancelStageIntroAutoStartBar(reason = null) {
+        if (stageIntroAutoStartTimerId && reason) {
+          logAutoplayEvent("stage_preview_autostart_cancelled", {
+            autoplay_mode: "manual",
+            cancel_source: reason,
+            level_number: Number.isFinite(stageIntroPendingIndex) ? stageIntroPendingIndex + 1 : null
+          }, { immediate: true });
+        }
         if (stageIntroAutoStartTimerId) {
           clearTimeout(stageIntroAutoStartTimerId);
           stageIntroAutoStartTimerId = null;
@@ -1532,6 +1706,14 @@ function runFlashCountdown(onComplete) {
         clearStageIntroAutoStart();
         const animateMode = stageIntroAnimationMode;
         stageIntroAnimationMode = null;
+        const previewSource = stageIntroOpenSource || (animateMode === "auto" ? "result_autoplay" : "stage_card");
+        logAutoplayEvent("stage_preview_open", {
+          autoplay_mode: animateMode === "auto" ? "auto" : "manual",
+          preview_source: previewSource,
+          level_number: index + 1,
+          stage_type: stage && stage.stageType ? String(stage.stageType).toLowerCase() : null
+        });
+        stageIntroStartSource = "manual";
         if (animateMode === "auto" && stageIntroAutoStartEnabled) {
           if (stageIntroCard) {
             void stageIntroCard.offsetWidth;
@@ -1554,6 +1736,7 @@ function runFlashCountdown(onComplete) {
             stageIntroAutoStartTimerId = null;
             if (stageIntroModal && stageIntroModal.classList.contains("show")) {
               if (stageIntroStart) {
+                stageIntroStartSource = "auto_preview_timer";
                 stageIntroStart.click();
               }
             }
@@ -1566,6 +1749,7 @@ function runFlashCountdown(onComplete) {
         } else {
           applyStageIntroOrigin(stageIntroOriginEl);
         }
+        stageIntroOpenSource = "stage_card";
         return true;
       }
 
@@ -2103,7 +2287,7 @@ function runFlashCountdown(onComplete) {
         startRound({ advanceRound: true });
       }
 
-      async function startFromSplash() {
+      async function startFromSplash(startMode = "manual", telemetry = {}) {
         if (splashStartInProgress) {
           return;
         }
@@ -2139,6 +2323,10 @@ function runFlashCountdown(onComplete) {
           runFlashCountdown(() => {
             startStage(0, { skipIntro: true });
           });
+          logAutoplayEvent("first_level_countdown", {
+            autoplay_mode: startMode,
+            ...telemetry
+          });
           splashStartInProgress = false;
           return;
         }
@@ -2149,17 +2337,30 @@ function runFlashCountdown(onComplete) {
 
       practiceStart.addEventListener("click", () => {
         if (!isPracticeUnlocked()) return;
+        logUiInteraction("practice_start", {
+          area: "home_menu",
+          action: "click"
+        });
         openPracticeModal();
       });
 
       if (referenceOpen) {
         referenceOpen.addEventListener("click", () => {
+          logUiInteraction("reference_open", {
+            area: "home_menu",
+            action: "open"
+          });
           setModalState(referenceModal, true);
         });
       }
 
       if (referenceClose) {
         referenceClose.addEventListener("click", () => {
+          logUiInteraction("reference_close", {
+            area: "reference_modal",
+            action: "close",
+            close_source: "button"
+          });
           setModalState(referenceModal, false);
         });
       }
@@ -2167,17 +2368,33 @@ function runFlashCountdown(onComplete) {
       if (referenceModal) {
         referenceModal.addEventListener("click", (event) => {
           if (event.target === referenceModal) {
+            logUiInteraction("reference_close", {
+              area: "reference_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
             setModalState(referenceModal, false);
           }
         });
       }
       if (stageIntroClose && stageIntroModal) {
         stageIntroClose.addEventListener("click", () => {
+          logUiInteraction("stage_preview_close", {
+            area: "stage_preview",
+            action: "close",
+            close_source: "button",
+            level_number: Number.isFinite(stageIntroPendingIndex) ? stageIntroPendingIndex + 1 : null
+          });
           closeStageIntro();
         });
       }
       if (leaderboardOpen && leaderboardModal) {
         leaderboardOpen.addEventListener("click", async () => {
+          logUiInteraction("stage_leaderboard_open", {
+            area: "stage_preview",
+            action: "open",
+            level_number: Number.isFinite(stageIntroPendingIndex) ? stageIntroPendingIndex + 1 : null
+          });
           setModalState(leaderboardModal, true);
           if (typeof window.syncLocalBestTimesOnce === "function") {
             try {
@@ -2198,12 +2415,22 @@ function runFlashCountdown(onComplete) {
       }
       if (leaderboardClose && leaderboardModal) {
         leaderboardClose.addEventListener("click", () => {
+          logUiInteraction("stage_leaderboard_close", {
+            area: "stage_leaderboard_modal",
+            action: "close",
+            close_source: "button"
+          });
           setModalState(leaderboardModal, false);
         });
       }
       if (leaderboardModal) {
         leaderboardModal.addEventListener("click", (event) => {
           if (event.target === leaderboardModal) {
+            logUiInteraction("stage_leaderboard_close", {
+              area: "stage_leaderboard_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
             setModalState(leaderboardModal, false);
           }
         });
@@ -2418,13 +2645,20 @@ function runFlashCountdown(onComplete) {
       };
       if (stageIntroStart && stageIntroModal) {
         stageIntroStart.addEventListener("click", async () => {
+          const index = stageIntroPendingIndex;
+          const stage = Number.isFinite(index) && window.getStageConfig ? window.getStageConfig(index) : null;
+          logAutoplayEvent("stage_preview_start", {
+            autoplay_mode: stageIntroStartSource === "auto_preview_timer" ? "auto" : "manual",
+            preview_start_source: stageIntroStartSource,
+            level_number: Number.isFinite(index) ? index + 1 : null,
+            stage_type: stage && stage.stageType ? String(stage.stageType).toLowerCase() : null
+          }, { immediate: true });
+          stageIntroStartSource = "manual";
           clearStageIntroAutoStart();
           if (leaderboardModal) {
             setModalState(leaderboardModal, false);
           }
-          const index = stageIntroPendingIndex;
           if (!Number.isFinite(index)) return;
-          const stage = window.getStageConfig ? window.getStageConfig(index) : null;
           if (stage && String(stage.stageType).toLowerCase() === "flash") {
             if (flashWarningEnabled) {
               openFlashStagePrompt(index);
@@ -2460,14 +2694,20 @@ function runFlashCountdown(onComplete) {
       if (stageIntroModal) {
         stageIntroModal.addEventListener("pointerdown", () => {
           if (stageIntroCard && stageIntroCard.classList.contains("intro-auto")) {
-            cancelStageIntroAutoStartBar();
+            cancelStageIntroAutoStartBar("stage_preview_pointerdown");
           }
         });
         stageIntroModal.addEventListener("click", (event) => {
           if (stageIntroCard && stageIntroCard.classList.contains("intro-auto")) {
-            cancelStageIntroAutoStartBar();
+            cancelStageIntroAutoStartBar("stage_preview_click");
           }
           if (event.target === stageIntroModal) {
+            logUiInteraction("stage_preview_close", {
+              area: "stage_preview",
+              action: "close",
+              close_source: "backdrop",
+              level_number: Number.isFinite(stageIntroPendingIndex) ? stageIntroPendingIndex + 1 : null
+            });
             closeStageIntro();
           }
         });
@@ -2481,7 +2721,7 @@ function runFlashCountdown(onComplete) {
             stageIntroCard &&
             stageIntroCard.classList.contains("intro-auto")
           ) {
-            cancelStageIntroAutoStartBar();
+            cancelStageIntroAutoStartBar("document_pointerdown");
           }
         }, { capture: true });
       }
@@ -2489,6 +2729,11 @@ function runFlashCountdown(onComplete) {
         window.__stageNextAutoCancelListener = true;
         document.addEventListener("pointerdown", () => {
           if (document.body && document.body.dataset.state === "result" && autoAdvanceNextTimerId) {
+            logAutoplayEvent("result_auto_advance_cancelled", {
+              autoplay_mode: "manual",
+              cancel_source: "pointerdown",
+              level_number: Number.isFinite(stageState && stageState.index) ? stageState.index + 2 : null
+            }, { immediate: true });
             clearTimeout(autoAdvanceNextTimerId);
             autoAdvanceNextTimerId = null;
             cancelStageNextAutoAdvanceBar();
@@ -2555,6 +2800,12 @@ function runFlashCountdown(onComplete) {
       if (photosensitivityWarningToggle) {
         photosensitivityWarningToggle.addEventListener("change", () => {
           setFlashWarningEnabled(photosensitivityWarningToggle.checked, true);
+          logSettingChange("flash_warning_enabled", photosensitivityWarningToggle.checked, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "flash_warning_enabled"
+          });
         });
       }
       if (flashStageModal) {
@@ -2578,18 +2829,30 @@ function runFlashCountdown(onComplete) {
 
       if (fullscreenToggle) {
         fullscreenToggle.addEventListener("click", async () => {
+          logUiInteraction("fullscreen_toggle", {
+            area: "home_header",
+            action: "click"
+          });
           await toggleFullscreen();
         });
       }
 
       if (playStart) {
         playStart.addEventListener("click", () => {
+          logUiInteraction("play_start", {
+            area: "home_menu",
+            action: "click"
+          });
           openStagesScreen(true);
         });
       }
 
       if (mainMenuTitle) {
         mainMenuTitle.addEventListener("click", () => {
+          logUiInteraction("main_menu_title", {
+            area: "home_menu",
+            action: "click"
+          });
           splashReturnToHome = !shouldShowSplashScreen();
           openSplashScreen();
           attachSplashStartListeners();
@@ -2621,17 +2884,29 @@ function runFlashCountdown(onComplete) {
 
       if (stagesOpen) {
         stagesOpen.addEventListener("click", () => {
+          logUiInteraction("stages_open", {
+            area: "home_menu",
+            action: "click"
+          });
           openStagesScreen(true);
         });
       }
 
       if (stagesBack) {
         stagesBack.addEventListener("click", () => {
+          logUiInteraction("stages_back", {
+            area: "stage_select",
+            action: "click"
+          });
           closeStagesScreen();
         });
       }
       if (stagesPrev) {
         stagesPrev.addEventListener("click", () => {
+          logUiInteraction("stages_page_prev", {
+            area: "stage_select",
+            action: "click"
+          });
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const pageSize = 20;
           const totalPages = Math.max(1, Math.ceil(stages.length / pageSize));
@@ -2641,6 +2916,10 @@ function runFlashCountdown(onComplete) {
       }
       if (stagesNext) {
         stagesNext.addEventListener("click", () => {
+          logUiInteraction("stages_page_next", {
+            area: "stage_select",
+            action: "click"
+          });
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const pageSize = 20;
           const totalPages = Math.max(1, Math.ceil(stages.length / pageSize));
@@ -2655,12 +2934,20 @@ function runFlashCountdown(onComplete) {
           if (!button) return;
           const index = Number(button.dataset.stageIndex);
           if (!Number.isFinite(index)) return;
+          logUiInteraction("stage_card_open", {
+            area: "stage_select",
+            action: "click",
+            level_number: index + 1,
+            stage_status: button.classList.contains("locked") ? "locked" : "unlocked"
+          });
           
           // Check if stage is unlocked before starting
           if (!isStageUnlocked(index)) {
             return;
           }
-          
+          if (typeof window.setStageIntroOpenSource === "function") {
+            window.setStageIntroOpenSource("stage_card");
+          }
           startStage(index, { originEl: button });
         });
       }
@@ -2784,6 +3071,10 @@ function runFlashCountdown(onComplete) {
       }
       if (settingsOpen && settingsModal) {
         settingsOpen.addEventListener("click", () => {
+          logUiInteraction("settings_open", {
+            area: "home_menu",
+            action: "open"
+          });
           updatePlayerNameSettingVisibility();
           activeRebindAction = null;
           refreshKeybindButtons();
@@ -2794,6 +3085,10 @@ function runFlashCountdown(onComplete) {
       }
       if (settingsClose && settingsModal) {
         settingsClose.addEventListener("click", () => {
+          logUiInteraction("settings_close", {
+            area: "settings_modal",
+            action: "close"
+          });
           activeRebindAction = null;
           refreshKeybindButtons();
           setKeybindStatus("");
@@ -2805,11 +3100,21 @@ function runFlashCountdown(onComplete) {
           button.addEventListener("click", () => {
             const tabName = button.getAttribute("data-settings-tab");
             if (!tabName) return;
+            logUiInteraction("settings_tab_view", {
+              area: "settings_modal",
+              action: "view",
+              settings_tab: tabName
+            });
             setSettingsTab(tabName);
           });
         });
         settingsModal.addEventListener("click", (event) => {
           if (event.target === settingsModal) {
+            logUiInteraction("settings_close", {
+              area: "settings_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
             activeRebindAction = null;
             refreshKeybindButtons();
             setKeybindStatus("");
@@ -3461,6 +3766,12 @@ function runFlashCountdown(onComplete) {
             <strong class="achievement-tile__title">${escapeAchievementHtml(getAchievementDisplayTitle(item))}</strong>
           `;
           tile.addEventListener("click", () => {
+            logUiInteraction("achievement_detail_open", {
+              area: "achievements_modal",
+              action: "open",
+              achievement_id: item.id || null,
+              achievement_unlocked: Boolean(item.unlocked)
+            });
             openAchievementInfoModal(item, totalPlayers);
           });
           achievementsList.appendChild(tile);
@@ -3469,6 +3780,10 @@ function runFlashCountdown(onComplete) {
 
       async function openAchievementsModal() {
         if (!achievementsModal || !achievementsList) return;
+        logUiInteraction("achievements_open", {
+          area: "home_menu",
+          action: "open"
+        });
         if (achievementsSummary) {
           achievementsSummary.textContent = "Loading achievements...";
         }
@@ -3501,6 +3816,11 @@ function runFlashCountdown(onComplete) {
       async function openStatsLeaderboard(metric = activeStatsLeaderboardTab) {
         if (!statsLeaderboardModal) return;
         const nextTab = statsLeaderboardTabs[metric] ? metric : "stars_earned";
+        logUiInteraction("stats_leaderboard_view", {
+          area: "stats_leaderboard_modal",
+          action: "view",
+          leaderboard_metric: nextTab
+        });
         activeStatsLeaderboardTab = nextTab;
         if (statsLeaderboardTitle) {
           statsLeaderboardTitle.textContent = statsLeaderboardTabs[nextTab].title;
@@ -3521,6 +3841,10 @@ function runFlashCountdown(onComplete) {
       }
       if (statsOpen && statsModal) {
         statsOpen.addEventListener("click", async () => {
+          logUiInteraction("stats_open", {
+            area: "home_menu",
+            action: "open"
+          });
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const stagesClearedEl = document.getElementById("statsStagesCleared");
           const stagesTotalEl = document.getElementById("statsStagesTotal");
@@ -3677,6 +4001,11 @@ function runFlashCountdown(onComplete) {
       }
       if (statsLeaderboardOpen) {
         statsLeaderboardOpen.addEventListener("click", () => {
+          logUiInteraction("stats_leaderboard_open", {
+            area: "stats_modal",
+            action: "open",
+            leaderboard_metric: activeStatsLeaderboardTab
+          });
           openStatsLeaderboard(activeStatsLeaderboardTab);
         });
       }
@@ -3685,6 +4014,11 @@ function runFlashCountdown(onComplete) {
         button.addEventListener("click", () => {
           const tab = button.getAttribute("data-stats-leaderboard-tab");
           if (!tab) return;
+          logUiInteraction("stats_leaderboard_tab_view", {
+            area: "stats_leaderboard_modal",
+            action: "view",
+            leaderboard_metric: tab
+          });
           openStatsLeaderboard(tab);
         });
       });
@@ -3702,11 +4036,21 @@ function runFlashCountdown(onComplete) {
       }
       if (statsClose && statsModal) {
         statsClose.addEventListener("click", () => {
+          logUiInteraction("stats_close", {
+            area: "stats_modal",
+            action: "close",
+            close_source: "button"
+          });
           setModalState(statsModal, false);
         });
       }
       if (achievementsClose && achievementsModal) {
         achievementsClose.addEventListener("click", () => {
+          logUiInteraction("achievements_close", {
+            area: "achievements_modal",
+            action: "close",
+            close_source: "button"
+          });
           setModalState(achievementsModal, false);
           if (window.achievementInfoModal) {
             setModalState(window.achievementInfoModal, false);
@@ -3716,6 +4060,11 @@ function runFlashCountdown(onComplete) {
       if (statsModal) {
         statsModal.addEventListener("click", (event) => {
           if (event.target === statsModal) {
+            logUiInteraction("stats_close", {
+              area: "stats_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
             setModalState(statsModal, false);
           }
         });
@@ -3723,6 +4072,11 @@ function runFlashCountdown(onComplete) {
       if (achievementsModal) {
         achievementsModal.addEventListener("click", (event) => {
           if (event.target === achievementsModal) {
+            logUiInteraction("achievements_close", {
+              area: "achievements_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
             setModalState(achievementsModal, false);
             if (window.achievementInfoModal) {
               setModalState(window.achievementInfoModal, false);
@@ -3732,12 +4086,22 @@ function runFlashCountdown(onComplete) {
       }
       if (window.achievementInfoClose && window.achievementInfoModal) {
         window.achievementInfoClose.addEventListener("click", () => {
+          logUiInteraction("achievement_detail_close", {
+            area: "achievement_detail_modal",
+            action: "close",
+            close_source: "button"
+          });
           setModalState(window.achievementInfoModal, false);
         });
       }
       if (window.achievementInfoModal) {
         window.achievementInfoModal.addEventListener("click", (event) => {
           if (event.target === window.achievementInfoModal) {
+            logUiInteraction("achievement_detail_close", {
+              area: "achievement_detail_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
             setModalState(window.achievementInfoModal, false);
           }
         });
@@ -3750,13 +4114,53 @@ function runFlashCountdown(onComplete) {
       });
       if (statsLeaderboardClose && statsLeaderboardModal) {
         statsLeaderboardClose.addEventListener("click", () => {
+          logUiInteraction("stats_leaderboard_close", {
+            area: "stats_leaderboard_modal",
+            action: "close",
+            close_source: "button"
+          });
           setModalState(statsLeaderboardModal, false);
         });
       }
       if (statsLeaderboardModal) {
         statsLeaderboardModal.addEventListener("click", (event) => {
           if (event.target === statsLeaderboardModal) {
+            logUiInteraction("stats_leaderboard_close", {
+              area: "stats_leaderboard_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
             setModalState(statsLeaderboardModal, false);
+          }
+        });
+      }
+
+      const contentResetModal = document.getElementById("contentResetModal");
+      const contentResetClose = document.getElementById("contentResetClose");
+      const contentResetAcknowledge = document.getElementById("contentResetAcknowledge");
+      const closeContentResetNotice = (source) => {
+        if (!contentResetModal) return;
+        logUiInteraction("content_reset_notice_close", {
+          area: "content_reset_modal",
+          action: "close",
+          close_source: source || "unknown"
+        });
+        setModalState(contentResetModal, false);
+      };
+      if (contentResetClose && contentResetModal) {
+        contentResetClose.addEventListener("click", () => {
+          closeContentResetNotice("button");
+        });
+      }
+      if (contentResetAcknowledge && contentResetModal) {
+        contentResetAcknowledge.addEventListener("click", () => {
+          closeContentResetNotice("acknowledge");
+        });
+      }
+      if (contentResetModal) {
+        contentResetModal.addEventListener("click", (event) => {
+          if (event.target === contentResetModal) {
+            closeContentResetNotice("backdrop");
           }
         });
       }
@@ -4113,6 +4517,10 @@ function runFlashCountdown(onComplete) {
         }
         const menuButton = event.target.closest("#stageMenuButton, #stageBackButton");
         if (menuButton) {
+          logUiInteraction("stage_menu", {
+            area: "result_actions",
+            action: "click"
+          });
           // Analytics: Track level quit via back button
           if (gameMode === "stages" && stageState.active && !stageState.completed) {
             const backElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
@@ -4139,9 +4547,16 @@ function runFlashCountdown(onComplete) {
         }
         const nextButton = event.target.closest("#stageNextButton");
         if (nextButton) {
+          logUiInteraction("stage_next", {
+            area: "result_actions",
+            action: "click"
+          });
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const nextIndex = stageState.index + 1;
           if (!stages[nextIndex]) return;
+          if (typeof window.setStageIntroOpenSource === "function") {
+            window.setStageIntroOpenSource("manual_next_button");
+          }
           if (typeof window.hideAutoAdvanceNextFromResults === "function") {
             window.hideAutoAdvanceNextFromResults();
           } else {
@@ -4155,6 +4570,10 @@ function runFlashCountdown(onComplete) {
         }
         const practiceBack = event.target.closest("#practiceBackButton");
         if (practiceBack) {
+          logUiInteraction("practice_back", {
+            area: "result_actions",
+            action: "click"
+          });
           resetGame();
           setPhase("Waiting to start", "idle");
           document.body.dataset.view = "home";
@@ -4165,17 +4584,29 @@ function runFlashCountdown(onComplete) {
         }
         const practiceRetry = event.target.closest("#practiceRetryButton");
         if (practiceRetry) {
+          logUiInteraction("practice_retry", {
+            area: "result_actions",
+            action: "click"
+          });
           resetForRetryRound();
           startRound({ reuseItems: false, advanceRound: false });
           return;
         }
         const practiceSettings = event.target.closest("#practiceSettingsButton");
         if (practiceSettings) {
+          logUiInteraction("practice_settings_open", {
+            area: "result_actions",
+            action: "open"
+          });
           openPracticeModal();
           return;
         }
         const homeButton = event.target.closest("#stageHomeButton");
         if (homeButton) {
+          logUiInteraction("stage_home", {
+            area: "result_actions",
+            action: "click"
+          });
           resetStageProgress();
           resetGame();
           setPhase("Waiting to start", "idle");
@@ -4190,6 +4621,10 @@ function runFlashCountdown(onComplete) {
         }
         const retryButton = event.target.closest("#stageRetryButton");
         if (!retryButton) return;
+        logUiInteraction("stage_retry", {
+          area: "result_actions",
+          action: "click"
+        });
         startStage(stageState.index, { skipIntro: true });
         return;
       }
@@ -4240,11 +4675,18 @@ function runFlashCountdown(onComplete) {
             return;
           }
           keybinds[activeRebindAction] = key;
+          const changedAction = activeRebindAction;
           event.preventDefault();
           activeRebindAction = null;
           saveKeybinds();
           refreshKeybindButtons();
           refreshActionKeyHints();
+          logSettingChange(`keybind_${changedAction}`, key, {
+            setting_category: "keybind"
+          });
+          logSettingsSnapshot("keybind_change", {
+            setting_name: `keybind_${changedAction}`
+          });
           setKeybindStatus("Keybind saved.");
           return;
         }
@@ -4552,6 +4994,11 @@ function runFlashCountdown(onComplete) {
           saveKeybinds();
           refreshKeybindButtons();
           refreshActionKeyHints();
+          logUiInteraction("keybind_reset_defaults", {
+            area: "settings_modal",
+            action: "click"
+          });
+          logSettingsSnapshot("keybind_reset_defaults");
           setKeybindStatus("Keybinds reset.");
         });
       }
@@ -4614,6 +5061,12 @@ function runFlashCountdown(onComplete) {
         successAnimationToggle.addEventListener("change", () => {
           window.localStorage.setItem(storageKey, successAnimationToggle.checked ? "1" : "0");
           setSuccessAnimationEnabled(successAnimationToggle.checked);
+          logSettingChange("success_animation_enabled", successAnimationToggle.checked, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "success_animation_enabled"
+          });
         });
       }
       if (enterToNextToggle) {
@@ -4628,6 +5081,12 @@ function runFlashCountdown(onComplete) {
         enterToNextToggle.addEventListener("change", () => {
           enterToNextEnabled = enterToNextToggle.checked;
           window.localStorage.setItem(storageKey, enterToNextEnabled ? "1" : "0");
+          logSettingChange("enter_to_next_enabled", enterToNextEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "enter_to_next_enabled"
+          });
         });
       } else {
         enterToNextEnabled = Boolean(defaultControlSettings.enterToNext);
@@ -4645,6 +5104,12 @@ function runFlashCountdown(onComplete) {
         flashCountdownToggle.addEventListener("change", () => {
           flashCountdownEnabled = flashCountdownToggle.checked;
           window.localStorage.setItem(storageKey, flashCountdownToggle.checked ? "1" : "0");
+          logSettingChange("flash_countdown_enabled", flashCountdownEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "flash_countdown_enabled"
+          });
         });
       }
       if (autoAdvanceNextToggle) {
@@ -4659,11 +5124,22 @@ function runFlashCountdown(onComplete) {
         autoAdvanceNextToggle.addEventListener("change", () => {
           autoAdvanceNextEnabled = autoAdvanceNextToggle.checked;
           window.localStorage.setItem(storageKey, autoAdvanceNextToggle.checked ? "1" : "0");
+          logSettingChange("auto_advance_next_enabled", autoAdvanceNextEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "auto_advance_next_enabled"
+          });
           if (!autoAdvanceNextEnabled) {
             if (typeof window.clearDeferredAutoAdvanceNext === "function") {
               window.clearDeferredAutoAdvanceNext();
             }
             if (autoAdvanceNextTimerId) {
+              logAutoplayEvent("result_auto_advance_cancelled", {
+                autoplay_mode: "manual",
+                cancel_source: "settings_toggle",
+                level_number: Number.isFinite(stageState && stageState.index) ? stageState.index + 2 : null
+              }, { immediate: true });
               clearTimeout(autoAdvanceNextTimerId);
               autoAdvanceNextTimerId = null;
               cancelStageNextAutoAdvanceBar();
@@ -4685,7 +5161,14 @@ function runFlashCountdown(onComplete) {
         autoStartStagePreviewToggle.addEventListener("change", () => {
           stageIntroAutoStartEnabled = autoStartStagePreviewToggle.checked;
           window.localStorage.setItem(storageKey, autoStartStagePreviewToggle.checked ? "1" : "0");
+          logSettingChange("auto_start_stage_preview_enabled", stageIntroAutoStartEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "auto_start_stage_preview_enabled"
+          });
           if (!stageIntroAutoStartEnabled) {
+            cancelStageIntroAutoStartBar("settings_toggle");
             clearStageIntroAutoStart();
           }
         });
@@ -4705,6 +5188,12 @@ function runFlashCountdown(onComplete) {
         leaderboardsEnabledToggle.addEventListener("change", () => {
           leaderboardsEnabled = leaderboardsEnabledToggle.checked;
           window.localStorage.setItem(storageKey, leaderboardsEnabled ? "1" : "0");
+          logSettingChange("leaderboards_enabled", leaderboardsEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "leaderboards_enabled"
+          });
           if (typeof window.refreshVisibleLeaderboards === "function") {
             window.refreshVisibleLeaderboards();
           }
@@ -4717,6 +5206,7 @@ function runFlashCountdown(onComplete) {
       if (appearanceTheme) {
         persistAndApplyAppearance = (themeOverride = "") => {
           const previousTheme = document.body && document.body.dataset ? document.body.dataset.theme || "" : "";
+          const previousColorVision = document.body && document.body.dataset ? document.body.dataset.colorVision || "" : "";
           const currentTheme = document.body && document.body.dataset ? document.body.dataset.theme || "" : "";
           const selectedTheme = appearanceTheme ? appearanceTheme.value : "";
           const requestedTheme = typeof themeOverride === "string" ? themeOverride : "";
@@ -4741,6 +5231,23 @@ function runFlashCountdown(onComplete) {
           if (typeof window.recordAchievementThemeChange === "function") {
             window.recordAchievementThemeChange(previousTheme, document.body.dataset.theme || "");
           }
+          const nextTheme = document.body && document.body.dataset ? document.body.dataset.theme || "" : "";
+          const nextColorVision = document.body && document.body.dataset ? document.body.dataset.colorVision || "" : "";
+          if (nextTheme && nextTheme !== previousTheme) {
+            logSettingChange("theme_id", nextTheme, {
+              setting_category: "appearance",
+              previous_value: previousTheme || null
+            });
+          }
+          if (nextColorVision && nextColorVision !== previousColorVision) {
+            logSettingChange("color_vision_mode", nextColorVision, {
+              setting_category: "appearance",
+              previous_value: previousColorVision || null
+            });
+          }
+          logSettingsSnapshot("appearance_change", {
+            shuffled_theme: requestedTheme === "prism-parade" || requestedTheme !== ""
+          });
           if (
             requestedTheme === "prism-parade"
             && typeof window.recordSecretRainbowThemeFound === "function"
@@ -4758,11 +5265,20 @@ function runFlashCountdown(onComplete) {
       if (appearanceShuffle && appearanceTheme) {
         appearanceShuffle.addEventListener("click", () => {
           const pick = (list) => list[Math.floor(Math.random() * list.length)];
+          logUiInteraction("appearance_shuffle", {
+            area: "settings_modal",
+            action: "click"
+          });
           if (typeof persistAndApplyAppearance === "function") {
             persistAndApplyAppearance(pick(ALL_APPEARANCE_THEMES));
           }
         });
       }
+
+      logSettingsSnapshot("initial_load", {}, { immediate: true });
+      window.requestAnimationFrame(() => {
+        showContentResetNoticeIfNeeded();
+      });
 
       // Track session end on page unload
       window.addEventListener("beforeunload", () => {

@@ -626,6 +626,9 @@
         }
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         const hasNextStage = Boolean(stages[stageState.index + 1]);
+        const nextStage = hasNextStage && typeof window.getStageConfig === "function"
+          ? window.getStageConfig(stageState.index + 1)
+          : stages[stageState.index + 1] || null;
         const nextTimer = document.querySelector("#resultsPanel .stage-next-timer");
         const nextTimerFill = nextTimer
           ? nextTimer.querySelector(".stage-next-timer__fill")
@@ -666,10 +669,27 @@
               nextTimer.classList.add("is-running");
             }
           });
+          if (typeof window.trackAutoplayEvent === "function") {
+            window.trackAutoplayEvent("result_auto_advance_scheduled", {
+              autoplay_mode: "auto",
+              level_number: stageState.index + 2,
+              stage_type: nextStage && nextStage.stageType ? String(nextStage.stageType).toLowerCase() : null
+            });
+          }
           autoAdvanceNextTimerId = window.setTimeout(() => {
             autoAdvanceNextTimerId = null;
             const nextBtn = document.getElementById("stageNextButton");
             if (nextBtn && stages[stageState.index + 1]) {
+              if (typeof window.trackAutoplayEvent === "function") {
+                window.trackAutoplayEvent("result_auto_advance_triggered", {
+                  autoplay_mode: "auto",
+                  level_number: stageState.index + 2,
+                  stage_type: nextStage && nextStage.stageType ? String(nextStage.stageType).toLowerCase() : null
+                }, { immediate: true });
+              }
+              if (typeof window.setStageIntroOpenSource === "function") {
+                window.setStageIntroOpenSource("result_autoplay");
+              }
               hideAutoAdvanceNextFromResults();
               if (typeof window.setStageIntroAnimationMode === "function") {
                 window.setStageIntroAnimationMode("auto");

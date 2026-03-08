@@ -449,6 +449,21 @@
     <div data-include="ui/achievements.html"></div>
     <div data-include="ui/stage-intro.html"></div>
     <div data-include="ui/reference.html"></div>
+    <div class="modal" id="contentResetModal" aria-hidden="true">
+      <div class="modal-card modal-card--muted modal-card--reset-notice">
+        <button class="interrupt-close icon-button modal-close" id="contentResetClose" type="button" aria-label="Close">
+          <img class="action-icon" src="imgs/x_button.png" alt="" />
+        </button>
+        <h3 id="contentResetTitle">Hey Player!</h3>
+        <div class="content-reset-copy" id="contentResetCopy">
+          <p>Due to updates in game levels we have reset your progress on in Flash Recall. We've added a additional "Challenge" stages and slightly increased average level difficulty. We hope that you'll enjoy our new level designs even more. Sorry for any inconvenience we have caused you and thank you so much for playing our game.</p>
+          <p>Sincerely,<br />The Flash Recall Team</p>
+        </div>
+        <div class="modal-actions modal-actions--center">
+          <button id="contentResetAcknowledge" class="secondary" type="button">Continue</button>
+        </div>
+      </div>
+    </div>
     <div class="modal" id="flashStageModal" aria-hidden="true">
       <div class="modal-card modal-card--muted modal-card--flash">
         <h3>Photosensitivity Warning</h3>

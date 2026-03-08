@@ -41,11 +41,17 @@ let lastActivityAtMs = sessionStartedAtMs;
 let activePlaytimeAccumulatedSeconds = 0;
 let activeSegmentStartedAtMs = sessionStartedAtMs;
 let isSessionActiveForPlaytime = true;
+let fullscreenEnteredAtMs = document.fullscreenElement ? Date.now() : null;
+let fullscreenAccumulatedSeconds = 0;
 
 const playerId = getOrCreatePlayerId();
 const sessionId = generateId();
 const gameVersion = window.FLASH_RECALL_VERSION || "dev";
 const releaseChannel = window.FLASH_RECALL_RELEASE_CHANNEL || deriveReleaseChannel();
+const contentResetVersion = window.FLASH_RECALL_CONTENT_RESET_VERSION || "";
+const progressLeaderboardVersion = String(
+  window.FLASH_RECALL_PROGRESS_LEADERBOARD_VERSION || contentResetVersion || gameVersion
+).replace(/[^A-Za-z0-9._-]+/g, "_");
 
 const leaderboardSyncKey = `flashRecallLeaderboardSynced_${gameVersion}`;
 const leaderboardReadBudgetKey = `flashRecallLeaderboardReadBudget_${playerId}`;
@@ -53,7 +59,7 @@ const LEADERBOARDS_ENABLED_KEY = "flashRecallLeaderboardsEnabled";
 const leaderboardSessionCache = new Map();
 const statsLeaderboardSessionCache = new Map();
 const STATS_LEADERBOARD_CACHE_TTL_MS = 60 * 1000;
-const PROGRESS_LEADERBOARD_PATH = "leaderboards_global/progress/entries";
+const PROGRESS_LEADERBOARD_PATH = `leaderboards_global/progress_versions/${progressLeaderboardVersion}/entries`;
 const ACHIEVEMENT_PROFILE_PATH = "achievement_profiles";
 const ACHIEVEMENT_SUMMARY_PATH = "achievements_global/summary";
 const ACHIEVEMENT_ENTRY_PATH = `${ACHIEVEMENT_SUMMARY_PATH}/entries`;
@@ -86,6 +92,15 @@ const SANDBOX_ICON_SRC = "imgs/icons/sand-icon.svg";
 const CONTRAST_ICON_SRC = "imgs/icons/contrast-icon.svg";
 const DOOR_KEY_ICON_SRC = "imgs/icons/door-key-icon.svg";
 const CAT_ICON_SRC = "imgs/icons/cat-animal-icon.svg";
+
+function isContentResetPending() {
+  if (!contentResetVersion) return false;
+  try {
+    return window.localStorage.getItem("flashRecallContentResetVersion") !== contentResetVersion;
+  } catch (error) {
+    return false;
+  }
+}
 const STAIRS_ICON_SRC = "imgs/icons/stairs-icon.svg";
 const ROCK_CLIMBER_ICON_SRC = "imgs/icons/rock-climber-icon.svg";
 const WORLD_CLASS_CLIMBER_NAMES = new Set([
@@ -499,6 +514,7 @@ function computeStatsLeaderboardView(entries, metric, limit = 5) {
   const active = safeEntries
     .filter((entry) => entry && entry.active !== false)
     .map((entry) => ({ ...entry, metricValue: Number(entry[metric]) || 0 }))
+    .filter((entry) => entry.metricValue > 0)
     .sort((a, b) => b.metricValue - a.metricValue);
   const top = active.slice(0, Math.max(1, Number(limit) || 5));
   const meIndex = active.findIndex((entry) => entry && entry.player_id === playerId);
@@ -1651,6 +1667,9 @@ async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, pla
   const safeAchievementsUnlocked = Number.isFinite(Number(achievementsUnlocked))
     ? Math.max(0, Number(achievementsUnlocked))
     : cachedAchievementsUnlocked;
+  if (safeStagesCleared <= 0 && safeStarsEarned <= 0 && safeAchievementsUnlocked <= 0) {
+    return;
+  }
   const payload = {
     player_id: playerId,
     auth_uid: currentUserId,
@@ -1660,6 +1679,7 @@ async function updateProgressLeaderboardSnapshot(stagesCleared, starsEarned, pla
     achievements_unlocked: safeAchievementsUnlocked,
     active: true,
     game_version: gameVersion,
+    leaderboard_version: progressLeaderboardVersion,
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
   };
   try {
@@ -1763,6 +1783,7 @@ async function fetchProgressLeaderboard(metric, limit = 5, options = {}) {
 async function syncLocalBestTimesOnce(force = false, options = {}) {
   if (!firebaseDb || !currentUserId) return;
   if (!areLeaderboardsEnabled()) return;
+  if (isContentResetPending()) return;
   try {
     if (!force && window.localStorage.getItem(leaderboardSyncKey) === "1") return;
     const bestTimes = window.stageBestTimes || {};
@@ -2135,6 +2156,146 @@ function noteActivity(source) {
   resetInactivityTimer();
 }
 
+function sanitizeTelemetryMap(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") {
+    return out;
+  }
+  Object.entries(raw).forEach(([key, value]) => {
+    if (value === undefined) return;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      out[key] = sanitizeTelemetryMap(value);
+      return;
+    }
+    out[key] = value;
+  });
+  return out;
+}
+
+function getTelemetryUiContextSnapshot() {
+  if (typeof window.getTelemetryUiContext !== "function") {
+    return {};
+  }
+  try {
+    return sanitizeTelemetryMap(window.getTelemetryUiContext() || {});
+  } catch (error) {
+    return {};
+  }
+}
+
+function getTelemetrySettingsSnapshot() {
+  if (typeof window.getTelemetrySettingsSnapshot !== "function") {
+    return {};
+  }
+  try {
+    return sanitizeTelemetryMap(window.getTelemetrySettingsSnapshot() || {});
+  } catch (error) {
+    return {};
+  }
+}
+
+function getAdaptiveTelemetrySnapshot() {
+  if (typeof window.getAdaptiveProfileSnapshot !== "function") {
+    return {};
+  }
+  try {
+    const adaptive = window.getAdaptiveProfileSnapshot() || {};
+    return sanitizeTelemetryMap({
+      adaptive_group: adaptive.group === "A" || adaptive.group === "B" ? adaptive.group : "undecided",
+      adaptive_group_decided: adaptive.group === "A" || adaptive.group === "B"
+    });
+  } catch (error) {
+    return {};
+  }
+}
+
+function getFullscreenTotalSeconds(nowMs = Date.now()) {
+  const liveSeconds = fullscreenEnteredAtMs
+    ? Math.max(0, (nowMs - fullscreenEnteredAtMs) / 1000)
+    : 0;
+  return Math.max(0, fullscreenAccumulatedSeconds + liveSeconds);
+}
+
+function trackUiInteraction(target, metadata = {}, options = {}) {
+  if (!target) return;
+  enqueueEvent("ui_interaction", {
+    target,
+    ...getTelemetryUiContextSnapshot(),
+    ...getAdaptiveTelemetrySnapshot(),
+    ...sanitizeTelemetryMap(metadata)
+  }, options);
+}
+
+function trackSettingsChange(settingName, value, metadata = {}, options = {}) {
+  if (!settingName) return;
+  enqueueEvent("settings_change", {
+    setting_name: settingName,
+    setting_value: value,
+    ...getTelemetryUiContextSnapshot(),
+    ...getAdaptiveTelemetrySnapshot(),
+    ...sanitizeTelemetryMap(metadata)
+  }, options);
+}
+
+function trackSettingsSnapshot(snapshot = {}, metadata = {}, options = {}) {
+  const payload = {
+    ...getTelemetryUiContextSnapshot(),
+    ...getAdaptiveTelemetrySnapshot(),
+    ...sanitizeTelemetryMap(snapshot),
+    ...sanitizeTelemetryMap(metadata)
+  };
+  enqueueEvent("settings_snapshot", payload, options);
+  const sessionRef = getSessionRef();
+  if (!sessionRef || !isReadyForWrites()) return;
+  sessionRef.update({
+    settings_snapshot: sanitizeTelemetryMap(snapshot),
+    settings_updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch((error) => {
+    console.warn("Failed to update settings snapshot on session", error);
+  });
+}
+
+function trackAutoplayEvent(target, metadata = {}, options = {}) {
+  if (!target) return;
+  enqueueEvent("autoplay_event", {
+    target,
+    ...getTelemetryUiContextSnapshot(),
+    ...getAdaptiveTelemetrySnapshot(),
+    ...sanitizeTelemetryMap(metadata)
+  }, options);
+}
+
+function trackFullscreenState(enabled, metadata = {}, options = {}) {
+  const nowMs = Date.now();
+  const nextEnabled = Boolean(enabled);
+  if (nextEnabled) {
+    if (!fullscreenEnteredAtMs) {
+      fullscreenEnteredAtMs = nowMs;
+    }
+  } else if (fullscreenEnteredAtMs) {
+    fullscreenAccumulatedSeconds += Math.max(0, (nowMs - fullscreenEnteredAtMs) / 1000);
+    fullscreenEnteredAtMs = null;
+  }
+  const totalFullscreenSeconds = parseFloat(getFullscreenTotalSeconds(nowMs).toFixed(2));
+  enqueueEvent("fullscreen_state_change", {
+    enabled: nextEnabled,
+    fullscreen_total_seconds: totalFullscreenSeconds,
+    ...getTelemetryUiContextSnapshot(),
+    ...getAdaptiveTelemetrySnapshot(),
+    ...sanitizeTelemetryMap(metadata)
+  }, options);
+  const sessionRef = getSessionRef();
+  if (!sessionRef || !isReadyForWrites()) return;
+  sessionRef.update({
+    fullscreen_active: nextEnabled,
+    fullscreen_total_seconds: totalFullscreenSeconds,
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch((error) => {
+    console.warn("Failed to update fullscreen state on session", error);
+  });
+}
+
 function bindLifecycleListeners() {
   if (lifecycleListenersBound) return;
   lifecycleListenersBound = true;
@@ -2160,6 +2321,12 @@ function bindLifecycleListeners() {
     enqueueEvent("window_blur", {});
   });
 
+  document.addEventListener("fullscreenchange", () => {
+    trackFullscreenState(Boolean(document.fullscreenElement), {
+      source: "fullscreenchange"
+    }, { immediate: true });
+  });
+
   window.addEventListener("pagehide", () => {
     enqueueEvent("page_hide", {}, { immediate: true });
     flushEvents();
@@ -2169,15 +2336,19 @@ function bindLifecycleListeners() {
     const activeContext = typeof window.getActiveLevelContext === "function"
       ? window.getActiveLevelContext()
       : null;
+    const uiContext = getTelemetryUiContextSnapshot();
     if (activeContext) {
       enqueueEvent("quit_reason", {
         reason: "close_tab_mid_level",
+        ...uiContext,
         ...activeContext
       }, { immediate: true });
     }
     enqueueEvent("before_unload", {
       session_duration_seconds: Math.max(0, (Date.now() - sessionStartedAtMs) / 1000),
-      active_playtime_seconds: parseFloat(getActivePlaytimeSeconds().toFixed(2))
+      active_playtime_seconds: parseFloat(getActivePlaytimeSeconds().toFixed(2)),
+      fullscreen_total_seconds: parseFloat(getFullscreenTotalSeconds().toFixed(2)),
+      ...uiContext
     }, { immediate: true });
     flushEvents();
   });
@@ -2266,6 +2437,10 @@ async function createNewSession() {
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       last_activity_at: firebase.firestore.FieldValue.serverTimestamp(),
       total_playtime_seconds: 0,
+      fullscreen_active: Boolean(document.fullscreenElement),
+      fullscreen_total_seconds: 0,
+      settings_snapshot: getTelemetrySettingsSnapshot(),
+      settings_updated_at: firebase.firestore.FieldValue.serverTimestamp(),
       last_level_completed: 0,
       quit_inferred: false,
       session_state: "active"
@@ -2277,7 +2452,10 @@ async function createNewSession() {
     enqueueEvent("session_start", {
       ip_collected: Boolean(ipAddress),
       referrer: document.referrer || null,
-      game_build: window.FLASH_RECALL_BUILD_ID || null
+      game_build: window.FLASH_RECALL_BUILD_ID || null,
+      ...getTelemetrySettingsSnapshot(),
+      ...getTelemetryUiContextSnapshot(),
+      ...getAdaptiveTelemetrySnapshot()
     }, { immediate: true });
 
     if (typeof window.getAdaptiveProfileSnapshot === "function") {
@@ -2293,7 +2471,6 @@ async function createNewSession() {
     startHeartbeat();
     resetActiveInactivityTimer();
     resetInactivityTimer();
-    await updateProgressLeaderboardSnapshot(0, 0, getDisplayNameFallback());
 
     console.log("New session created:", currentSessionDocId);
   } catch (error) {
@@ -2486,15 +2663,21 @@ async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted, endReaso
   }
 
   finalizeActiveSegment(Date.now());
+  if (fullscreenEnteredAtMs) {
+    fullscreenAccumulatedSeconds += Math.max(0, (Date.now() - fullscreenEnteredAtMs) / 1000);
+    fullscreenEnteredAtMs = null;
+  }
 
   stopHeartbeat();
 
   const activePlaytimeSeconds = parseFloat(getActivePlaytimeSeconds().toFixed(2));
   const sessionElapsedSeconds = parseFloat(((Date.now() - sessionStartedAtMs) / 1000).toFixed(2));
+  const fullscreenTotalSeconds = parseFloat(getFullscreenTotalSeconds().toFixed(2));
 
   enqueueEvent("session_end", {
     total_playtime_seconds: activePlaytimeSeconds,
     session_elapsed_seconds: sessionElapsedSeconds,
+    fullscreen_total_seconds: fullscreenTotalSeconds,
     reported_session_seconds: Number.isFinite(totalSessionSeconds) ? parseFloat(totalSessionSeconds.toFixed(2)) : null,
     last_level_completed: Number.isFinite(lastLevelCompleted) ? lastLevelCompleted : 0,
     end_reason: endReason,
@@ -2507,6 +2690,7 @@ async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted, endReaso
     await sessionRef.update({
       total_playtime_seconds: activePlaytimeSeconds,
       session_elapsed_seconds: sessionElapsedSeconds,
+      fullscreen_total_seconds: fullscreenTotalSeconds,
       last_level_completed: Number.isFinite(lastLevelCompleted) ? lastLevelCompleted : 0,
       ended_at: firebase.firestore.FieldValue.serverTimestamp(),
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2538,6 +2722,8 @@ function getLoggingDebugSnapshot() {
 function trackQuitReason(reason, metadata = {}) {
   enqueueEvent("quit_reason", {
     reason: reason || "unknown",
+    ...getTelemetryUiContextSnapshot(),
+    ...getAdaptiveTelemetrySnapshot(),
     ...metadata
   }, { immediate: true });
 }
@@ -2570,6 +2756,11 @@ window.trackLevelSession = trackLevelSession;
 window.trackSessionEnd = trackSessionEnd;
 window.trackQuitReason = trackQuitReason;
 window.trackAdaptiveGroupStatus = trackAdaptiveGroupStatus;
+window.trackUiInteraction = trackUiInteraction;
+window.trackSettingsChange = trackSettingsChange;
+window.trackSettingsSnapshot = trackSettingsSnapshot;
+window.trackAutoplayEvent = trackAutoplayEvent;
+window.trackFullscreenState = trackFullscreenState;
 window.getLoggingDebugSnapshot = getLoggingDebugSnapshot;
 window.updateStageLeaderboard = updateStageLeaderboard;
 window.fetchStageLeaderboard = fetchStageLeaderboard;
