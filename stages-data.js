@@ -150,6 +150,7 @@
       rounds: 1,
       cards: 3,
       noRepeatAcrossRounds: true,
+      noDuplicateAnswerInitialsPerRound: true,
       revealSeconds: 10,
       recallSeconds: 30,
       categories: ["numbers"],
@@ -394,7 +395,7 @@
       categories: ["diagonal"],
       cardCounts: {},
       modifiers: {},
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4, gold: 5, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[19] || []
     },
     {
@@ -402,23 +403,27 @@
       version: 1,
       name: "Stage 20",
       stageType: "challenge",
-      rounds: 2,
+      rounds: 1,
       cards: 4,
       uniqueCardTypesPerRound: true,
       noRepeatAcrossRounds: true,
       revealSeconds: 10,
       recallSeconds: 30,
       categories: ["numbers", "letters", "shapes", "colors", "diagonal"],
-      cardCounts: { diagonal: 1 },
+      cardCounts: { diagonal: 1, numbers: 1 },
       modifiers: {
         backgroundColor: true,
         backgroundColorChance: 1.0,
         backgroundColorMinCount: 2,
         backgroundColorMaxCount: 2,
         backgroundPromptMinCount: 1,
-        backgroundPromptMaxCount: 2
+        backgroundPromptMaxCount: 2,
+        mathOps: true,
+        mathChance: 1.0,
+        mathMinCount: 1,
+        mathMaxCount: 1,
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 6, gold: 7, silver: 10, bronze: 16 },
       instructions: window.stageInstructions[20] || []
     },
     {
@@ -520,6 +525,7 @@
         misleadUniqueLabelsPerRound: true,
         textColor: true,
         textColorChance: 1.0,
+        textColorUniqueLabelsPerRound: true,
         textColorAvoidCardBackground: true,
         textColorUniqueLabelsPerRound: true
       },
@@ -534,6 +540,7 @@
       rounds: 1,
       cards: 3,
       noRepeatAcrossRounds: true,
+      noDuplicateAnswerInitialsPerRound: true,
       revealSeconds: 10,
       recallSeconds: 30,
       categories: ["colors"],
@@ -554,6 +561,7 @@
         misleadUniqueLabelsPerRound: true,
         textColor: true,
         textColorChance: 1.0,
+        textColorUniqueLabelsPerRound: true,
         textColorAvoidCardBackground: true,
         textColorNoAdjacent: true
       },
@@ -689,7 +697,7 @@
       modifiers: {
         glitch: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4, gold: 5, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[31] || []
     },
     {
@@ -742,11 +750,14 @@
         backgroundColorChance: 1.0,
         misleadColors: true,
         misleadChance: 1.0,
+        textLabelUniquePerRound: true,
         textColor: true,
         textColorChance: 1.0,
+        textColorUniqueLabelsPerRound: true,
+        textColorAvoidCardBackground: true,
         glitch: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4, gold: 5, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[33] || []
     },
     {
@@ -764,7 +775,7 @@
       modifiers: {
         swapCards: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 2.5, gold: 3.5, silver: 6, bronze: 10 },
       instructions: window.stageInstructions[34] || []
     },
     {
@@ -788,7 +799,7 @@
         glitch: true,
         swapCards: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 9.5, gold: 11.5, silver: 16, bronze: 20 },
       instructions: window.stageInstructions[35] || []
     },
     {
@@ -796,7 +807,7 @@
       version: 1,
       name: "Stage 36",
       stageType: "challenge",
-      rounds: 2,
+      rounds: 1,
       cards: 3,
       noRepeatAcrossRounds: true,
       revealSeconds: 10,
@@ -808,8 +819,11 @@
         backgroundColorChance: 1.0,
         misleadColors: true,
         misleadChance: 1.0,
+        textLabelUniquePerRound: true,
         textColor: true,
         textColorChance: 1.0,
+        textColorUniqueLabelsPerRound: true,
+        textColorAvoidCardBackground: true,
         glitch: true,
         swapCards: true,
         backgroundPromptMinCount: 1,
@@ -817,7 +831,7 @@
         textPromptMinCount: 1,
         textPromptMaxCount: 1
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4.5, gold: 6, silver: 10, bronze: 14 },
       instructions: window.stageInstructions[36] || []
     },
     {
@@ -836,7 +850,7 @@
       modifiers: {
         fog: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 2.5, gold: 3, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[37] || []
     },
     {
@@ -844,24 +858,27 @@
       version: 1,
       name: "Stage 38",
       stageType: "challenge",
-      rounds: 2,
-      cards: 2,
+      rounds: 1,
+      cards: 3,
       noRepeatAcrossRounds: true,
       revealSeconds: 10,
       recallSeconds: 30,
-      categories: ["numbers", "letters"],
+      categories: ["numbers"],
       cardCounts: {},
       modifiers: {
         mathOps: true,
-        backgroundColor: true,
-        backgroundColorChance: 1.0,
-        backgroundPromptMinCount: 1,
-        backgroundPromptMaxCount: 1,
+        mathMinCount: 1,
+        mathMaxCount: 1,
         textColor: true,
+        textColorChance: 1.0,
+        textColorUniqueLabelsPerRound: true,
+        textColorAvoidCardBackground: true,
+        textPromptMinCount: 1,
+        textPromptMaxCount: 1,
         swapCards: true,
         fog: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 6, gold: 7, silver: 10, bronze: 16 },
       instructions: window.stageInstructions[38] || []
     },
     {
@@ -872,6 +889,7 @@
       rounds: 3,
       cards: 1,
       noRepeatAcrossRounds: true,
+      noRepeatAnswerInitialsAcrossRounds: true,
       revealSeconds: 0.10,
       recallSeconds: 30,
       categories: ["colors"],
@@ -887,7 +905,8 @@
         misleadColors: true,
         misleadChance: 1.0,
         textColor: true,
-        textColorChance: 1.0
+        textColorChance: 1.0,
+        textColorAvoidCardBackground: true
       },
       starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
       instructions: window.stageInstructions[39] || []
@@ -929,6 +948,7 @@
       modifiers: {
         backgroundColor: true,
         backgroundColorChance: 1.0,
+        backgroundColorUniqueLabelsPerRound: true,
         backgroundPromptMinCount: 1,
         backgroundPromptMaxCount: 1,
         glitch: true,
@@ -937,7 +957,7 @@
         rotateMinCount: 1,
         rotateMaxCount: 1
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 8, gold: 10, silver: 15, bronze: 20 },
       instructions: window.stageInstructions[41] || []
     },
     {
@@ -958,7 +978,7 @@
         mathMinCount: 1,
         mathMaxCount: 1
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 3, gold: 4, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[42] || []
     },
     {
@@ -980,7 +1000,7 @@
         mathMinCount: 3,
         mathMaxCount: 3
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4, gold: 3, silver: 8, bronze: 20 },
       instructions: window.stageInstructions[43] || []
     },
     {
@@ -996,7 +1016,7 @@
       categories: ["numbers"],
       cardCounts: {},
       modifiers: {},
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 3, gold: 4, silver: 8, bronze: 12 },
       instructions: window.stageInstructions[44] || []
     },
     {
@@ -1004,17 +1024,15 @@
       version: 1,
       name: "Stage 45",
       stageType: "challenge",
-      rounds: 2,
+      rounds: 1,
       cards: 3,
       noRepeatAcrossRounds: true,
+      uniqueCardTypesPerRound: true,
       revealSeconds: 10,
       recallSeconds: 30,
-      categories: ["letters", "directions", "colors"],
+      categories: ["letters", "directions", "numbers"],
       cardCounts: {},
       modifiers: {
-        backgroundColor: true,
-        backgroundPromptMinCount: 1,
-        backgroundPromptMaxCount: 1,
         rotate: true,
         rotateMinCount: 1,
         rotateMaxCount: 1,
@@ -1022,7 +1040,7 @@
         fog: true,
         ads: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 5, gold: 6, silver: 10, bronze: 16 },
       instructions: window.stageInstructions[45] || []
     },
     {
@@ -1062,7 +1080,7 @@
         previousCard: true,
         previousCardChance: 1.0
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 0.8, gold: 2, silver: 4, bronze: 8 },
       instructions: window.stageInstructions[47] || []
     },
     {
@@ -1081,7 +1099,7 @@
         previousCard: true,
         previousCardChance: 1.0
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 2, gold: 3, silver: 5, bronze: 8 },
       instructions: window.stageInstructions[48] || []
     },
     {
@@ -1107,8 +1125,31 @@
         previousCard: true,
         previousCardChance: 1.0
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 5, gold: 6, silver: 10, bronze: 14 },
       instructions: window.stageInstructions[49] || []
+    },
+    {
+      id: 50,
+      version: 1,
+      name: "Stage 50",
+      stageType: "challenge",
+      rounds: 3,
+      cards: 2,
+      noRepeatAcrossRounds: true,
+      revealSeconds: 10,
+      recallSeconds: 30,
+      categories: ["numbers"],
+      cardCounts: {},
+      modifiers: {
+        previousCard: true,
+        previousCardChance: 1.0,
+        previousPromptMinCount: 1,
+        previousPromptMaxCount: 1,
+        swapCards: true,
+        swapChance: 1.0
+      },
+      starTimes: { platinum: 8, gold: 10, silver: 14, bronze: 18 },
+      instructions: window.stageInstructions[50] || []
     }
   ];
 })();

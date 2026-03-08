@@ -148,6 +148,10 @@
           clearTimeout(swapTimeoutId);
           swapTimeoutId = null;
           swapStartTime = null;
+          if (swapStagePauseStart) {
+            swapStagePauseAccumulated += performance.now() - swapStagePauseStart;
+            swapStagePauseStart = null;
+          }
         }
         if (successAnimationActive) {
           pauseSuccessAnimation();
@@ -205,7 +209,9 @@
         }
         restorePausedEffects(remainingSeconds);
         if (gameMode === "stages" && stageState.active) {
-          if (successAnimationActive) {
+          if (pausedState.swapRemaining && swapStartRecall) {
+            swapStagePauseStart = performance.now();
+          } else if (successAnimationActive) {
             resumeSuccessAnimation();
           } else {
             startStageStopwatch();
@@ -257,6 +263,12 @@
       }
 
       function buildExpectedLabel(item) {
+        if (item && item.specialType === "cat") {
+          return {
+            label: "Cat",
+            answer: "cat"
+          };
+        }
         if (item.category === "numbers" && item.recallHint) {
           return {
             label: item.recallHint,
@@ -658,6 +670,7 @@
             autoAdvanceNextTimerId = null;
             const nextBtn = document.getElementById("stageNextButton");
             if (nextBtn && stages[stageState.index + 1]) {
+              hideAutoAdvanceNextFromResults();
               if (typeof window.setStageIntroAnimationMode === "function") {
                 window.setStageIntroAnimationMode("auto");
               }
@@ -688,8 +701,28 @@
             nextTimerFill.style.removeProperty("transform");
           }
         };
+        const hideAutoAdvanceNextFromResults = () => {
+          if (autoAdvanceNextTimerId) {
+            clearTimeout(autoAdvanceNextTimerId);
+            autoAdvanceNextTimerId = null;
+          }
+          if (nextTimer) {
+            nextTimer.classList.remove("is-running");
+            nextTimer.classList.remove("is-waiting");
+            nextTimer.classList.remove("is-canceled");
+            nextTimer.classList.add("is-disabled");
+          }
+          if (nextTimerFill) {
+            nextTimerFill.style.transition = "none";
+            nextTimerFill.style.transform = "scaleX(0)";
+            void nextTimerFill.offsetWidth;
+            nextTimerFill.style.removeProperty("transition");
+            nextTimerFill.style.removeProperty("transition-duration");
+          }
+        };
         window.startAutoAdvanceNextFromResults = startAutoAdvanceNext;
         window.cancelAutoAdvanceNextFromResults = cancelAutoAdvanceNextFromResults;
+        window.hideAutoAdvanceNextFromResults = hideAutoAdvanceNextFromResults;
         const autoAdvanceEnabled = typeof autoAdvanceNextEnabled === "undefined"
           ? true
           : autoAdvanceNextEnabled;
@@ -890,6 +923,8 @@
           sandboxPlayed: false,
           sandboxCompletedCount: 0,
           flashCompletedCount: 0,
+          tutorialCompletedCount: 0,
+          challengeCompletedCount: 0,
           cardTypeCounts: {},
           modifierVariantCounts: {}
         };
@@ -929,6 +964,8 @@
         window.flashRecallSessionStats.sandboxPlayed = Boolean(window.flashRecallSessionStats.sandboxPlayed);
         window.flashRecallSessionStats.sandboxCompletedCount = Number(window.flashRecallSessionStats.sandboxCompletedCount) || 0;
         window.flashRecallSessionStats.flashCompletedCount = Number(window.flashRecallSessionStats.flashCompletedCount) || 0;
+        window.flashRecallSessionStats.tutorialCompletedCount = Number(window.flashRecallSessionStats.tutorialCompletedCount) || 0;
+        window.flashRecallSessionStats.challengeCompletedCount = Number(window.flashRecallSessionStats.challengeCompletedCount) || 0;
         window.flashRecallSessionStats.cardTypeCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.cardTypeCounts);
         window.flashRecallSessionStats.modifierVariantCounts = normalizeStatsCounterMap(window.flashRecallSessionStats.modifierVariantCounts);
       }
@@ -948,6 +985,8 @@
           payload.sandboxPlayed = Boolean(parsed.sandboxPlayed);
           payload.sandboxCompletedCount = Number(parsed.sandboxCompletedCount) || 0;
           payload.flashCompletedCount = Number(parsed.flashCompletedCount) || 0;
+          payload.tutorialCompletedCount = Number(parsed.tutorialCompletedCount) || 0;
+          payload.challengeCompletedCount = Number(parsed.challengeCompletedCount) || 0;
           payload.cardTypeCounts = normalizeStatsCounterMap(parsed.cardTypeCounts);
           payload.modifierVariantCounts = normalizeStatsCounterMap(parsed.modifierVariantCounts);
           return payload;
@@ -1039,6 +1078,22 @@
         window.flashRecallSessionStats.flashCompletedCount += 1;
         const payload = loadStoredStatsPayload();
         payload.flashCompletedCount = (Number(payload.flashCompletedCount) || 0) + 1;
+        saveStoredStatsPayload(payload);
+      }
+
+      function recordTutorialCompletionStat() {
+        ensureSessionStatsObject();
+        window.flashRecallSessionStats.tutorialCompletedCount += 1;
+        const payload = loadStoredStatsPayload();
+        payload.tutorialCompletedCount = (Number(payload.tutorialCompletedCount) || 0) + 1;
+        saveStoredStatsPayload(payload);
+      }
+
+      function recordChallengeCompletionStat() {
+        ensureSessionStatsObject();
+        window.flashRecallSessionStats.challengeCompletedCount += 1;
+        const payload = loadStoredStatsPayload();
+        payload.challengeCompletedCount = (Number(payload.challengeCompletedCount) || 0) + 1;
         saveStoredStatsPayload(payload);
       }
 
@@ -1145,8 +1200,13 @@
               if (typeof window.registerAdaptiveSuccessForStage === "function") {
                 window.registerAdaptiveSuccessForStage(stageState.index);
               }
-              if (String(stage && stage.stageType ? stage.stageType : "").toLowerCase() === "flash") {
+              const stageType = String(stage && stage.stageType ? stage.stageType : "").toLowerCase();
+              if (stageType === "flash") {
                 recordFlashCompletionStat();
+              } else if (stageType === "tutorial") {
+                recordTutorialCompletionStat();
+              } else if (stageType === "challenge") {
+                recordChallengeCompletionStat();
               }
               if (typeof trackLevelSession === 'function') {
                 const activeContext = typeof window.getActiveLevelContext === "function"
@@ -1426,11 +1486,25 @@
           swapStartRecall = startRecall;
           swapRemaining = swapAnimationDuration + 200;
           swapStartTime = performance.now();
+          if (gameMode === "stages" && stageState.active) {
+            stopStageStopwatch();
+            swapStagePauseStart = swapStartTime;
+            swapStagePauseAccumulated = 0;
+          }
           swapTimeoutId = setTimeout(() => {
             swapTimeoutId = null;
             swapStartTime = null;
             swapRemaining = null;
             swapStartRecall = null;
+            if (gameMode === "stages" && stageState.active && typeof stageState.startTime === "number") {
+              const swapElapsed = swapStagePauseStart
+                ? performance.now() - swapStagePauseStart
+                : 0;
+              stageState.startTime += swapStagePauseAccumulated + swapElapsed;
+              swapStagePauseStart = null;
+              swapStagePauseAccumulated = 0;
+              startStageStopwatch();
+            }
             if (swapCleanup) {
               swapCleanup();
               swapCleanup = null;

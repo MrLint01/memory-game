@@ -75,9 +75,25 @@
       function applyNumberChallenges(items, options) {
         if (!options.enableMathOps && !options.enableMathOpsPlus) return items;
         const usePlus = Boolean(options.enableMathOpsPlus);
-        const candidates = items
+        let candidates = items
           .map((item, index) => ({ item, index }))
           .filter((entry) => entry.item.category === "numbers");
+        const minRequired =
+          typeof options.mathMinCount === "number" ? Math.max(0, Math.floor(options.mathMinCount)) : 0;
+        const textPromptIndices =
+          options && options._textPromptSelectedIndices instanceof Set
+            ? options._textPromptSelectedIndices
+            : null;
+        if (textPromptIndices && textPromptIndices.size) {
+          const unlocked = candidates.filter((entry) => !textPromptIndices.has(entry.index));
+          if (unlocked.length >= minRequired) {
+            candidates = unlocked;
+          }
+        }
+        const withoutTextPromptHint = candidates.filter((entry) => entry.item.recallHint !== "Text color");
+        if (withoutTextPromptHint.length >= minRequired) {
+          candidates = withoutTextPromptHint;
+        }
         for (let i = candidates.length - 1; i > 0; i -= 1) {
           const j = Math.floor(Math.random() * (i + 1));
           [candidates[i], candidates[j]] = [candidates[j], candidates[i]];

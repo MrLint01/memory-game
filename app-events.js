@@ -1216,19 +1216,6 @@ function runFlashCountdown(onComplete) {
       }
 
       function startFlashRound() {
-        const warmupDelay =
-          stageState && typeof stageState.flashStartDelayMs === "number"
-            ? Math.max(0, stageState.flashStartDelayMs)
-            : 0;
-        if (warmupDelay > 0) {
-          stageState.flashStartDelayMs = 0;
-          window.setTimeout(() => {
-            runFlashCountdown(() => {
-              startRound({ advanceRound: true, __flashOverride: true });
-            });
-          }, warmupDelay);
-          return;
-        }
         runFlashCountdown(() => {
           startRound({ advanceRound: true, __flashOverride: true });
         });
@@ -1367,6 +1354,24 @@ function runFlashCountdown(onComplete) {
           fill.style.transition = "none";
           fill.style.transform = "scaleX(0)";
           void fill.offsetWidth;
+        }
+      }
+
+      function hideStageNextAutoAdvanceBar() {
+        const timer = document.querySelector("#resultsPanel .stage-next-timer");
+        const fill = timer ? timer.querySelector(".stage-next-timer__fill") : null;
+        if (timer) {
+          timer.classList.remove("is-running");
+          timer.classList.remove("is-waiting");
+          timer.classList.remove("is-canceled");
+          timer.classList.add("is-disabled");
+        }
+        if (fill) {
+          fill.style.transition = "none";
+          fill.style.transform = "scaleX(0)";
+          void fill.offsetWidth;
+          fill.style.removeProperty("transition");
+          fill.style.removeProperty("transition-duration");
         }
       }
 
@@ -1527,7 +1532,7 @@ function runFlashCountdown(onComplete) {
         clearStageIntroAutoStart();
         const animateMode = stageIntroAnimationMode;
         stageIntroAnimationMode = null;
-        if (animateMode === "auto") {
+        if (animateMode === "auto" && stageIntroAutoStartEnabled) {
           if (stageIntroCard) {
             void stageIntroCard.offsetWidth;
             stageIntroCard.classList.add("intro-soft", "intro-auto");
@@ -1691,6 +1696,8 @@ function runFlashCountdown(onComplete) {
                 ? { src: "imgs/flash_icon.png", label: "Flash level" }
                 : stageType === "tutorial"
                   ? { src: "imgs/tutorial_icon.png", label: "Tutorial level" }
+                  : stageType === "challenge"
+                    ? { src: "imgs/icons/challenge-icon.svg", label: "Challenge level" }
                   : null;
 
             const starsMarkup = [1, 2, 3]
@@ -2064,7 +2071,6 @@ function runFlashCountdown(onComplete) {
         clearResultAutoActionCountdown();
         const stage = window.getStageConfig ? window.getStageConfig(index) : null;
         const isFlashStage = stage && String(stage.stageType).toLowerCase() === "flash";
-        stageState.flashStartDelayMs = isFlashStage && deferStartRound ? 200 : 0;
         if (isFlashStage && flashWarningEnabled && !skipFlashWarningPrompt && skipIntro) {
           openFlashStagePrompt(index);
           return;
@@ -2954,6 +2960,10 @@ function runFlashCountdown(onComplete) {
             totalLevelSuccesses: 0,
             failedLevelCount: 0,
             sandboxPlayed: false,
+            sandboxCompletedCount: 0,
+            flashCompletedCount: 0,
+            tutorialCompletedCount: 0,
+            challengeCompletedCount: 0,
             cardTypeCounts: {},
             modifierVariantCounts: {}
           };
@@ -3014,6 +3024,13 @@ function runFlashCountdown(onComplete) {
               clearTimeout(autoAdvanceNextTimerId);
               autoAdvanceNextTimerId = null;
               cancelStageNextAutoAdvanceBar();
+            }
+          }
+          if (autoStartStagePreviewToggle) {
+            autoStartStagePreviewToggle.checked = Boolean(defaultControlSettings.autoStartStagePreview);
+            stageIntroAutoStartEnabled = autoStartStagePreviewToggle.checked;
+            if (!stageIntroAutoStartEnabled) {
+              clearStageIntroAutoStart();
             }
           }
           if (enterToNextToggle) {
@@ -3897,9 +3914,12 @@ function runFlashCountdown(onComplete) {
         });
       }
 
-      interruptClose.addEventListener("click", () => {
-        hideAd();
-        if (pendingSkipAfterAd) {
+      interruptModal.addEventListener("click", (event) => {
+        const closeButton = event.target.closest(".interrupt-close");
+        if (!closeButton) return;
+        const card = closeButton.closest(".interrupt-card");
+        hideAd(card || null);
+        if (pendingSkipAfterAd && !adActive) {
           pendingSkipAfterAd = false;
           beginRecallPhase();
         }
@@ -4122,6 +4142,11 @@ function runFlashCountdown(onComplete) {
           const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
           const nextIndex = stageState.index + 1;
           if (!stages[nextIndex]) return;
+          if (typeof window.hideAutoAdvanceNextFromResults === "function") {
+            window.hideAutoAdvanceNextFromResults();
+          } else {
+            hideStageNextAutoAdvanceBar();
+          }
           if (typeof window.setStageIntroAnimationMode === "function") {
             window.setStageIntroAnimationMode("soft");
           }
@@ -4648,6 +4673,25 @@ function runFlashCountdown(onComplete) {
       } else {
         autoAdvanceNextEnabled = Boolean(defaultControlSettings.autoAdvanceNext);
       }
+      if (autoStartStagePreviewToggle) {
+        const storageKey = "flashRecallAutoStartStagePreview";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          autoStartStagePreviewToggle.checked = saved === "1";
+        } else {
+          autoStartStagePreviewToggle.checked = Boolean(defaultControlSettings.autoStartStagePreview);
+        }
+        stageIntroAutoStartEnabled = autoStartStagePreviewToggle.checked;
+        autoStartStagePreviewToggle.addEventListener("change", () => {
+          stageIntroAutoStartEnabled = autoStartStagePreviewToggle.checked;
+          window.localStorage.setItem(storageKey, autoStartStagePreviewToggle.checked ? "1" : "0");
+          if (!stageIntroAutoStartEnabled) {
+            clearStageIntroAutoStart();
+          }
+        });
+      } else {
+        stageIntroAutoStartEnabled = Boolean(defaultControlSettings.autoStartStagePreview);
+      }
 
       if (leaderboardsEnabledToggle) {
         const storageKey = LEADERBOARDS_ENABLED_STORAGE_KEY;
@@ -4744,9 +4788,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
-
 
 
 

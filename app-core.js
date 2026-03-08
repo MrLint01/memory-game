@@ -177,6 +177,13 @@ const revealInput = document.getElementById("revealTime");
           }
         }
       };
+      const RARE_CAT_CARD_CHANCE = 1 / 5000;
+      const RARE_CAT_CARD_IMAGES = [
+        "imgs/cats/Aidan_cat.jpg",
+        "imgs/cats/Aidan_cat2.jpg",
+        "imgs/cats/Karl_Cat.jpg",
+        "imgs/cats/Lin_Cat.jpg"
+      ];
 
       function normalizeColorVisionLabel(label) {
         return String(label || "").trim().toLowerCase();
@@ -264,6 +271,7 @@ const revealInput = document.getElementById("revealTime");
       const flashCountdown = document.getElementById("flashCountdown");
       const flashStageSkip = document.getElementById("flashStageSkip");
       const autoAdvanceNextToggle = document.getElementById("autoAdvanceNextToggle");
+      const autoStartStagePreviewToggle = document.getElementById("autoStartStagePreviewToggle");
       const leaderboardsEnabledToggle = document.getElementById("leaderboardsEnabledToggle");
       const stageIntroModal = document.getElementById("stageIntroModal");
       const stageIntroTitle = document.getElementById("stageIntroTitle");
@@ -353,6 +361,7 @@ const revealInput = document.getElementById("revealTime");
       let adTimer = null;
       let autoAdvanceNextTimerId = null;
       let autoAdvanceNextEnabled = true;
+      let stageIntroAutoStartEnabled = true;
       let stageIntroAutoStartTimerId = null;
       let adEnabled = false;
       let adActive = false;
@@ -377,6 +386,8 @@ const revealInput = document.getElementById("revealTime");
       let swapRemaining = null;
       let swapStartRecall = null;
       let swapCleanup = null;
+      let swapStagePauseStart = null;
+      let swapStagePauseAccumulated = 0;
       let stageCategoryQueue = null;
       let stageCategoryQueueIndex = 0;
       let stageCategoryQueueStageId = null;
@@ -802,11 +813,8 @@ const revealInput = document.getElementById("revealTime");
             box.style.fontSize = entry.size;
           }
           if (entry.color) {
-            const theme = document.body.dataset.theme;
-            const forceThemeInk = theme === "night-drive"
-              || theme === "ember-glow"
-              || theme === "velvet-noir"
-              || theme === "vault-ops";
+            const theme = String(document.body && document.body.dataset ? document.body.dataset.theme || "" : "");
+            const forceThemeInk = theme.startsWith("night-");
             box.style.color = forceThemeInk ? "var(--ink)" : entry.color;
           }
           stageInstructions.appendChild(box);
@@ -1023,6 +1031,32 @@ const revealInput = document.getElementById("revealTime");
 
       function normalize(value) {
         return value.trim().toLowerCase();
+      }
+
+      function pickRareCatImage() {
+        if (!RARE_CAT_CARD_IMAGES.length) return "";
+        const index = Math.floor(Math.random() * RARE_CAT_CARD_IMAGES.length);
+        return RARE_CAT_CARD_IMAGES[index] || RARE_CAT_CARD_IMAGES[0];
+      }
+
+      function maybeConvertToCatCard(item) {
+        if (!item || item.specialType === "cat" || Math.random() >= RARE_CAT_CARD_CHANCE) {
+          return item;
+        }
+        return {
+          ...item,
+          specialType: "cat",
+          specialImage: pickRareCatImage(),
+          answer: "cat",
+          answerAliases: ["c", "cat"],
+          recallHint: "Cat",
+          textLabel: null,
+          colorTarget: null,
+          backgroundColorLabel: null,
+          backgroundColorHex: null,
+          textColorLabel: null,
+          textColorHex: null
+        };
       }
 
       function formatCategoryLabel(category) {
@@ -1433,6 +1467,12 @@ const revealInput = document.getElementById("revealTime");
         }
         const actual = normalize(actualValue);
         const expected = normalize(item.answer ?? item.label);
+        const answerAliases = Array.isArray(item.answerAliases)
+          ? item.answerAliases.map((value) => normalize(String(value)))
+          : [];
+        if (answerAliases.includes(actual)) {
+          return true;
+        }
         const category = item.answerCategory || item.category;
         const stage = gameMode === "stages" && window.getStageConfig
           ? window.getStageConfig(stageState.index)
@@ -1695,13 +1735,23 @@ const revealInput = document.getElementById("revealTime");
           const shouldApplyBackground =
             forceBackground || (!useBackgroundPlan && Math.random() < bgChance);
           if (shouldApplyBackground) {
-            const backgroundColor = noRepeatBackgroundAcrossRounds
+            const usedLabels =
+              options && options.backgroundColorUniqueLabelsPerRound && options._backgroundColorUsedLabels
+                ? options._backgroundColorUsedLabels
+                : null;
+            const backgroundColor = pickBackgroundColorWithUsed(
+              usedLabels,
+              noRepeatBackgroundAcrossRounds ? previousBackgroundLabel : null
+            ) || (noRepeatBackgroundAcrossRounds
               ? (pickBackgroundColorAvoiding(previousBackgroundLabel) || pickBackgroundColor())
-              : pickBackgroundColor();
+              : pickBackgroundColor());
             challenge.backgroundColorLabel = backgroundColor.label;
             challenge.backgroundColorHex = backgroundColor.color;
             if (!challenge.achievementModifiers.includes("backgroundColor")) {
               challenge.achievementModifiers.push("backgroundColor");
+            }
+            if (usedLabels && backgroundColor.label) {
+              usedLabels.add(String(backgroundColor.label).toLowerCase());
             }
             if (noRepeatBackgroundAcrossRounds && backgroundColor.label && stage) {
               lastBackgroundColorLabel = backgroundColor.label;
@@ -1747,6 +1797,40 @@ const revealInput = document.getElementById("revealTime");
               challenge.recallHint = "Background color";
             }
           }
+        }
+        if (options && options.textColorMatchCardBackground) {
+          const matchLabel = item.category === "colors"
+            ? item.label
+            : (challenge.backgroundColorLabel || item.backgroundColorLabel);
+          const matchHex = item.category === "colors"
+            ? item.color
+            : (challenge.backgroundColorHex || item.backgroundColorHex);
+          if (matchLabel && matchHex) {
+            const usedLabels =
+              options.textColorUniqueLabelsPerRound && options._textColorUsedLabels
+                ? options._textColorUsedLabels
+                : null;
+            if (usedLabels && challenge._textColorUsedLabel) {
+              usedLabels.delete(challenge._textColorUsedLabel);
+              challenge._textColorUsedLabel = null;
+            }
+            if (usedLabels) {
+              const key = String(matchLabel).toLowerCase();
+              usedLabels.add(key);
+              challenge._textColorUsedLabel = key;
+            }
+            challenge.textColorLabel = matchLabel;
+            challenge.textColorHex = matchHex;
+            if (!challenge.achievementModifiers.includes("textColor")) {
+              challenge.achievementModifiers.push("textColor");
+            }
+            if (challenge.recallHint === "Text color") {
+              challenge.answer = matchLabel;
+            }
+          }
+        }
+        if (challenge.recallHint === "Text color" && challenge.textColorLabel) {
+          challenge.answer = challenge.textColorLabel;
         }
         return challenge;
       }
@@ -1871,6 +1955,7 @@ const revealInput = document.getElementById("revealTime");
               plan[index].forceTextPrompt = true;
               selectedTextPromptIndices.add(index);
             });
+            options._textPromptSelectedIndices = selectedTextPromptIndices;
           }
         }
         if (options && options.enableBackgroundColor) {
@@ -2014,6 +2099,37 @@ const revealInput = document.getElementById("revealTime");
         return filtered[Math.floor(Math.random() * filtered.length)];
       }
 
+      function pickBackgroundColorWithUsed(usedLabels, avoidLabel) {
+        const list = Array.isArray(backgroundColors) ? backgroundColors : [];
+        if (!list.length) return null;
+        const normalizeLabel = (value) => String(value || "").trim().toLowerCase();
+        const avoidValue = normalizeLabel(avoidLabel);
+        let pool = list;
+        if (usedLabels && usedLabels.size) {
+          const filtered = pool.filter((entry) => {
+            if (!entry || !entry.label) return false;
+            return !usedLabels.has(normalizeLabel(entry.label));
+          });
+          if (filtered.length) {
+            pool = filtered;
+          }
+        }
+        if (avoidValue) {
+          const filtered = pool.filter((entry) => {
+            if (!entry || !entry.label) return false;
+            return normalizeLabel(entry.label) !== avoidValue;
+          });
+          if (filtered.length) {
+            pool = filtered;
+          }
+        }
+        const choice = pool[Math.floor(Math.random() * pool.length)];
+        if (typeof window.getAccessibleColorEntry === "function") {
+          return window.getAccessibleColorEntry(choice.label, choice.color);
+        }
+        return choice;
+      }
+
       function pickItems(attempt = 0) {
         const options = getChallengeOptions(round);
         if (options && (options.misleadUniqueLabelsPerRound || options.textLabelUniquePerRound)) {
@@ -2021,6 +2137,9 @@ const revealInput = document.getElementById("revealTime");
         }
         if (options && options.textColorUniqueLabelsPerRound) {
           options._textColorUsedLabels = new Set();
+        }
+        if (options && options.backgroundColorUniqueLabelsPerRound) {
+          options._backgroundColorUsedLabels = new Set();
         }
         const stage = gameMode === "stages" && window.getStageConfig
           ? window.getStageConfig(stageState.index)
@@ -2336,7 +2455,19 @@ const revealInput = document.getElementById("revealTime");
           }
         }
         const plan = planModifierAssignments(chosen, options);
-        const built = chosen.map((item, index) => buildChallenge(item, options, plan[index]));
+        if (options && options.backgroundColorUniqueLabelsPerRound && options._backgroundColorUsedLabels) {
+          chosen.forEach((item) => {
+            if (!item || item.category !== "colors" || !item.label) return;
+            options._backgroundColorUsedLabels.add(String(item.label).toLowerCase());
+          });
+        }
+        const built = chosen.map((item, index) => maybeConvertToCatCard(buildChallenge(item, options, plan[index])));
+        if (
+          built.some((item) => item && item.specialType === "cat") &&
+          typeof window.recordCatSecretFound === "function"
+        ) {
+          window.recordCatSecretFound();
+        }
         if (options && (options.misleadUniqueLabelsPerRound || options.textLabelUniquePerRound)) {
           const used = new Set();
           built.forEach((item) => {
@@ -2355,6 +2486,41 @@ const revealInput = document.getElementById("revealTime");
               item.answer = next;
             }
             used.add(next);
+          });
+        }
+        if (options && options.textColorUniqueLabelsPerRound && Array.isArray(built)) {
+          const usedLabels =
+            options._textColorUsedLabels instanceof Set ? options._textColorUsedLabels : new Set();
+          usedLabels.clear();
+          const normalizeLabel = (value) => String(value || "").trim().toLowerCase();
+          const maxAttempts = 6;
+          built.forEach((item) => {
+            if (!item || !item.textColorLabel) return;
+            const currentLabel = normalizeLabel(item.textColorLabel);
+            if (!currentLabel) return;
+            if (!usedLabels.has(currentLabel)) {
+              usedLabels.add(currentLabel);
+              return;
+            }
+            const avoidHex = options.textColorAvoidCardBackground
+              ? (item.color || item.backgroundColorHex || getCardBackgroundHex())
+              : "";
+            let replacement = null;
+            for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+              const next = pickTextColor(usedLabels, avoidHex);
+              if (!next || !next.label) continue;
+              const nextLabel = normalizeLabel(next.label);
+              if (!nextLabel || usedLabels.has(nextLabel)) continue;
+              replacement = next;
+              break;
+            }
+            if (replacement) {
+              item.textColorLabel = replacement.label;
+              item.textColorHex = replacement.color;
+              usedLabels.add(normalizeLabel(replacement.label));
+            } else {
+              usedLabels.add(currentLabel);
+            }
           });
         }
         if (options && options.textColorNoAdjacent && Array.isArray(built) && built.length > 1) {
@@ -2455,7 +2621,12 @@ const revealInput = document.getElementById("revealTime");
           card.style.order = index;
           card.dataset.index = index;
           if (show) {
-            if (item.category === "directions") {
+            if (item.specialType === "cat") {
+              const src = item.specialImage || pickRareCatImage();
+              card.innerHTML = `
+                <img class="cat-image" src="${src}" alt="Cat" />
+              `;
+            } else if (item.category === "directions") {
               const rotation = getDirectionRotation(item.label);
               card.innerHTML = `
                 <img
@@ -2489,30 +2660,37 @@ const revealInput = document.getElementById("revealTime");
             }
             let fillCue = null;
             let textCue = null;
-            if (item.color) {
-              fillCue = getAccessibleColorEntry(item.label, item.color);
-              card.style.background = fillCue.color;
-              if (!item.textColorHex) {
-                card.style.color = "#000";
+            if (item.specialType !== "cat") {
+              if (item.color) {
+                fillCue = getAccessibleColorEntry(item.label, item.color);
+                card.style.background = fillCue.color;
+                if (!item.textColorHex) {
+                  card.style.color = "#000";
+                }
+              } else if (item.backgroundColorHex) {
+                fillCue = getAccessibleColorEntry(item.backgroundColorLabel, item.backgroundColorHex);
+                card.style.background = fillCue.color;
+                if (!item.textColorHex) {
+                  card.style.color = "#000";
+                }
+                card.classList.add("background-color");
               }
-            } else if (item.backgroundColorHex) {
-              fillCue = getAccessibleColorEntry(item.backgroundColorLabel, item.backgroundColorHex);
-              card.style.background = fillCue.color;
-              if (!item.textColorHex) {
-                card.style.color = "#000";
+              if (item.textColorHex) {
+                textCue = getAccessibleColorEntry(item.textColorLabel, item.textColorHex);
+                card.style.color = textCue.color;
+                card.classList.add("card--text-color");
               }
-              card.classList.add("background-color");
+              applyCardColorVisionAssist(card, fillCue, textCue);
             }
-            if (item.textColorHex) {
-              textCue = getAccessibleColorEntry(item.textColorLabel, item.textColorHex);
-              card.style.color = textCue.color;
-              card.classList.add("card--text-color");
-            }
-            applyCardColorVisionAssist(card, fillCue, textCue);
           } else {
             const cardLabel = `Card ${index + 1}`;
-            const categoryLabel = formatCategoryLabel(item.category);
-            if (item.recallHint) {
+            const categoryLabel = item.specialType === "cat" ? "Cat" : formatCategoryLabel(item.category);
+            if (item.specialType === "cat") {
+              card.innerHTML = `
+                <small>${cardLabel}</small>
+                <span>Cat</span>
+              `;
+            } else if (item.recallHint) {
               const hintHtml = String(item.recallHint)
                 .replace(/\u21bb/g, '<span class="rotation-icon">\u21bb</span>')
                 .replace(/\u21ba/g, '<span class="rotation-icon">\u21ba</span>');
