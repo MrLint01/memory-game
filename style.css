@@ -1258,7 +1258,7 @@ button.icon-button {
   transform: translateY(-1%);
   bottom: -1.4rem;
 }
-      .action-icon {
+.action-icon {
         width: 28px;
         height: 28px;
         display: block;
@@ -1266,6 +1266,14 @@ button.icon-button {
         pointer-events: none;
         margin: 0;
       }
+body[data-theme^="night-"] .action-icon,
+body[data-theme^="night-"] .stage-intro-icon img[src$="flash_icon.png"],
+body[data-theme^="night-"] .stage-intro-icon img[src$="tutorial_icon.png"],
+body[data-theme^="night-"] .stage-intro-icon img[src$="leaderboard.png"],
+body[data-theme^="night-"] .stage-type-icon[src$="flash_icon.png"],
+body[data-theme^="night-"] .stage-type-icon[src$="tutorial_icon.png"] {
+  filter: brightness(0) invert(1);
+}
 .action-glyph {
   display: inline-flex;
   align-items: center;
