@@ -82,7 +82,8 @@
           : fallbackAppearance.colorVisionModes,
         layouts: Array.isArray(defaultAppearance.layouts) && defaultAppearance.layouts.length
           ? defaultAppearance.layouts
-          : fallbackAppearance.layouts
+          : fallbackAppearance.layouts,
+        
       };
       const HIDDEN_APPEARANCE_THEMES = ["prism-parade"];
       const ALL_APPEARANCE_THEMES = appearanceOptions.themes.concat(HIDDEN_APPEARANCE_THEMES);
@@ -4729,14 +4730,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
-
-
-
-
-
-
 
 
 
