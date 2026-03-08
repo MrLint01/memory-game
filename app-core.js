@@ -219,6 +219,11 @@ const revealInput = document.getElementById("revealTime");
         return luminance > 0.58 ? "#0f172a" : "#f8fafc";
       }
 
+      function getCardBackgroundHex() {
+        if (typeof window.getComputedStyle !== "function" || !document.body) return "";
+        return String(window.getComputedStyle(document.body).getPropertyValue("--card") || "").trim();
+      }
+
       function applyCardColorVisionAssist(card, fillCue, textCue) {
         const existingCueStack = card.querySelector(".card-color-cues");
         if (existingCueStack) {
@@ -322,6 +327,8 @@ const revealInput = document.getElementById("revealTime");
       let roundItemsBase = [];
       let lastRoundItems = null;
       let lastRoundStageId = null;
+      let lastAnswerInitials = null;
+      let lastAnswerInitialsStageId = null;
       let priorRoundItems = null;
       let priorRoundStageId = null;
       let lastBackgroundColorLabel = null;
@@ -1253,6 +1260,10 @@ const revealInput = document.getElementById("revealTime");
         const actual = normalize(actualValue);
         const expected = normalize(item.answer ?? item.label);
         const category = item.answerCategory || item.category;
+        const stage = gameMode === "stages" && window.getStageConfig
+          ? window.getStageConfig(stageState.index)
+          : null;
+        const disableColorInitials = Boolean(stage && stage.disableColorInitials);
         if (item.recallHint === "Previous card" && Array.isArray(item.previousAnswerKeys)) {
           if (item.previousAnswerKeys.includes(actual)) {
             return true;
@@ -1260,11 +1271,11 @@ const revealInput = document.getElementById("revealTime");
         }
         if (item.recallHint === "Background color" || item.recallHint === "Text color") {
           const initial = expected.charAt(0);
-          return actual === expected || actual === initial;
+          return disableColorInitials ? actual === expected : (actual === expected || actual === initial);
         }
         if (category === "colors") {
           const initial = expected.charAt(0);
-          return actual === expected || actual === initial;
+          return disableColorInitials ? actual === expected : (actual === expected || actual === initial);
         }
         if (category === "directions") {
           const initial = expected.charAt(0);
@@ -1421,9 +1432,23 @@ const revealInput = document.getElementById("revealTime");
           canUseTextColor &&
           (plan.forceTextPrompt || Math.random() < (Number(options.textColorChance) || 0));
         if (applyTextColor) {
-          const textColor = pickTextColor();
-          challenge.textColorLabel = textColor.label;
-          challenge.textColorHex = textColor.color;
+          const usedLabels =
+            options && options.textColorUniqueLabelsPerRound && options._textColorUsedLabels
+              ? options._textColorUsedLabels
+              : null;
+          const avoidHex = options && options.textColorAvoidCardBackground
+            ? (item.color || item.backgroundColorHex || getCardBackgroundHex())
+            : "";
+          const textColor = pickTextColor(usedLabels, avoidHex);
+          if (textColor) {
+            challenge.textColorLabel = textColor.label;
+            challenge.textColorHex = textColor.color;
+            if (usedLabels && textColor.label) {
+              const key = String(textColor.label).toLowerCase();
+              usedLabels.add(key);
+              challenge._textColorUsedLabel = key;
+            }
+          }
           if (!challenge.achievementModifiers.includes("textColor")) {
             challenge.achievementModifiers.push("textColor");
           }
@@ -1445,7 +1470,9 @@ const revealInput = document.getElementById("revealTime");
               : plan.forceMislead || Math.random() < options.misleadChance;
             if (useMislead) {
               const usedLabels =
-                options && options.misleadUniqueLabelsPerRound && options._misleadUsedLabels
+                options &&
+                (options.misleadUniqueLabelsPerRound || options.textLabelUniquePerRound) &&
+                options._misleadUsedLabels
                   ? options._misleadUsedLabels
                   : null;
               challenge.misleadingLabel = pickMisleadingLabel(item.label, usedLabels);
@@ -1505,6 +1532,32 @@ const revealInput = document.getElementById("revealTime");
             if (noRepeatBackgroundAcrossRounds && backgroundColor.label && stage) {
               lastBackgroundColorLabel = backgroundColor.label;
               lastBackgroundColorStageId = stage.id;
+            }
+            if (
+              options &&
+              options.textColorAvoidCardBackground &&
+              challenge.textColorHex &&
+              challenge.backgroundColorHex &&
+              String(challenge.textColorHex).toLowerCase() === String(challenge.backgroundColorHex).toLowerCase()
+            ) {
+              const usedLabels =
+                options.textColorUniqueLabelsPerRound && options._textColorUsedLabels
+                  ? options._textColorUsedLabels
+                  : null;
+              if (usedLabels && challenge._textColorUsedLabel) {
+                usedLabels.delete(challenge._textColorUsedLabel);
+                challenge._textColorUsedLabel = null;
+              }
+              const reroll = pickTextColor(usedLabels, challenge.backgroundColorHex);
+              if (reroll) {
+                challenge.textColorLabel = reroll.label;
+                challenge.textColorHex = reroll.color;
+                if (usedLabels && reroll.label) {
+                  const key = String(reroll.label).toLowerCase();
+                  usedLabels.add(key);
+                  challenge._textColorUsedLabel = key;
+                }
+              }
             }
             const promptChance =
               typeof options.backgroundPromptChance === "number" ? options.backgroundPromptChance : 0.5;
@@ -1766,6 +1819,13 @@ const revealInput = document.getElementById("revealTime");
         return value[0].toLowerCase();
       }
 
+      function buildAnswerInitial(item) {
+        if (!item) return "";
+        const value = item.answer ?? item.label ?? "";
+        const normalized = normalize(String(value));
+        return normalized ? normalized[0] : "";
+      }
+
       function pickBackgroundColorAvoiding(previousLabel) {
         if (typeof pickBackgroundColor !== "function") return null;
         const safePrev = previousLabel ? String(previousLabel).toLowerCase() : "";
@@ -1780,14 +1840,21 @@ const revealInput = document.getElementById("revealTime");
         return filtered[Math.floor(Math.random() * filtered.length)];
       }
 
-      function pickItems() {
+      function pickItems(attempt = 0) {
         const options = getChallengeOptions(round);
-        if (options && options.misleadUniqueLabelsPerRound) {
+        if (options && (options.misleadUniqueLabelsPerRound || options.textLabelUniquePerRound)) {
           options._misleadUsedLabels = new Set();
+        }
+        if (options && options.textColorUniqueLabelsPerRound) {
+          options._textColorUsedLabels = new Set();
         }
         const stage = gameMode === "stages" && window.getStageConfig
           ? window.getStageConfig(stageState.index)
           : null;
+        const enforceAnswerInitials =
+          gameMode === "stages" && stage && stage.noRepeatAnswerInitialsAcrossRounds === true;
+        const previousAnswerInitials =
+          enforceAnswerInitials && lastAnswerInitialsStageId === stage.id ? lastAnswerInitials : null;
         const roundOverride =
           stage && typeof window.getStageRoundOverride === "function"
             ? window.getStageRoundOverride(stage, round)
@@ -2087,7 +2154,7 @@ const revealInput = document.getElementById("revealTime");
         }
         const plan = planModifierAssignments(chosen, options);
         const built = chosen.map((item, index) => buildChallenge(item, options, plan[index]));
-        if (options && options.misleadUniqueLabelsPerRound) {
+        if (options && (options.misleadUniqueLabelsPerRound || options.textLabelUniquePerRound)) {
           const used = new Set();
           built.forEach((item) => {
             if (!item || item.category !== "colors" || !item.misleadingLabel) return;
@@ -2108,7 +2175,28 @@ const revealInput = document.getElementById("revealTime");
           });
         }
         const rotated = applyRotationChallenges(built, options);
-        return applyNumberChallenges(rotated, options);
+        const result = applyNumberChallenges(rotated, options);
+        if (enforceAnswerInitials && Array.isArray(result)) {
+          const currentInitials = result.map(buildAnswerInitial);
+          const limit = Array.isArray(previousAnswerInitials)
+            ? Math.min(currentInitials.length, previousAnswerInitials.length)
+            : 0;
+          let conflict = false;
+          for (let i = 0; i < limit; i += 1) {
+            const current = currentInitials[i];
+            const prev = previousAnswerInitials[i];
+            if (current && prev && current === prev) {
+              conflict = true;
+              break;
+            }
+          }
+          if (conflict && attempt < 8) {
+            return pickItems(attempt + 1);
+          }
+          lastAnswerInitials = currentInitials;
+          lastAnswerInitialsStageId = stage && stage.id ? stage.id : null;
+        }
+        return result;
       }
 
 

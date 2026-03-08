@@ -454,9 +454,10 @@
         textColor: true,
         textColorChance: 1.0,
         textPromptMinCount: 1,
-        textPromptMaxCount: 1
+        textPromptMaxCount: 1,
+        textColorUniqueLabelsPerRound: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 5, gold: 6, silver: 7, bronze: 10 },
       instructions: window.stageInstructions[22] || []
     },
     {
@@ -469,14 +470,21 @@
       noRepeatAcrossRounds: true,
       revealSeconds: 10,
       recallSeconds: 30,
-      categories: ["numbers", "letters", "colors"],
+      categories: ["colors"],
       cardCounts: {},
       modifiers: {
         textColor: true,
         textColorChance: 1.0,
-        textPromptMinCount: 1
+        textPromptMinCount: 1,
+        textPromptMaxCount: 1,
+        misleadColors: true,
+        misleadChance: 1.0,
+        misleadUniqueLabelsPerRound: true,
+        textLabelUniquePerRound: true,
+        textColorUniqueLabelsPerRound: true,
+        textColorAvoidCardBackground: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 7, gold: 8, silver: 12, bronze: 16 },
       instructions: window.stageInstructions[23] || []
     },
     {
@@ -487,6 +495,7 @@
       rounds: 3,
       cards: 1,
       noRepeatAcrossRounds: true,
+      noRepeatAnswerInitialsAcrossRounds: true,
       revealSeconds: 10,
       recallSeconds: 30,
       categories: ["colors"],
@@ -503,9 +512,10 @@
         misleadChance: 1.0,
         misleadUniqueLabelsPerRound: true,
         textColor: true,
-        textColorChance: 1.0
+        textColorChance: 1.0,
+        textColorAvoidCardBackground: true
       },
-      starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
+      starTimes: { platinum: 4, gold: 5, silver: 6, bronze: 10 },
       instructions: window.stageInstructions[24] || []
     },
     {
@@ -535,7 +545,8 @@
         misleadChance: 1.0,
         misleadUniqueLabelsPerRound: true,
         textColor: true,
-        textColorChance: 1.0
+        textColorChance: 1.0,
+        textColorAvoidCardBackground: true
       },
       starTimes: { platinum: 2, gold: 3, silver: 8, bronze: 20 },
       instructions: window.stageInstructions[25] || []
@@ -548,6 +559,7 @@
       rounds: 3,
       cards: 1,
       noRepeatAcrossRounds: true,
+      noRepeatAnswerInitialsAcrossRounds: true,
       revealSeconds: 10,
       recallSeconds: 30,
       categories: ["directions"],

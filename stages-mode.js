@@ -211,6 +211,7 @@
       misleadColors: Boolean(modifiers.misleadColors),
       misleadChance: typeof modifiers.misleadChance === "number" ? modifiers.misleadChance : 0.6,
       misleadUniqueLabelsPerRound: Boolean(modifiers.misleadUniqueLabelsPerRound),
+      textLabelUniquePerRound: Boolean(modifiers.textLabelUniquePerRound),
       misleadMinCount: typeof modifiers.misleadMinCount === "number" ? modifiers.misleadMinCount : null,
       misleadMaxCount: typeof modifiers.misleadMaxCount === "number" ? modifiers.misleadMaxCount : null,
       enableBackgroundColor: Boolean(modifiers.backgroundColor),
@@ -229,6 +230,8 @@
       enableTextColor: Boolean(modifiers.textColor),
       textColorChance: typeof modifiers.textColorChance === "number" ? modifiers.textColorChance : 0.6,
       textPromptChance: typeof modifiers.textPromptChance === "number" ? modifiers.textPromptChance : 0.5,
+      textColorUniqueLabelsPerRound: Boolean(modifiers.textColorUniqueLabelsPerRound),
+      textColorAvoidCardBackground: Boolean(modifiers.textColorAvoidCardBackground),
       textPromptMinCount:
         typeof modifiers.textPromptMinCount === "number" ? modifiers.textPromptMinCount : null,
       textPromptMaxCount:
