@@ -28,7 +28,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /leaderboards_global/progress/entries/{playerId} {
+    match /leaderboards_global/progress_versions/{versionId}/entries/{playerId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.player_id == playerId
