@@ -1271,7 +1271,8 @@ body[data-theme^="night-"] .stage-intro-icon img[src$="flash_icon.png"],
 body[data-theme^="night-"] .stage-intro-icon img[src$="tutorial_icon.png"],
 body[data-theme^="night-"] .stage-intro-icon img[src$="leaderboard.png"],
 body[data-theme^="night-"] .stage-type-icon[src$="flash_icon.png"],
-body[data-theme^="night-"] .stage-type-icon[src$="tutorial_icon.png"] {
+body[data-theme^="night-"] .stage-type-icon[src$="tutorial_icon.png"],
+body[data-theme^="night-"] .stage-type-icon[src$="challenge-icon.svg"] {
   filter: brightness(0) invert(1);
 }
 .action-glyph {
@@ -1284,6 +1285,9 @@ body[data-theme^="night-"] .stage-type-icon[src$="tutorial_icon.png"] {
   line-height: 1;
   color: var(--ink);
   pointer-events: none;
+}
+#achievementsOpen .action-glyph {
+  display: none;
 }
 .action-glyph--stars {
   width: 28px;
@@ -2997,6 +3001,10 @@ body[data-state="paused"] .hud-pause {
 .stage-card--flash {
   --stage-card-outline: #e0b41b;
   border-color: #e0b41b;
+}
+.stage-card--challenge {
+  --stage-card-outline: #ec4899;
+  border-color: #ec4899;
 }
 .stage-card--animate {
   animation: stageCardPop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;

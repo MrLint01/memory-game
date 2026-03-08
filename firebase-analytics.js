@@ -60,6 +60,15 @@ const ACHIEVEMENT_ENTRY_PATH = `${ACHIEVEMENT_SUMMARY_PATH}/entries`;
 const ACHIEVEMENT_CACHE_TTL_MS = 60 * 1000;
 const ACHIEVEMENT_CARD_TYPE_THRESHOLDS = [1, 10, 100, 1000];
 const ACHIEVEMENT_MODIFIER_VARIANT_THRESHOLDS = [10, 100, 1000];
+const LEVEL_PROGRESS_ICON_SRC = "imgs/icons/level-completed-acheivements.svg";
+const RETRY_ICON_SRC = "imgs/icons/retry-level-icon.svg";
+const PAINT_ICON_SRC = "imgs/icons/paint-roller-bucket-icon.svg";
+const RAINBOW_ICON_SRC = "imgs/icons/cloud-rainbow-icon.svg";
+const HOURGLASS_ICON_SRC = "imgs/icons/sand-clock-half-icon.svg";
+const CHALLENGE_ICON_SRC = "imgs/icons/challenge-icon.svg";
+const SANDBOX_ICON_SRC = "imgs/icons/sand-icon.svg";
+const CONTRAST_ICON_SRC = "imgs/icons/contrast-icon.svg";
+const DOOR_KEY_ICON_SRC = "imgs/icons/door-key-icon.svg";
 const ACHIEVEMENT_CARD_TYPE_META = {
   numbers: { label: "Numbers", noun: "number cards", short: "NUM", iconSrc: "imgs/icons/card-numbers.svg" },
   letters: { label: "Letters", noun: "letter cards", short: "LET", iconSrc: "imgs/icons/card-letters.svg" },
@@ -126,6 +135,24 @@ function buildModifierVariantAchievementDefinitions() {
   );
 }
 
+function buildStageTypeCompletionAchievementDefinitions(prefix, entries) {
+  return entries.map((entry, tierIndex) => ({
+    ...entry,
+    id: `${prefix}_${entry.threshold}`,
+    iconBadge: getAchievementRomanTier(tierIndex)
+  }));
+}
+
+function buildLeaderboardPlacementAchievementDefinitions() {
+  return [5, 4, 3, 2, 1].map((place, index) => ({
+    id: `leaderboard_place_${place}`,
+    title: place === 1 ? "Podium Peak" : `Top ${place}`,
+    description: `Reach rank ${place} or better on a leaderboard.`,
+    iconSrc: "imgs/leaderboard.png",
+    iconBadge: getAchievementRomanTier(index)
+  }));
+}
+
 const ACHIEVEMENT_DEFINITIONS = [
   ...Object.values(ACHIEVEMENT_MODIFIER_META).map((meta) => ({
     id: meta.firstUseId,
@@ -135,41 +162,57 @@ const ACHIEVEMENT_DEFINITIONS = [
   })),
   ...buildCardTypeAchievementDefinitions(),
   ...buildModifierVariantAchievementDefinitions(),
-  { id: "complete_1", title: "First Clear", description: "Complete one level.", iconText: "1" },
-  { id: "complete_flash_1", title: "Flash Initiate", description: "Complete a flash level 1 time.", iconText: "FLASH I" },
-  { id: "complete_flash_10", title: "Flash Runner", description: "Complete a flash level 10 times.", iconText: "FLASH II" },
-  { id: "complete_flash_100", title: "Flash Veteran", description: "Complete a flash level 100 times.", iconText: "FLASH III" },
-  { id: "complete_flash_1000", title: "Flash Legend", description: "Complete a flash level 1000 times.", iconText: "FLASH IV" },
-  { id: "complete_10", title: "Ten Clears", description: "Complete 10 levels.", iconText: "10" },
-  { id: "complete_all", title: "Full Clear", description: "Complete all levels.", iconText: "ALL" },
-  { id: "complete_stage_67", title: "Lucky 67", description: "Complete level 67.", iconText: "67" },
-  { id: "attempt_10", title: "Getting Started", description: "Attempt 10 levels.", iconText: "A10" },
-  { id: "attempt_100", title: "Committed", description: "Attempt 100 levels.", iconText: "A100" },
-  { id: "attempt_1000", title: "Relentless", description: "Attempt 1000 levels.", iconText: "1K" },
-  { id: "attempt_10000", title: "Endless Grind", description: "Attempt 10000 levels.", iconText: "10K" },
-  { id: "fail_1", title: "First Fall", description: "Fail 1 level.", iconText: "F1" },
-  { id: "fail_10", title: "Still Learning", description: "Fail 10 levels.", iconText: "F10" },
-  { id: "fail_100", title: "Tough Lessons", description: "Fail 100 levels.", iconText: "F100" },
-  { id: "fail_1000", title: "Impossible Odds", description: "Fail 1000 levels.", iconText: "F1K" },
-  { id: "stars_level_1", title: "First Star", description: "Collect 1 star on a level.", iconText: "1\u2605" },
-  { id: "stars_level_2", title: "Double Star", description: "Collect 2 stars on a level.", iconText: "2\u2605" },
-  { id: "stars_level_3", title: "Triple Star", description: "Collect 3 stars on a level.", iconText: "3\u2605" },
+  { id: "complete_1", title: "First Clear", description: "Complete one level.", iconSrc: LEVEL_PROGRESS_ICON_SRC, iconBadge: "I" },
+  { id: "complete_10", title: "Ten Clears", description: "Complete 10 levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC, iconBadge: "II" },
+  { id: "complete_all", title: "Full Clear", description: "Complete all levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC, iconBadge: "III" },
+  ...buildStageTypeCompletionAchievementDefinitions("complete_flash", [
+    { threshold: 1, title: "Flash Initiate", description: "Complete a flash level 1 time.", iconSrc: "imgs/flash_icon.png" },
+    { threshold: 10, title: "Flash Runner", description: "Complete a flash level 10 times.", iconSrc: "imgs/flash_icon.png" },
+    { threshold: 100, title: "Flash Veteran", description: "Complete a flash level 100 times.", iconSrc: "imgs/flash_icon.png" },
+    { threshold: 1000, title: "Flash Legend", description: "Complete a flash level 1000 times.", iconSrc: "imgs/flash_icon.png" }
+  ]),
+  ...buildStageTypeCompletionAchievementDefinitions("complete_tutorial", [
+    { threshold: 1, title: "Tutorial Steps", description: "Complete a tutorial level 1 time.", iconSrc: "imgs/tutorial_icon.png" },
+    { threshold: 10, title: "Tutorial Guide", description: "Complete a tutorial level 10 times.", iconSrc: "imgs/tutorial_icon.png" },
+    { threshold: 100, title: "Tutorial Mentor", description: "Complete a tutorial level 100 times.", iconSrc: "imgs/tutorial_icon.png" },
+    { threshold: 1000, title: "Tutorial Sage", description: "Complete a tutorial level 1000 times.", iconSrc: "imgs/tutorial_icon.png" }
+  ]),
+  ...buildStageTypeCompletionAchievementDefinitions("complete_challenge", [
+    { threshold: 1, title: "Challenge Scout", description: "Complete a challenge level 1 time.", iconSrc: CHALLENGE_ICON_SRC },
+    { threshold: 10, title: "Challenge Climber", description: "Complete a challenge level 10 times.", iconSrc: CHALLENGE_ICON_SRC },
+    { threshold: 100, title: "Challenge Veteran", description: "Complete a challenge level 100 times.", iconSrc: CHALLENGE_ICON_SRC },
+    { threshold: 1000, title: "Challenge Summit", description: "Complete a challenge level 1000 times.", iconSrc: CHALLENGE_ICON_SRC }
+  ]),
+  ...buildStageTypeCompletionAchievementDefinitions("attempt", [
+    { threshold: 10, title: "Getting Started", description: "Attempt 10 levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC },
+    { threshold: 100, title: "Committed", description: "Attempt 100 levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC },
+    { threshold: 1000, title: "Relentless", description: "Attempt 1000 levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC },
+    { threshold: 10000, title: "Endless Grind", description: "Attempt 10000 levels.", iconSrc: LEVEL_PROGRESS_ICON_SRC }
+  ]),
+  ...buildStageTypeCompletionAchievementDefinitions("fail", [
+    { threshold: 1, title: "First Fall", description: "Fail 1 level.", iconSrc: RETRY_ICON_SRC },
+    { threshold: 10, title: "Still Learning", description: "Fail 10 levels.", iconSrc: RETRY_ICON_SRC },
+    { threshold: 100, title: "Tough Lessons", description: "Fail 100 levels.", iconSrc: RETRY_ICON_SRC },
+    { threshold: 1000, title: "Impossible Odds", description: "Fail 1000 levels.", iconSrc: RETRY_ICON_SRC }
+  ]),
+  { id: "stars_level_1", title: "First Star", description: "Collect 1 star on a level.", iconText: "\u2605" },
+  { id: "stars_level_2", title: "Double Star", description: "Collect 2 stars on a level.", iconText: "\u2605\u2605" },
+  { id: "stars_level_3", title: "Triple Star", description: "Collect 3 stars on a level.", iconText: "\u2605\u2605\u2605" },
   { id: "stars_total_50", title: "Star Keeper", description: "Collect 50 stars.", iconText: "50\u2605" },
   { id: "stars_total_100", title: "Star Hoard", description: "Collect 100 stars.", iconText: "100\u2605" },
   { id: "stars_total_150", title: "Star Vault", description: "Collect 150 stars.", iconText: "150\u2605" },
-  { id: "leaderboard_top_5", title: "Top Five", description: "Get top 5 on a leaderboard.", iconText: "TOP5" },
-  { id: "leaderboard_first", title: "First Place", description: "Get first place on a leaderboard.", iconText: "#1" },
-  { id: "time_minutes_10", title: "Ten Minutes In", description: "Spend 10 total in-level minutes in game.", iconText: "10m" },
-  { id: "time_minutes_100", title: "Century Club", description: "Spend 100 total in-level minutes in game.", iconText: "100m" },
-  { id: "theme_changed", title: "Fresh Paint", description: "Change your theme.", iconText: "THEME" },
-  { id: "sandbox_complete_1", title: "Sandbox Clear I", description: "Complete 1 Sandbox level.", iconText: "SBX", iconBadge: "I" },
-  { id: "sandbox_complete_10", title: "Sandbox Clear II", description: "Complete 10 Sandbox levels.", iconText: "SBX", iconBadge: "II" },
-  { id: "sandbox_complete_100", title: "Sandbox Clear III", description: "Complete 100 Sandbox levels.", iconText: "SBX", iconBadge: "III" },
-  { id: "sandbox_complete_1000", title: "Sandbox Clear IV", description: "Complete 1000 Sandbox levels.", iconText: "SBX", iconBadge: "IV" },
-  { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconText: "MONO" },
-  { id: "secret_any_key", title: "Any Key Means Enter", description: "Type 'Any Key' on the splash screen, then press Enter.", iconText: "KEY", secret: true },
-  { id: "secret_prism_parade", title: "Prism Parade", description: "Find the hidden rainbow theme through Shuffle Theme.", iconText: "RAIN", secret: true },
-  { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "4\u2605", secret: true },
+  ...buildLeaderboardPlacementAchievementDefinitions(),
+  { id: "time_minutes_10", title: "Ten Minutes In", description: "Spend 10 total in-level minutes in game.", iconSrc: HOURGLASS_ICON_SRC, iconBadge: "I" },
+  { id: "time_minutes_100", title: "Century Club", description: "Spend 100 total in-level minutes in game.", iconSrc: HOURGLASS_ICON_SRC, iconBadge: "II" },
+  { id: "theme_changed", title: "Fresh Paint", description: "Change your theme.", iconSrc: PAINT_ICON_SRC },
+  { id: "sandbox_complete_1", title: "Sandbox Clear I", description: "Complete 1 Sandbox level.", iconSrc: SANDBOX_ICON_SRC, iconBadge: "I" },
+  { id: "sandbox_complete_10", title: "Sandbox Clear II", description: "Complete 10 Sandbox levels.", iconSrc: SANDBOX_ICON_SRC, iconBadge: "II" },
+  { id: "sandbox_complete_100", title: "Sandbox Clear III", description: "Complete 100 Sandbox levels.", iconSrc: SANDBOX_ICON_SRC, iconBadge: "III" },
+  { id: "sandbox_complete_1000", title: "Sandbox Clear IV", description: "Complete 1000 Sandbox levels.", iconSrc: SANDBOX_ICON_SRC, iconBadge: "IV" },
+  { id: "win_monochrome", title: "Monochrome Win", description: "Beat a level with monochrome enabled.", iconSrc: CONTRAST_ICON_SRC },
+  { id: "secret_any_key", title: "Any Key Means Enter", description: "Type 'Any Key' on the splash screen, then press Enter.", iconSrc: DOOR_KEY_ICON_SRC, secret: true },
+  { id: "secret_prism_parade", title: "Prism Parade", description: "Find the hidden rainbow theme through Shuffle Theme.", iconSrc: RAINBOW_ICON_SRC, secret: true },
+  { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "\u2605\u2605\u2605\u2605", secret: true },
   { id: "secret_stars_total_200", title: "Hidden Galaxy", description: "Collect 200 stars.", iconText: "200\u2605", secret: true }
 ];
 const ACHIEVEMENT_DEFINITION_BY_ID = Object.fromEntries(
@@ -179,11 +222,11 @@ const ACHIEVEMENT_DEFINITION_BY_ID = Object.fromEntries(
 function getAchievementDifficultyScore(definition) {
   const id = String(definition && definition.id ? definition.id : "");
   if (definition && definition.secret) return 98;
-  if (/^complete_all$|^leaderboard_first$|^time_minutes_100$|^fail_1000$/.test(id)) return 94;
-  if (/^attempt_10000$|^complete_stage_67$/.test(id)) return 90;
-  if (/^attempt_1000$|^fail_100$|^complete_flash_1000$|^stars_total_150$/.test(id)) return 82;
-  if (/^attempt_100$|^complete_flash_100$|^win_monochrome$|^leaderboard_top_5$|^time_minutes_10$/.test(id)) return 70;
-  if (/^complete_10$|^fail_10$|^stars_total_100$|^complete_flash_10$|^theme_changed$/.test(id)) return 58;
+  if (/^complete_all$|^leaderboard_place_1$|^time_minutes_100$|^fail_1000$/.test(id)) return 94;
+  if (/^attempt_10000$/.test(id)) return 90;
+  if (/^attempt_1000$|^fail_100$|^complete_(flash|tutorial|challenge)_1000$|^stars_total_150$/.test(id)) return 82;
+  if (/^attempt_100$|^complete_(flash|tutorial|challenge)_100$|^win_monochrome$|^leaderboard_place_[2-5]$|^time_minutes_10$/.test(id)) return 70;
+  if (/^complete_10$|^fail_10$|^stars_total_100$|^complete_(flash|tutorial|challenge)_10$|^theme_changed$/.test(id)) return 58;
   if (/^stars_level_3$|^stars_level_2$/.test(id)) return 48;
   if (/^mod_variants_/.test(id)) {
     if (/_1000$/.test(id)) return 86;
@@ -201,7 +244,7 @@ function getAchievementDifficultyScore(definition) {
   if (/^sandbox_complete_100$/.test(id)) return 80;
   if (/^sandbox_complete_10$/.test(id)) return 58;
   if (/^sandbox_complete_1$/.test(id)) return 20;
-  if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_50$|^complete_flash_1$/.test(id)) return 18;
+  if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_50$|^complete_(flash|tutorial|challenge)_1$/.test(id)) return 18;
   return 45;
 }
 
@@ -502,11 +545,14 @@ function getDefaultAchievementProfile() {
     completed_count: 0,
     sandbox_completed_count: 0,
     flash_completed_count: 0,
+    tutorial_completed_count: 0,
+    challenge_completed_count: 0,
     any_key_secret: false,
     prism_parade_found: false,
     total_stars: 0,
     total_time_seconds: 0,
     max_stars_on_level: 0,
+    best_leaderboard_rank: 0,
     total_stages: 0,
     sandbox_played: false,
     completed_flash_level: false,
@@ -543,11 +589,14 @@ function normalizeAchievementProfile(raw) {
   base.completed_count = Math.max(0, Number(source.completed_count) || 0);
   base.sandbox_completed_count = Math.max(0, Number(source.sandbox_completed_count) || 0);
   base.flash_completed_count = Math.max(0, Number(source.flash_completed_count) || 0);
+  base.tutorial_completed_count = Math.max(0, Number(source.tutorial_completed_count) || 0);
+  base.challenge_completed_count = Math.max(0, Number(source.challenge_completed_count) || 0);
   base.any_key_secret = Boolean(source.any_key_secret);
   base.prism_parade_found = Boolean(source.prism_parade_found);
   base.total_stars = Math.max(0, Number(source.total_stars) || 0);
   base.total_time_seconds = Math.max(0, Number(source.total_time_seconds) || 0);
   base.max_stars_on_level = Math.max(0, Number(source.max_stars_on_level) || 0);
+  base.best_leaderboard_rank = Math.max(0, Number(source.best_leaderboard_rank) || 0);
   base.total_stages = Math.max(0, Number(source.total_stages) || 0);
   base.sandbox_played = Boolean(source.sandbox_played);
   base.completed_flash_level = Boolean(source.completed_flash_level);
@@ -596,6 +645,14 @@ function getLocalStatsSnapshot() {
     Number(stored && stored.flashCompletedCount) || 0,
     Number(sessionStats.flashCompletedCount) || 0
   );
+  const tutorialCompletedCount = Math.max(
+    Number(stored && stored.tutorialCompletedCount) || 0,
+    Number(sessionStats.tutorialCompletedCount) || 0
+  );
+  const challengeCompletedCount = Math.max(
+    Number(stored && stored.challengeCompletedCount) || 0,
+    Number(sessionStats.challengeCompletedCount) || 0
+  );
   const failedLevelCount = Math.max(
     Number(stored && stored.failedLevelCount) || 0,
     Number(sessionStats.failedLevelCount) || 0
@@ -618,6 +675,8 @@ function getLocalStatsSnapshot() {
     totalLevelSuccesses,
     sandboxCompletedCount,
     flashCompletedCount,
+    tutorialCompletedCount,
+    challengeCompletedCount,
     failedLevelCount,
     sandboxPlayed,
     cardTypeCounts,
@@ -696,11 +755,14 @@ function normalizeAchievementUpdate(update = {}) {
     completedCount: null,
     sandboxCompletedCount: null,
     flashCompletedCount: null,
+    tutorialCompletedCount: null,
+    challengeCompletedCount: null,
     anyKeySecret: false,
     prismParadeFound: false,
     totalStars: null,
     totalTimeSeconds: null,
     maxStarsOnLevel: null,
+    bestLeaderboardRank: null,
     totalStages: null,
     sandboxPlayed: false,
     completedFlashLevel: false,
@@ -724,11 +786,20 @@ function normalizeAchievementUpdate(update = {}) {
   base.flashCompletedCount = Number.isFinite(Number(update.flashCompletedCount))
     ? Math.max(0, Number(update.flashCompletedCount))
     : null;
+  base.tutorialCompletedCount = Number.isFinite(Number(update.tutorialCompletedCount))
+    ? Math.max(0, Number(update.tutorialCompletedCount))
+    : null;
+  base.challengeCompletedCount = Number.isFinite(Number(update.challengeCompletedCount))
+    ? Math.max(0, Number(update.challengeCompletedCount))
+    : null;
   base.anyKeySecret = Boolean(update.anyKeySecret);
   base.prismParadeFound = Boolean(update.prismParadeFound);
   base.totalStars = Number.isFinite(Number(update.totalStars)) ? Math.max(0, Number(update.totalStars)) : null;
   base.totalTimeSeconds = Number.isFinite(Number(update.totalTimeSeconds)) ? Math.max(0, Number(update.totalTimeSeconds)) : null;
   base.maxStarsOnLevel = Number.isFinite(Number(update.maxStarsOnLevel)) ? Math.max(0, Number(update.maxStarsOnLevel)) : null;
+  base.bestLeaderboardRank = Number.isFinite(Number(update.bestLeaderboardRank))
+    ? Math.max(1, Number(update.bestLeaderboardRank))
+    : null;
   base.totalStages = Number.isFinite(Number(update.totalStages)) ? Math.max(0, Number(update.totalStages)) : null;
   base.sandboxPlayed = Boolean(update.sandboxPlayed);
   base.completedFlashLevel = Boolean(update.completedFlashLevel);
@@ -773,6 +844,18 @@ function mergeAchievementUpdateInputs(...updates) {
         update.flashCompletedCount
       );
     }
+    if (Number.isFinite(update.tutorialCompletedCount)) {
+      merged.tutorialCompletedCount = Math.max(
+        Number(merged.tutorialCompletedCount) || 0,
+        update.tutorialCompletedCount
+      );
+    }
+    if (Number.isFinite(update.challengeCompletedCount)) {
+      merged.challengeCompletedCount = Math.max(
+        Number(merged.challengeCompletedCount) || 0,
+        update.challengeCompletedCount
+      );
+    }
     if (Number.isFinite(update.totalStars)) {
       merged.totalStars = Math.max(Number(merged.totalStars) || 0, update.totalStars);
     }
@@ -781,6 +864,12 @@ function mergeAchievementUpdateInputs(...updates) {
     }
     if (Number.isFinite(update.maxStarsOnLevel)) {
       merged.maxStarsOnLevel = Math.max(Number(merged.maxStarsOnLevel) || 0, update.maxStarsOnLevel);
+    }
+    if (Number.isFinite(update.bestLeaderboardRank)) {
+      const currentBest = Number(merged.bestLeaderboardRank) || 0;
+      merged.bestLeaderboardRank = currentBest > 0
+        ? Math.min(currentBest, update.bestLeaderboardRank)
+        : update.bestLeaderboardRank;
     }
     if (Number.isFinite(update.totalStages)) {
       merged.totalStages = Math.max(Number(merged.totalStages) || 0, update.totalStages);
@@ -830,6 +919,8 @@ function getLocalAchievementSyncUpdate(extra = {}) {
     completedCount,
     sandboxCompletedCount: stats.sandboxCompletedCount,
     flashCompletedCount: stats.flashCompletedCount,
+    tutorialCompletedCount: stats.tutorialCompletedCount,
+    challengeCompletedCount: stats.challengeCompletedCount,
     totalStars: starSnapshot.totalStars,
     totalTimeSeconds: stats.totalSeconds,
     maxStarsOnLevel: starSnapshot.maxStarsOnLevel,
@@ -865,6 +956,12 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   if (Number.isFinite(normalized.flashCompletedCount)) {
     next.flash_completed_count = Math.max(next.flash_completed_count, normalized.flashCompletedCount);
   }
+  if (Number.isFinite(normalized.tutorialCompletedCount)) {
+    next.tutorial_completed_count = Math.max(next.tutorial_completed_count, normalized.tutorialCompletedCount);
+  }
+  if (Number.isFinite(normalized.challengeCompletedCount)) {
+    next.challenge_completed_count = Math.max(next.challenge_completed_count, normalized.challengeCompletedCount);
+  }
   next.any_key_secret = next.any_key_secret || normalized.anyKeySecret;
   next.prism_parade_found = next.prism_parade_found || normalized.prismParadeFound;
   if (Number.isFinite(normalized.totalStars)) {
@@ -875,6 +972,11 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   }
   if (Number.isFinite(normalized.maxStarsOnLevel)) {
     next.max_stars_on_level = Math.max(next.max_stars_on_level, normalized.maxStarsOnLevel);
+  }
+  if (Number.isFinite(normalized.bestLeaderboardRank)) {
+    next.best_leaderboard_rank = next.best_leaderboard_rank > 0
+      ? Math.min(next.best_leaderboard_rank, normalized.bestLeaderboardRank)
+      : normalized.bestLeaderboardRank;
   }
   if (Number.isFinite(normalized.totalStages)) {
     next.total_stages = Math.max(next.total_stages, normalized.totalStages);
@@ -938,9 +1040,16 @@ function getAchievementUnlockIds(profile) {
   if (profile.flash_completed_count >= 10) unlocks.push("complete_flash_10");
   if (profile.flash_completed_count >= 100) unlocks.push("complete_flash_100");
   if (profile.flash_completed_count >= 1000) unlocks.push("complete_flash_1000");
+  if (profile.tutorial_completed_count >= 1) unlocks.push("complete_tutorial_1");
+  if (profile.tutorial_completed_count >= 10) unlocks.push("complete_tutorial_10");
+  if (profile.tutorial_completed_count >= 100) unlocks.push("complete_tutorial_100");
+  if (profile.tutorial_completed_count >= 1000) unlocks.push("complete_tutorial_1000");
+  if (profile.challenge_completed_count >= 1) unlocks.push("complete_challenge_1");
+  if (profile.challenge_completed_count >= 10) unlocks.push("complete_challenge_10");
+  if (profile.challenge_completed_count >= 100) unlocks.push("complete_challenge_100");
+  if (profile.challenge_completed_count >= 1000) unlocks.push("complete_challenge_1000");
   if (profile.completed_count >= 10) unlocks.push("complete_10");
   if (profile.total_stages > 0 && profile.completed_count >= profile.total_stages) unlocks.push("complete_all");
-  if (profile.completed_stage_67) unlocks.push("complete_stage_67");
   if (profile.attempt_count >= 10) unlocks.push("attempt_10");
   if (profile.attempt_count >= 100) unlocks.push("attempt_100");
   if (profile.attempt_count >= 1000) unlocks.push("attempt_1000");
@@ -955,8 +1064,13 @@ function getAchievementUnlockIds(profile) {
   if (profile.total_stars >= 50) unlocks.push("stars_total_50");
   if (profile.total_stars >= 100) unlocks.push("stars_total_100");
   if (profile.total_stars >= 150) unlocks.push("stars_total_150");
-  if (profile.leaderboard_top_5) unlocks.push("leaderboard_top_5");
-  if (profile.leaderboard_first_place) unlocks.push("leaderboard_first");
+  if (profile.best_leaderboard_rank > 0) {
+    for (let place = 5; place >= 1; place -= 1) {
+      if (profile.best_leaderboard_rank <= place) {
+        unlocks.push(`leaderboard_place_${place}`);
+      }
+    }
+  }
   if (profile.total_time_seconds >= 10 * 60) unlocks.push("time_minutes_10");
   if (profile.total_time_seconds >= 100 * 60) unlocks.push("time_minutes_100");
   if (profile.theme_changed) unlocks.push("theme_changed");
@@ -1020,11 +1134,14 @@ async function applyAchievementUpdate(update = {}) {
         completed_count: nextProfile.completed_count,
         sandbox_completed_count: nextProfile.sandbox_completed_count,
         flash_completed_count: nextProfile.flash_completed_count,
+        tutorial_completed_count: nextProfile.tutorial_completed_count,
+        challenge_completed_count: nextProfile.challenge_completed_count,
         any_key_secret: nextProfile.any_key_secret,
         prism_parade_found: nextProfile.prism_parade_found,
         total_stars: nextProfile.total_stars,
         total_time_seconds: nextProfile.total_time_seconds,
         max_stars_on_level: nextProfile.max_stars_on_level,
+        best_leaderboard_rank: nextProfile.best_leaderboard_rank,
         total_stages: nextProfile.total_stages,
         sandbox_played: nextProfile.sandbox_played,
         completed_flash_level: nextProfile.completed_flash_level,
@@ -1126,6 +1243,9 @@ async function updateLeaderboardAchievementFlags(stageId, stageVersion, playerTi
   const rankData = await getPlayerRankAndPercentile(stageId, stageVersion, Number(playerTimeMs));
   if (!rankData) return;
   const update = {};
+  if (Number.isFinite(Number(rankData.rank)) && Number(rankData.rank) > 0) {
+    update.bestLeaderboardRank = Number(rankData.rank);
+  }
   if (rankData.rank <= 5) {
     update.leaderboardTop5 = true;
   }

@@ -28,6 +28,7 @@
       successAnimation: true,
       flashCountdown: true,
       autoAdvanceNext: true,
+      autoStartStagePreview: true,
       enterToNext: false,
       flashWarningEnabled: true,
       leaderboardsEnabled: true

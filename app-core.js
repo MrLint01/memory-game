@@ -264,6 +264,7 @@ const revealInput = document.getElementById("revealTime");
       const flashCountdown = document.getElementById("flashCountdown");
       const flashStageSkip = document.getElementById("flashStageSkip");
       const autoAdvanceNextToggle = document.getElementById("autoAdvanceNextToggle");
+      const autoStartStagePreviewToggle = document.getElementById("autoStartStagePreviewToggle");
       const leaderboardsEnabledToggle = document.getElementById("leaderboardsEnabledToggle");
       const stageIntroModal = document.getElementById("stageIntroModal");
       const stageIntroTitle = document.getElementById("stageIntroTitle");
@@ -353,6 +354,7 @@ const revealInput = document.getElementById("revealTime");
       let adTimer = null;
       let autoAdvanceNextTimerId = null;
       let autoAdvanceNextEnabled = true;
+      let stageIntroAutoStartEnabled = true;
       let stageIntroAutoStartTimerId = null;
       let adEnabled = false;
       let adActive = false;
@@ -802,11 +804,8 @@ const revealInput = document.getElementById("revealTime");
             box.style.fontSize = entry.size;
           }
           if (entry.color) {
-            const theme = document.body.dataset.theme;
-            const forceThemeInk = theme === "night-drive"
-              || theme === "ember-glow"
-              || theme === "velvet-noir"
-              || theme === "vault-ops";
+            const theme = String(document.body && document.body.dataset ? document.body.dataset.theme || "" : "");
+            const forceThemeInk = theme.startsWith("night-");
             box.style.color = forceThemeInk ? "var(--ink)" : entry.color;
           }
           stageInstructions.appendChild(box);
