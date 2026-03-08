@@ -51,11 +51,20 @@
         layout: "classic",
         themes: [
           "studio-light",
-          "night-drive",
-          "sea-glass",
-          "ember-glow",
-          "velvet-noir",
-          "vault-ops"
+          "night-red",
+          "night-orange",
+          "night-yellow",
+          "night-green",
+          "night-blue",
+          "night-purple",
+          "night-pink",
+          "pastel-red",
+          "pastel-orange",
+          "pastel-yellow",
+          "pastel-green",
+          "pastel-blue",
+          "pastel-purple",
+          "pastel-pink"
         ],
         colorVisionModes: ["standard", "protanopia", "deuteranopia", "tritanopia", "monochromacy"],
         layouts: ["classic"]
@@ -75,6 +84,8 @@
           ? defaultAppearance.layouts
           : fallbackAppearance.layouts
       };
+      const HIDDEN_APPEARANCE_THEMES = ["prism-parade"];
+      const ALL_APPEARANCE_THEMES = appearanceOptions.themes.concat(HIDDEN_APPEARANCE_THEMES);
       const defaultKeybinds = {
         retry: "r",
         stageNext: "enter",
@@ -231,8 +242,33 @@
         return getKeyLabel(keybinds[action] || defaultKeybinds[action] || "");
       };
 
+      function isKnownAppearanceTheme(theme) {
+        return ALL_APPEARANCE_THEMES.includes(theme);
+      }
+
+      function syncAppearanceThemeControl(theme) {
+        if (!appearanceTheme) return;
+        Array.from(appearanceTheme.querySelectorAll('option[data-hidden-theme="true"]')).forEach((option) => option.remove());
+        const hasVisibleOption = Array.from(appearanceTheme.options).some((option) => option.value === theme);
+        if (hasVisibleOption) {
+          appearanceTheme.value = theme;
+          return;
+        }
+        if (!isKnownAppearanceTheme(theme)) {
+          appearanceTheme.value = appearanceOptions.themes[0];
+          return;
+        }
+        const hiddenOption = document.createElement("option");
+        hiddenOption.value = theme;
+        hiddenOption.textContent = "???";
+        hiddenOption.hidden = true;
+        hiddenOption.dataset.hiddenTheme = "true";
+        appearanceTheme.appendChild(hiddenOption);
+        appearanceTheme.value = theme;
+      }
+
       function applyAppearance(theme, layout, colorVision) {
-        const nextTheme = appearanceOptions.themes.includes(theme) ? theme : appearanceOptions.themes[0];
+        const nextTheme = isKnownAppearanceTheme(theme) ? theme : appearanceOptions.themes[0];
         const colorVisionModes = Array.isArray(appearanceOptions.colorVisionModes)
           ? appearanceOptions.colorVisionModes
           : ["standard"];
@@ -246,7 +282,7 @@
         delete document.body.dataset.font;
         document.body.dataset.colorVision = nextColorVision;
         document.body.dataset.layout = nextLayout;
-        if (appearanceTheme) appearanceTheme.value = nextTheme;
+        syncAppearanceThemeControl(nextTheme);
         if (appearanceColorVision) appearanceColorVision.value = nextColorVision;
         if (appearanceLayout) appearanceLayout.value = nextLayout;
         if (typeof window.refreshRenderedCardsForAppearance === "function") {
@@ -271,7 +307,7 @@
           ? defaultAppearance.layout
           : appearanceOptions.layouts[0];
         return {
-          theme: appearanceOptions.themes.includes(savedTheme) ? savedTheme : fallbackTheme,
+          theme: isKnownAppearanceTheme(savedTheme) ? savedTheme : fallbackTheme,
           colorVision: colorVisionModes.includes(savedColorVision) ? savedColorVision : fallbackColorVision,
           layout: appearanceOptions.layouts.includes(savedLayout) ? savedLayout : fallbackLayout
         };
@@ -4618,10 +4654,17 @@ function runFlashCountdown(onComplete) {
         leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
       }
 
+      let persistAndApplyAppearance = null;
       if (appearanceTheme) {
-        const persistAndApplyAppearance = () => {
+        persistAndApplyAppearance = (themeOverride = "") => {
           const previousTheme = document.body && document.body.dataset ? document.body.dataset.theme || "" : "";
-          const theme = appearanceTheme.value;
+          const currentTheme = document.body && document.body.dataset ? document.body.dataset.theme || "" : "";
+          const selectedTheme = appearanceTheme ? appearanceTheme.value : "";
+          const requestedTheme = typeof themeOverride === "string" ? themeOverride : "";
+          const theme = requestedTheme
+            || (appearanceOptions.themes.includes(selectedTheme)
+              ? selectedTheme
+              : (isKnownAppearanceTheme(currentTheme) ? currentTheme : appearanceOptions.themes[0]));
           const colorVision = appearanceColorVision ? appearanceColorVision.value : "standard";
           applyAppearance(theme, "classic", colorVision);
           window.localStorage.setItem(APPEARANCE_THEME_KEY, document.body.dataset.theme || appearanceOptions.themes[0]);
@@ -4639,6 +4682,12 @@ function runFlashCountdown(onComplete) {
           if (typeof window.recordAchievementThemeChange === "function") {
             window.recordAchievementThemeChange(previousTheme, document.body.dataset.theme || "");
           }
+          if (
+            requestedTheme === "prism-parade"
+            && typeof window.recordSecretRainbowThemeFound === "function"
+          ) {
+            window.recordSecretRainbowThemeFound();
+          }
         };
         appearanceTheme.addEventListener("change", persistAndApplyAppearance);
         if (appearanceColorVision) {
@@ -4650,8 +4699,9 @@ function runFlashCountdown(onComplete) {
       if (appearanceShuffle && appearanceTheme) {
         appearanceShuffle.addEventListener("click", () => {
           const pick = (list) => list[Math.floor(Math.random() * list.length)];
-          appearanceTheme.value = pick(appearanceOptions.themes);
-          appearanceTheme.dispatchEvent(new Event("change"));
+          if (typeof persistAndApplyAppearance === "function") {
+            persistAndApplyAppearance(pick(ALL_APPEARANCE_THEMES));
+          }
         });
       }
 

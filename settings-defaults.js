@@ -6,11 +6,20 @@
       layout: "classic",
       themes: [
         "studio-light",
-        "night-drive",
-        "sea-glass",
-        "ember-glow",
-        "velvet-noir",
-        "vault-ops"
+        "night-red",
+        "night-orange",
+        "night-yellow",
+        "night-green",
+        "night-blue",
+        "night-purple",
+        "night-pink",
+        "pastel-red",
+        "pastel-orange",
+        "pastel-yellow",
+        "pastel-green",
+        "pastel-blue",
+        "pastel-purple",
+        "pastel-pink"
       ],
       colorVisionModes: ["standard", "protanopia", "deuteranopia", "tritanopia", "monochromacy"],
       layouts: ["classic"]
