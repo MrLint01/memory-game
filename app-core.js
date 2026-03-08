@@ -386,6 +386,8 @@ const revealInput = document.getElementById("revealTime");
       let swapRemaining = null;
       let swapStartRecall = null;
       let swapCleanup = null;
+      let swapStagePauseStart = null;
+      let swapStagePauseAccumulated = 0;
       let stageCategoryQueue = null;
       let stageCategoryQueueIndex = 0;
       let stageCategoryQueueStageId = null;
@@ -2453,6 +2455,12 @@ const revealInput = document.getElementById("revealTime");
           }
         }
         const plan = planModifierAssignments(chosen, options);
+        if (options && options.backgroundColorUniqueLabelsPerRound && options._backgroundColorUsedLabels) {
+          chosen.forEach((item) => {
+            if (!item || item.category !== "colors" || !item.label) return;
+            options._backgroundColorUsedLabels.add(String(item.label).toLowerCase());
+          });
+        }
         const built = chosen.map((item, index) => maybeConvertToCatCard(buildChallenge(item, options, plan[index])));
         if (
           built.some((item) => item && item.specialType === "cat") &&

@@ -4859,25 +4859,25 @@ body.stage-fail .rotation-icon {
 .modal-card--intro .modal-actions {
   margin-top: 0.6rem;
 }
-      .interrupt-modal {
-        position: fixed;
-        display: none;
-        place-items: center;
-        z-index: 12;
-      }
-      .interrupt-modal.show {
-        display: grid;
-      }
-      .interrupt-card {
-        width: min(420px, 90vw);
-        background: #ffffff;
-        border: 2px solid var(--border);
-        padding: 1rem;
-        display: grid;
-        gap: 0.6rem;
-        pointer-events: auto;
-        position: relative;
-      }
+.interrupt-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 12;
+}
+.interrupt-modal.show {
+  display: block;
+}
+.interrupt-card {
+  width: min(420px, 90vw);
+  background: #ffffff;
+  border: 2px solid var(--border);
+  padding: 1rem;
+  display: grid;
+  gap: 0.6rem;
+  pointer-events: auto;
+  position: absolute;
+}
       .interrupt-header {
         min-height: 1.1rem;
       }
