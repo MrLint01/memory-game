@@ -430,7 +430,7 @@
     },
     {
       id: 21,
-      version: 1,
+      version: 3,
       name: "Stage 21",
       stageType: "sequence",
       rounds: 1,
@@ -772,7 +772,7 @@
     },
     {
       id: 35,
-      version: 1,
+      version: 3,
       name: "Stage 35",
       stageType: "sequence",
       rounds: 2,
@@ -1136,8 +1136,8 @@
     },
     {
       id: 51,
-      version: 1,
-      name: "Stage 60",
+      version: 2,
+      name: "Stage 51",
       stageType: "sequence",
       rounds: 1,
       cards: 3,
@@ -1155,7 +1155,7 @@
     },
     {
       id: 52,
-      version: 1,
+      version: 2,
       name: "Stage 52",
       stageType: "tutorial",
       rounds: 3,
