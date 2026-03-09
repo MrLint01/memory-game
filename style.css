@@ -1453,7 +1453,8 @@ body[data-theme^="night-"] .stage-intro-icon img[src$="tutorial_icon.png"],
 body[data-theme^="night-"] .stage-intro-icon img[src$="leaderboard.png"],
 body[data-theme^="night-"] .stage-type-icon[src$="flash_icon.png"],
 body[data-theme^="night-"] .stage-type-icon[src$="tutorial_icon.png"],
-body[data-theme^="night-"] .stage-type-icon[src$="challenge-icon.svg"] {
+body[data-theme^="night-"] .stage-type-icon[src$="challenge-icon.svg"],
+body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   filter: brightness(0) invert(1);
 }
 .action-glyph {
@@ -1503,21 +1504,25 @@ body[data-theme^="night-"] .stage-type-icon[src$="challenge-icon.svg"] {
   gap: 1rem;
 }
 .stage-instructions {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 88px;
   pointer-events: none;
   z-index: 50;
 }
 .stage-instruction {
-  position: absolute;
-  padding: 0.55rem 0.7rem;
-  border: 2px solid #d1d5db;
-  background: #ffffff;
-  color: #4b5563;
-  font-size: 0.85rem;
-  line-height: 1.35;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
-  max-width: none;
+  position: relative;
+  padding: 0.9rem 1.2rem;
+  border: 2px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 1.3rem;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  width: 100%;
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 0.5s ease, transform 0.5s ease;
@@ -1533,6 +1538,18 @@ body[data-theme^="night-"] .stage-type-icon[src$="challenge-icon.svg"] {
   max-width: 100%;
   white-space: pre-wrap;
   text-align: center;
+}
+.stage-instruction-panel {
+  display: none;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  z-index: 60;
+  pointer-events: none;
 }
 .stage-instruction.is-visible {
   opacity: 1;
@@ -3175,6 +3192,10 @@ body[data-state="paused"] .hud-pause {
 .stage-card--challenge {
   --stage-card-outline: #ec4899;
   border-color: #ec4899;
+}
+.stage-card--sequence {
+  --stage-card-outline: #60a5fa;
+  border-color: #60a5fa;
 }
 .stage-card--animate {
   animation: stageCardPop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;

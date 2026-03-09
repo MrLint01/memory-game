@@ -17,6 +17,7 @@ const revealInput = document.getElementById("revealTime");
       const stagesFooter = document.getElementById("stagesFooter");
       const stageList = document.getElementById("stageList");
       const stageInstructions = document.getElementById("stageInstructions");
+      const stageInstructionPanel = document.getElementById("stageInstructionPanel");
       const hudCluster = document.getElementById("hudCluster");
       const submitBtn = document.getElementById("submitBtn");
       const nextBtn = document.getElementById("nextBtn");
@@ -308,6 +309,9 @@ const revealInput = document.getElementById("revealTime");
       const fogCanvas = document.getElementById("fogCanvas");
       const fogCtx = fogCanvas.getContext("2d");
       const page = document.body;
+      window.addEventListener("resize", () => {
+        positionStageInstructionPanel();
+      });
 
       let phase = "idle";
       let round = 0;
@@ -317,6 +321,8 @@ const revealInput = document.getElementById("revealTime");
       let stageTimerId = null;
       let stageInstructionTimers = [];
       let stageInstructionToken = 0;
+      const instructionPanelGapReveal = 170;
+      const instructionPanelGapRecall = 280;
       let roundFlowToken = 0;
       let successAnimationEnabled = true;
       let successAnimationActive = false;
@@ -388,6 +394,9 @@ const revealInput = document.getElementById("revealTime");
       let swapCleanup = null;
       let swapStagePauseStart = null;
       let swapStagePauseAccumulated = 0;
+      let sequenceRevealActive = false;
+      let sequenceRevealIndex = 0;
+      let sequenceRevealSeconds = 0;
       let stageCategoryQueue = null;
       let stageCategoryQueueIndex = 0;
       let stageCategoryQueueStageId = null;
@@ -709,6 +718,24 @@ const revealInput = document.getElementById("revealTime");
         });
       }
 
+      function positionStageInstructionPanel() {
+        if (!stageInstructionPanel || !stagePanel) return;
+        const anchor = timerBar ? timerBar.getBoundingClientRect() : stagePanel.getBoundingClientRect();
+        const baseRect = stagePanel.getBoundingClientRect();
+        const gap =
+          phase === "show"
+            ? instructionPanelGapReveal
+            : phase === "recall"
+              ? instructionPanelGapRecall
+              : instructionPanelGapRecall;
+        const panelWidth = Math.min(760, Math.max(260, baseRect.width * 0.72));
+        stageInstructionPanel.style.left = `${Math.round(baseRect.left + baseRect.width / 2)}px`;
+        stageInstructionPanel.style.top = `${Math.round(anchor.bottom + gap)}px`;
+        stageInstructionPanel.style.width = `${Math.round(panelWidth)}px`;
+        stageInstructionPanel.style.bottom = "";
+        stageInstructionPanel.style.transform = "translate(-50%, 0)";
+      }
+
       function setPhase(text, nextState) {
         if (nextState) {
           phase = nextState;
@@ -718,9 +745,10 @@ const revealInput = document.getElementById("revealTime");
         updateStreakVisibility();
         updateStageTimerVisibility();
         renderStageInstructions();
+        positionStageInstructionPanel();
         if (nextState === "idle") {
-          if (stagePanel && stageInstructions && stageInstructions.parentElement !== stagePanel) {
-            stagePanel.appendChild(stageInstructions);
+          if (stageInstructionPanel && stageInstructions && stageInstructions.parentElement !== stageInstructionPanel) {
+            stageInstructionPanel.appendChild(stageInstructions);
             stageInstructions.style.position = "";
             stageInstructions.style.left = "";
             stageInstructions.style.top = "";
@@ -740,26 +768,42 @@ const revealInput = document.getElementById("revealTime");
         return numberValue <= 1 ? numberValue * 100 : numberValue;
       }
 
+      function toInstructionPos(value, axis) {
+        const numberValue = Number(value);
+        if (!Number.isFinite(numberValue)) return null;
+        if (axis === "y") {
+          return numberValue <= 1 ? `${numberValue * 100}%` : `${numberValue}px`;
+        }
+        return numberValue <= 1 ? `${numberValue * 100}%` : `${numberValue}%`;
+      }
+
       function renderStageInstructions() {
         if (!stageInstructions) return;
         stageInstructionToken += 1;
         stageInstructionTimers.forEach((timerId) => clearTimeout(timerId));
         stageInstructionTimers = [];
         stageInstructions.innerHTML = "";
+        stageInstructions.style.display = "none";
+        if (stageInstructionPanel) {
+          stageInstructionPanel.style.display = "none";
+        }
         if (gameMode !== "stages") return;
         if (phase !== "show" && phase !== "recall" && phase !== "result") return;
-        if (stagePanel) {
-          if (stageInstructions.parentElement !== document.body) {
-            document.body.appendChild(stageInstructions);
+        if (stageInstructionPanel) {
+          if (stageInstructionPanel.parentElement !== document.body) {
+            document.body.appendChild(stageInstructionPanel);
           }
-          const rect = stagePanel.getBoundingClientRect();
-          stageInstructions.style.position = "fixed";
-          stageInstructions.style.left = `${rect.left}px`;
-          stageInstructions.style.top = `${rect.top}px`;
-          stageInstructions.style.width = `${rect.width}px`;
-          stageInstructions.style.height = `${rect.height}px`;
-          stageInstructions.style.inset = "auto";
-          stageInstructions.style.zIndex = "9999";
+          if (stageInstructions.parentElement !== stageInstructionPanel) {
+            stageInstructionPanel.appendChild(stageInstructions);
+          }
+          stageInstructions.style.position = "relative";
+          stageInstructions.style.left = "";
+          stageInstructions.style.top = "";
+          stageInstructions.style.width = "";
+          stageInstructions.style.height = "";
+          stageInstructions.style.inset = "";
+          stageInstructions.style.zIndex = "";
+          positionStageInstructionPanel();
         }
         const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
         if (!stage || !window.getStageInstructionSlides) return;
@@ -769,6 +813,10 @@ const revealInput = document.getElementById("revealTime");
         if (phase === "result") {
           if (!stageState || !stageState.completed) return;
           if (!Array.isArray(resultEntries) || !resultEntries.length) return;
+          if (stageInstructionPanel) {
+            stageInstructionPanel.style.display = "block";
+          }
+          stageInstructions.style.display = "flex";
           scheduleInstructionEntries(resultEntries);
           return;
         }
@@ -777,6 +825,10 @@ const revealInput = document.getElementById("revealTime");
         const slideIndex = (currentRound - 1) * 2 + (phase === "show" ? 0 : 1);
         const entries = slides[slideIndex];
         if (!Array.isArray(entries) || !entries.length) return;
+        if (stageInstructionPanel) {
+          stageInstructionPanel.style.display = "block";
+        }
+        stageInstructions.style.display = "flex";
         scheduleInstructionEntries(entries);
       }
 
@@ -798,14 +850,11 @@ const revealInput = document.getElementById("revealTime");
           const safeText = String(rawText).replace(/</g, "&lt;").replace(/>/g, "&gt;");
           const formatted = safeText.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
           box.innerHTML = `<span class="stage-instruction__text">${formatted}</span>`;
-          const left = toPercent(entry.x);
-          const top = toPercent(entry.y);
-          const width = toPercent(entry.w);
-          const height = toPercent(entry.h);
-          if (left !== null) box.style.left = `${left}%`;
-          if (top !== null) box.style.top = `${top}%`;
-          if (width !== null) box.style.width = `${width}%`;
-          if (height !== null) box.style.height = `${height}%`;
+          const left = toInstructionPos(entry.x, "x");
+          const top = toInstructionPos(entry.y, "y");
+          const width = toInstructionPos(entry.w, "x");
+          const height = toInstructionPos(entry.h, "x");
+          if (width !== null) box.style.width = width;
           if (entry.align) {
             box.style.textAlign = entry.align;
           }

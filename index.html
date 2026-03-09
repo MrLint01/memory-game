@@ -46,6 +46,7 @@
     <link rel="preload" href="imgs/icons/card-directions.svg" as="image" />
     <link rel="preload" href="imgs/icons/card-diagonal.svg" as="image" />
     <link rel="preload" href="imgs/icons/card-shapes.svg" as="image" />
+    <link rel="preload" href="imgs/icons/sequence-icon.svg" as="image" />
     <link rel="preload" href="imgs/retry_button.png" as="image" />
     <link rel="preload" href="imgs/settings_button.png" as="image" />
     <link rel="preload" href="imgs/stat_button.png" as="image" />
@@ -179,7 +180,6 @@
           <div class="timer-bar" id="timerBar">
             <div class="timer-bar__fill" id="timerFill"></div>
           </div>
-          <div class="stage-instructions" id="stageInstructions" aria-hidden="true"></div>
           <div class="cards" id="cardGrid"></div>
           <div class="prompts" id="promptGrid"></div>
           <div class="inputs" id="inputGrid"></div>
@@ -189,6 +189,9 @@
           </div>
           <div class="actions"></div>
           <div class="results" id="resultsPanel"></div>
+        </section>
+        <section class="stage-instruction-panel" id="stageInstructionPanel" aria-hidden="true">
+          <div class="stage-instructions" id="stageInstructions" aria-hidden="true"></div>
         </section>
       </section>
       <section class="stages-screen" id="stagesScreen" aria-hidden="true">
@@ -538,9 +541,9 @@
     <script src="version.js?v=20260217"></script>
     <script src="firebase-analytics.js?v=2"></script>
     <script>
-      window.unlockAllStages = false;
-      window.unlockSandbox = false;
-      window.unlockAllModifiers = false;
+      window.unlockAllStages = true;
+      window.unlockSandbox = true;
+      window.unlockAllModifiers = true;
     </script>
     <script src="ui-loader.js?v=1"></script>
   </body>

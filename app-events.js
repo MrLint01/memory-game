@@ -1904,6 +1904,8 @@ function runFlashCountdown(onComplete) {
                   ? { src: "imgs/tutorial_icon.png", label: "Tutorial level" }
                   : stageType === "challenge"
                     ? { src: "imgs/icons/challenge-icon.svg", label: "Challenge level" }
+                    : stageType === "sequence"
+                      ? { src: "imgs/icons/sequence-icon.svg", label: "Sequence level" }
                   : null;
 
             const starsMarkup = [1, 2, 3]
@@ -4970,6 +4972,14 @@ function runFlashCountdown(onComplete) {
           return;
         }
         if (phase === "show") {
+          if (gameMode === "stages") {
+            const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+            const stageType = stage && stage.stageType ? String(stage.stageType).toLowerCase() : "";
+            if (stageType === "flash" || stageType === "sequence") {
+              event.preventDefault();
+              return;
+            }
+          }
           skipRevealNow();
         } else if (phase === "recall") {
           const inputs = Array.from(inputGrid.querySelectorAll('input[data-index]'));
@@ -5390,8 +5400,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
 
 
 

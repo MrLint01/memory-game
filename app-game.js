@@ -1390,6 +1390,7 @@
         if (phase !== "show") return;
         clearInterval(timerId);
         timerId = null;
+        sequenceRevealActive = false;
         clearAdTimer();
         if (swapTimeoutId) {
           clearTimeout(swapTimeoutId);
@@ -1538,6 +1539,44 @@
         startRecall();
       }
 
+      function isSequenceStage() {
+        if (gameMode !== "stages") return false;
+        const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        return Boolean(stage && String(stage.stageType).toLowerCase() === "sequence");
+      }
+
+      function renderSequenceCard(index) {
+        if (!Array.isArray(roundItems) || !roundItems.length) {
+          cardGrid.innerHTML = "";
+          return;
+        }
+        const originalItems = roundItems;
+        const item = originalItems[index] || originalItems[0];
+        roundItems = [item];
+        renderCards(true);
+        roundItems = originalItems;
+      }
+
+      function advanceSequenceReveal() {
+        if (!sequenceRevealActive) return;
+        sequenceRevealIndex += 1;
+        if (sequenceRevealIndex >= roundItems.length) {
+          sequenceRevealActive = false;
+          beginRecallPhase();
+          return;
+        }
+        renderSequenceCard(sequenceRevealIndex);
+        setTimer(sequenceRevealSeconds, "Reveal", advanceSequenceReveal);
+      }
+
+      function startSequenceReveal(revealSeconds) {
+        sequenceRevealActive = true;
+        sequenceRevealIndex = 0;
+        sequenceRevealSeconds = revealSeconds;
+        renderSequenceCard(sequenceRevealIndex);
+        setTimer(sequenceRevealSeconds, "Reveal", advanceSequenceReveal);
+      }
+
       function startRound(options = {}) {
         const { reuseItems = false, advanceRound = true } = options;
         if (typeof window.clearTabKeyHint === "function") {
@@ -1618,7 +1657,7 @@
             priorRoundStageId = null;
           }
         }
-        renderCards(true);
+        const sequenceStage = isSequenceStage();
         renderInputs();
         lockInputs(true);
         if (submitBtn) {
@@ -1656,6 +1695,11 @@
           stopBlur();
         }
         const revealSeconds = getRevealSeconds();
+        if (sequenceStage) {
+          startSequenceReveal(revealSeconds);
+          return;
+        }
+        renderCards(true);
         scheduleAd(revealSeconds);
         setTimer(revealSeconds, "Reveal", () => {
           beginRecallPhase();

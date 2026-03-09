@@ -279,6 +279,7 @@
         mathMaxCount: 1,
         backgroundColor: true,
         backgroundColorChance: 1.0,
+        backgroundColorUniqueLabelsPerRound: true,
         backgroundPromptMinCount: 1
       },
       starTimes: { platinum: 7, gold: 10, silver: 20, bronze: 25 },
@@ -325,6 +326,7 @@
       modifiers: {
         misleadColors: true,
         misleadChance: 1.0,
+        textLabelUniquePerRound: true,
         backgroundColor: true,
         backgroundColorChance: 1.0,
         backgroundPromptMinCount: 1,
@@ -428,26 +430,16 @@
     },
     {
       id: 21,
-      version: 2,
+      version: 1,
       name: "Stage 21",
-      stageType: "flash",
-      rounds: 3,
-      cards: 1,
-      noRepeatAcrossRounds: true,
-      revealSeconds: 0.10,
-      recallSeconds: 30,
-      categories: ["letters", "colors", "diagonal"],
-      cardCounts: {},
-      roundOverridePool: [
-        { prompts: { background: { min: 1, max: 1 } } },
-        { prompts: { background: { min: 0, max: 0 } } },
-        null
-      ],
-      modifiers: {
-        backgroundColor: true,
-        backgroundColorChance: 1.0
-      },
-      starTimes: { platinum: 2, gold: 2.5, silver: 4, bronze: 8 },
+      stageType: "sequence",
+      rounds: 1,
+      cards: 3,
+      revealSeconds: 0.2,
+      recallSeconds: 20,
+      categories: ["numbers"],
+      modifiers: { },
+      starTimes: { platinum: 1.5, gold: 2, silver: 4, bronze: 8 },
       instructions: window.stageInstructions[21] || []
     },
     {
@@ -780,26 +772,17 @@
     },
     {
       id: 35,
-      version: 2,
+      version: 1,
       name: "Stage 35",
-      stageType: "memory",
+      stageType: "sequence",
       rounds: 2,
       cards: 3,
-      noRepeatAcrossRounds: true,
-      revealSeconds: 10,
-      recallSeconds: 30,
-      categories: ["numbers", "directions", "shapes", "colors"],
-      cardCounts: { directions: 1, numbers: 1 },
-      modifiers: {
-        mathOps: true,
-        mathMinCount: 1,
-        backgroundColor: true,
-        backgroundColorChance: 1.0,
-        rotate: true,
-        glitch: true,
-        swapCards: true
-      },
-      starTimes: { platinum: 9.5, gold: 11.5, silver: 16, bronze: 20 },
+      revealSeconds: 0.2,
+      recallSeconds: 20,
+      categories: ["numbers", "letters"],
+      cardCounts: {numbers: 1, letters: 1},
+      modifiers: { },
+      starTimes: { platinum: 4, gold: 5, silver: 9, bronze: 12 },
       instructions: window.stageInstructions[35] || []
     },
     {
@@ -1150,6 +1133,46 @@
       },
       starTimes: { platinum: 8, gold: 10, silver: 14, bronze: 18 },
       instructions: window.stageInstructions[50] || []
+    },
+    {
+      id: 51,
+      version: 1,
+      name: "Stage 60",
+      stageType: "sequence",
+      rounds: 1,
+      cards: 3,
+      revealSeconds: 0.2,
+      recallSeconds: 20,
+      categories: ["numbers", "directions", "shapes"],
+      cardCounts: { numbers: 1, directions: 1, shapes: 1 },
+      modifiers: {
+        rotate: true,
+        rotateMinCount: 1,
+        rotateMaxCount: 1
+      },
+      starTimes: { platinum: 3, gold: 4, silver: 8, bronze: 12 },
+      instructions: window.stageInstructions[51] || []
+    },
+    {
+      id: 52,
+      version: 1,
+      name: "Stage 52",
+      stageType: "tutorial",
+      rounds: 3,
+      cards: 1,
+      noRepeatAcrossRounds: true,
+      revealSeconds: 8,
+      recallSeconds: 20,
+      categories: ["directions", "diagonal"],
+      cardCounts: {},
+      modifiers: {
+        rotatePlus: true,
+        rotatePlusMinCount: 1,
+        rotatePlusMaxCount: 1,
+        rotateNoRepeatPromptsAcrossRounds: true
+      },
+      starTimes: { platinum: 8, gold: 12, silver: 16, bronze: 20 },
+      instructions: window.stageInstructions[52] || []
     }
   ];
 })();
