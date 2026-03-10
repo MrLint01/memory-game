@@ -3026,13 +3026,6 @@ function runFlashCountdown(onComplete) {
                 tabTutorialShownRound = round;
                 tabTutorialActive = true;
                 tabTutorialDisabledInputs = [];
-                inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
-                  const idx = Number(field.dataset.index);
-                  if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
-                    field.disabled = true;
-                    tabTutorialDisabledInputs.push(field);
-                  }
-                });
               }
             }
           }
@@ -3058,9 +3051,8 @@ function runFlashCountdown(onComplete) {
           if (!targetInput) return;
           const idx = Number(targetInput.dataset.index);
           if (Number.isFinite(idx) && idx > 0) {
-            event.preventDefault();
-            const firstInput = inputGrid.querySelector('input[data-index="0"]');
-            if (firstInput) firstInput.focus();
+            showTabKeyHint();
+            tabTutorialActive = false;
           }
         });
         inputGrid.addEventListener("focusin", (event) => {
@@ -3069,8 +3061,8 @@ function runFlashCountdown(onComplete) {
           if (!targetInput) return;
           const idx = Number(targetInput.dataset.index);
           if (Number.isFinite(idx) && idx > 0) {
-            const firstInput = inputGrid.querySelector('input[data-index="0"]');
-            if (firstInput) firstInput.focus();
+            showTabKeyHint();
+            tabTutorialActive = false;
           }
         });
       }
@@ -5131,7 +5123,15 @@ function runFlashCountdown(onComplete) {
 
       document.addEventListener("pointerdown", (event) => {
         if (!tabTutorialActive) return;
-        showTabKeyHint();
+        const targetInput = event.target && event.target.closest
+          ? event.target.closest("input[data-index]")
+          : null;
+        if (!targetInput) return;
+        const idx = Number(targetInput.dataset.index);
+        if (Number.isFinite(idx) && idx > 0) {
+          showTabKeyHint();
+          tabTutorialActive = false;
+        }
       }, { capture: true });
 
       loadKeybinds();
@@ -5454,5 +5454,4 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
 
