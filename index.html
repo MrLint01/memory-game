@@ -71,6 +71,7 @@
     <link rel="preload" href="imgs/icons/mod-previouscard.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-platformer.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-swapcards.svg" as="image" />
+    <link rel="preload" href="imgs/icons/mod-sequence.svg" as="image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -417,6 +418,14 @@
                 </span>
               </label>
               <label class="icon-choice">
+                <input id="practiceSequence" type="checkbox" />
+                <span class="icon-tile">
+                  <img src="imgs/icons/mod-sequence.svg" alt="" />
+                  <span>Sequence</span>
+                  <img class="lock-icon" src="imgs/lock.png" alt="" aria-hidden="true" />
+                </span>
+              </label>
+              <label class="icon-choice">
                 <input id="practiceFog" type="checkbox" />
                 <span class="icon-tile">
                   <img src="imgs/icons/mod-fog.svg" alt="" />
@@ -541,9 +550,9 @@
     <script src="version.js?v=20260217"></script>
     <script src="firebase-analytics.js?v=2"></script>
     <script>
-      window.unlockAllStages = false;
-      window.unlockSandbox = false;
-      window.unlockAllModifiers = false;
+      window.unlockAllStages = true;
+      window.unlockSandbox = true;
+      window.unlockAllModifiers = true;
     </script>
     <script src="ui-loader.js?v=1"></script>
   </body>

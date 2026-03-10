@@ -288,6 +288,7 @@
         previousCard: false,
         rotate: false,
         rotatePlus: false,
+        sequence: false,
         swapCards: false,
         platformer: false,
         glitch: false,
@@ -378,7 +379,17 @@
       rotatePlusChance: typeof modifiers.rotatePlusChance === "number" ? modifiers.rotatePlusChance : null,
       rotatePlusMinCount: typeof modifiers.rotatePlusMinCount === "number" ? modifiers.rotatePlusMinCount : null,
       rotatePlusMaxCount: typeof modifiers.rotatePlusMaxCount === "number" ? modifiers.rotatePlusMaxCount : null,
-      enableGlitch: Boolean(modifiers.glitch)
+      enableGlitch: Boolean(modifiers.glitch),
+      enableSequence: Boolean(modifiers.sequence),
+      sequenceSteps: typeof modifiers.sequenceSteps === "number" ? modifiers.sequenceSteps : null,
+      sequenceStepSeconds: typeof modifiers.sequenceStepSeconds === "number" ? modifiers.sequenceStepSeconds : null,
+      sequenceStepHoldSeconds:
+        typeof modifiers.sequenceStepHoldSeconds === "number" ? modifiers.sequenceStepHoldSeconds : null,
+      sequenceFinalHoldSeconds:
+        typeof modifiers.sequenceFinalHoldSeconds === "number" ? modifiers.sequenceFinalHoldSeconds : null,
+      sequencePool: Array.isArray(modifiers.sequencePool) ? modifiers.sequencePool.slice() : null,
+      sequenceMinCount: typeof modifiers.sequenceMinCount === "number" ? modifiers.sequenceMinCount : null,
+      sequenceMaxCount: typeof modifiers.sequenceMaxCount === "number" ? modifiers.sequenceMaxCount : null
     };
 
     const roundOverride =

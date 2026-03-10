@@ -1116,6 +1116,7 @@
         updatePlatformerVisibility(false);
         stopFog();
         stopGlitching();
+        stopSequenceModifier();
         clearAdTimer();
         hideAd();
         round = 0;
@@ -1168,6 +1169,7 @@
         updatePlatformerVisibility(false);
         stopFog();
         stopGlitching();
+        stopSequenceModifier();
         clearAdTimer();
         hideAd();
         if (timerFill) {
@@ -1665,6 +1667,7 @@ function runFlashCountdown(onComplete) {
           previousCard: { label: "Previous", src: "imgs/icons/mod-previouscard.svg" },
           rotate: { label: "Rotate", src: "imgs/icons/mod-rotate.svg" },
           rotatePlus: { label: "Rotate+", src: "imgs/icons/mod-rotateplus.svg" },
+          sequence: { label: "Sequence", src: "imgs/icons/mod-sequence.svg" },
           swapCards: { label: "Swap", src: "imgs/icons/mod-swapcards.svg" },
           platformer: { label: "Platformer", src: "imgs/icons/mod-platformer.svg" },
           glitch: { label: "Glitch", inlineSvg: glitchSvg },
@@ -4550,8 +4553,11 @@ function runFlashCountdown(onComplete) {
             if (activeInput) {
               const nextArrow = "\u2191";
               const current = String(activeInput.value || "").trim();
+              const isSequenceInput = activeInput.dataset.sequence === "true";
               const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
-              if (isArrowSeq && current.length === 1) {
+              if (isSequenceInput) {
+                activeInput.value = current + nextArrow;
+              } else if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
                 activeInput.value = nextArrow;
@@ -4564,8 +4570,11 @@ function runFlashCountdown(onComplete) {
             if (activeInput) {
               const nextArrow = "\u2193";
               const current = String(activeInput.value || "").trim();
+              const isSequenceInput = activeInput.dataset.sequence === "true";
               const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
-              if (isArrowSeq && current.length === 1) {
+              if (isSequenceInput) {
+                activeInput.value = current + nextArrow;
+              } else if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
                 activeInput.value = nextArrow;
@@ -4578,8 +4587,11 @@ function runFlashCountdown(onComplete) {
             if (activeInput) {
               const nextArrow = "\u2190";
               const current = String(activeInput.value || "").trim();
+              const isSequenceInput = activeInput.dataset.sequence === "true";
               const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
-              if (isArrowSeq && current.length === 1) {
+              if (isSequenceInput) {
+                activeInput.value = current + nextArrow;
+              } else if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
                 activeInput.value = nextArrow;
@@ -4592,8 +4604,11 @@ function runFlashCountdown(onComplete) {
             if (activeInput) {
               const nextArrow = "\u2192";
               const current = String(activeInput.value || "").trim();
+              const isSequenceInput = activeInput.dataset.sequence === "true";
               const isArrowSeq = /^[\u2191\u2193\u2190\u2192]+$/.test(current);
-              if (isArrowSeq && current.length === 1) {
+              if (isSequenceInput) {
+                activeInput.value = current + nextArrow;
+              } else if (isArrowSeq && current.length === 1) {
                 activeInput.value = current + nextArrow;
               } else {
                 activeInput.value = nextArrow;
@@ -5439,11 +5454,6 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
-
-
-
 
 
 

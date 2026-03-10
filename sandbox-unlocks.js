@@ -21,6 +21,7 @@ window.sandboxUnlockCosts = {
     practiceGlitch: 10,
     practiceRotate: 3,
     practiceRotatePlus: 5,
+    practiceSequence: 8,
     practiceFog: 10,
     practiceBlur: 10,
     practiceAds: 15
