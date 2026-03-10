@@ -127,6 +127,7 @@ const ACHIEVEMENT_MODIFIER_META = {
   previousCard: { firstUseId: "mod_previous_card", label: "Previous Card", iconSrc: "imgs/icons/mod-previouscard.svg", short: "PREV" },
   rotate: { firstUseId: "mod_rotate", label: "Rotate", iconSrc: "imgs/icons/mod-rotate.svg", short: "ROT" },
   rotatePlus: { firstUseId: "mod_rotate_plus", label: "Rotate+", iconSrc: "imgs/icons/mod-rotateplus.svg", short: "R+" },
+  sequence: { firstUseId: "mod_sequence", label: "Sequence", iconSrc: "imgs/icons/mod-sequence.svg", short: "SEQ" },
   swapCards: { firstUseId: "mod_swap_cards", label: "Card Swap", iconSrc: "imgs/icons/mod-swapcards.svg", short: "SWAP" },
   platformer: { firstUseId: "mod_platformer", label: "Platformer", iconSrc: "imgs/icons/mod-platformer.svg", short: "PLAT" },
   glitch: { firstUseId: "mod_glitch", label: "Glitch", iconSrc: "imgs/icons/mod-glitch.svg", short: "GLT" },

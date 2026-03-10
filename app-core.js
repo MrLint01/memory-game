@@ -31,6 +31,7 @@ const revealInput = document.getElementById("revealTime");
       const practiceGlitch = document.getElementById("practiceGlitch");
       const practiceRotate = document.getElementById("practiceRotate");
       const practiceRotatePlus = document.getElementById("practiceRotatePlus");
+      const practiceSequence = document.getElementById("practiceSequence");
       const practiceFog = document.getElementById("practiceFog");
       const practiceBlur = document.getElementById("practiceBlur");
       const practiceAds = document.getElementById("practiceAds");
@@ -381,6 +382,11 @@ const revealInput = document.getElementById("revealTime");
       let blurActive = false;
       let blurLastMove = { x: null, y: null, t: 0 };
       let glitchTimer = null;
+      let sequenceModifierActive = false;
+      let sequenceModifierTimer = null;
+      let sequenceModifierStepIndex = 0;
+      let sequenceModifierConfig = null;
+      let sequenceModifierItems = null;
       let swapEnabled = false;
       let swapChance = 1;
       let swapActive = false;
@@ -431,6 +437,7 @@ const revealInput = document.getElementById("revealTime");
         if (practicePreviousCard && practicePreviousCard.checked) active.push("previousCard");
         if (practiceRotate && practiceRotate.checked) active.push("rotate");
         if (practiceRotatePlus && practiceRotatePlus.checked) active.push("rotatePlus");
+        if (practiceSequence && practiceSequence.checked) active.push("sequence");
         if (practiceSwap && practiceSwap.checked) active.push("swapCards");
         if (practicePlatformer && practicePlatformer.checked) active.push("platformer");
         if (practiceGlitch && practiceGlitch.checked) active.push("glitch");
@@ -557,7 +564,15 @@ const revealInput = document.getElementById("revealTime");
             textPromptMaxCount: null,
             previousPromptMinCount: null,
             previousPromptMaxCount: null,
-            enableGlitch: false
+            enableGlitch: false,
+            enableSequence: false,
+            sequenceSteps: null,
+            sequenceStepSeconds: null,
+            sequenceStepHoldSeconds: null,
+            sequenceFinalHoldSeconds: null,
+            sequencePool: null,
+            sequenceMinCount: null,
+            sequenceMaxCount: null
           };
         }
         return {
@@ -576,7 +591,15 @@ const revealInput = document.getElementById("revealTime");
           previousCardChance: 0.5,
           enableRotate: Boolean(practiceRotate && practiceRotate.checked),
           enableRotatePlus: Boolean(practiceRotatePlus && practiceRotatePlus.checked),
-          enableGlitch: practiceGlitch.checked
+          enableGlitch: practiceGlitch.checked,
+          enableSequence: Boolean(practiceSequence && practiceSequence.checked),
+          sequenceSteps: 3,
+          sequenceStepSeconds: 0.2,
+          sequenceStepHoldSeconds: 0.2,
+          sequenceFinalHoldSeconds: 0.5,
+          sequencePool: getSelectedCategories(),
+          sequenceMinCount: null,
+          sequenceMaxCount: null
         };
       }
 
@@ -1524,6 +1547,9 @@ const revealInput = document.getElementById("revealTime");
         if (answerAliases.includes(actual)) {
           return true;
         }
+        if (Array.isArray(item.sequenceSteps) && item.sequenceSteps.length) {
+          return matchesSequenceAnswer(actual, item);
+        }
         const category = item.answerCategory || item.category;
         const stage = gameMode === "stages" && window.getStageConfig
           ? window.getStageConfig(stageState.index)
@@ -1937,6 +1963,7 @@ const revealInput = document.getElementById("revealTime");
           forceBackgroundColor: false,
           forceTextPrompt: false,
           forcePreviousPrompt: false,
+          forceSequence: false,
           positionIndex: 0
         }));
         plan.forEach((entry, index) => {
@@ -2131,6 +2158,75 @@ const revealInput = document.getElementById("revealTime");
         return plan;
       }
 
+      function applySequenceModifier(items, options) {
+        sequenceModifierConfig = null;
+        if (!options || !options.enableSequence) return items;
+        const pool = Array.isArray(options.sequencePool) && options.sequencePool.length
+          ? options.sequencePool.filter((key) => dataSets[key])
+          : getActiveCategories(round);
+        const stepsCount = clampCount(options.sequenceSteps) ?? 3;
+        const stepSeconds = typeof options.sequenceStepSeconds === "number" ? options.sequenceStepSeconds : 0.2;
+        const stepHoldSeconds =
+          typeof options.sequenceStepHoldSeconds === "number" ? options.sequenceStepHoldSeconds : 0.2;
+        const finalHoldSeconds =
+          typeof options.sequenceFinalHoldSeconds === "number" ? options.sequenceFinalHoldSeconds : 0.5;
+        let min = clampCount(options.sequenceMinCount);
+        let max = clampCount(options.sequenceMaxCount);
+        if (gameMode !== "stages") {
+          const total = Array.isArray(items) ? items.length : 0;
+          if (total <= 8) {
+            min = 1;
+            max = 1;
+          } else {
+            min = 1;
+            if (max === null) {
+              max = total;
+            }
+          }
+        }
+        if (min === null && max === null) {
+          min = 1;
+          max = 1;
+        }
+        const eligible = items.map((_, index) => index);
+        const selected = selectModifierIndices(eligible, 1, min, max);
+        if (!selected.size) return items;
+        sequenceModifierConfig = {
+          steps: stepsCount,
+          stepSeconds,
+          stepHoldSeconds,
+          finalHoldSeconds
+        };
+        return items.map((item, index) => {
+          if (!selected.has(index)) return item;
+          const steps = [];
+          let previousKey = "";
+          for (let i = 0; i < stepsCount; i += 1) {
+            const step = pickSequenceStepItem(pool, previousKey);
+            if (step) {
+              steps.push(step);
+              previousKey = buildSequenceStepKey(step);
+            }
+          }
+          if (!steps.length) return item;
+          const answer = steps.map(buildSequenceInitial).join("");
+          const achievementModifiers = Array.isArray(item.achievementModifiers)
+            ? item.achievementModifiers.slice()
+            : [];
+          if (!achievementModifiers.includes("sequence")) {
+            achievementModifiers.push("sequence");
+          }
+          return {
+            ...item,
+            sequenceSteps: steps,
+            sequenceAnswer: answer,
+            answer,
+            recallHint: "Sequence",
+            achievementModifiers
+          };
+        });
+      }
+
       function buildItemKey(category, label) {
         const value = String(label || "").trim();
         if (!value) return String(category || "").toLowerCase();
@@ -2142,6 +2238,116 @@ const revealInput = document.getElementById("revealTime");
         const value = item.answer ?? item.label ?? "";
         const normalized = normalize(String(value));
         return normalized ? normalized[0] : "";
+      }
+
+      function buildSequenceInitial(step) {
+        if (!step) return "";
+        const value = step.answer ?? step.textLabel ?? step.label ?? step.symbol ?? "";
+        const normalized = normalize(String(value));
+        if (!normalized) return "";
+        const category = String(step.answerCategory || step.category || "").toLowerCase();
+        if (category === "diagonal") {
+          return normalized.replace(/\s+/g, "");
+        }
+        if (category === "numbers") {
+          return normalized;
+        }
+        return normalized[0];
+      }
+
+      function getSequenceStepTokens(step) {
+        if (!step) return [];
+        const tokens = new Set();
+        const category = String(step.answerCategory || step.category || "").toLowerCase();
+        const label = normalize(String(step.label ?? step.answer ?? step.textLabel ?? ""));
+        if (category === "diagonal") {
+          const compact = label.replace(/\s+/g, "");
+          if (compact) tokens.add(compact);
+          const arrowPairs = {
+            ne: ["\u2191\u2192", "\u2192\u2191"],
+            nw: ["\u2191\u2190", "\u2190\u2191"],
+            se: ["\u2193\u2192", "\u2192\u2193"],
+            sw: ["\u2193\u2190", "\u2190\u2193"]
+          };
+          const allowed = arrowPairs[compact];
+          if (Array.isArray(allowed)) {
+            allowed.forEach((value) => tokens.add(value));
+          }
+          return Array.from(tokens).filter(Boolean);
+        }
+        if (category === "directions") {
+          if (label) {
+            tokens.add(label[0]);
+          }
+          const arrowMap = {
+            up: "\u2191",
+            down: "\u2193",
+            left: "\u2190",
+            right: "\u2192"
+          };
+          const cardinalMap = { up: "n", right: "e", down: "s", left: "w" };
+          if (arrowMap[label]) tokens.add(arrowMap[label]);
+          if (cardinalMap[label]) tokens.add(cardinalMap[label]);
+          return Array.from(tokens).filter(Boolean);
+        }
+        if (category === "numbers") {
+          if (label) tokens.add(label);
+          return Array.from(tokens);
+        }
+        const initial = buildSequenceInitial(step);
+        if (initial) tokens.add(initial);
+        return Array.from(tokens).filter(Boolean);
+      }
+
+      function matchesSequenceAnswer(actualInput, item) {
+        if (!item || !Array.isArray(item.sequenceSteps) || !item.sequenceSteps.length) return false;
+        const actual = normalize(String(actualInput || "")).replace(/\s+/g, "");
+        if (!actual) return false;
+        const expected = normalize(String(item.answer ?? "")).replace(/\s+/g, "");
+        if (expected && actual === expected) return true;
+        let positions = new Set([0]);
+        for (const step of item.sequenceSteps) {
+          const tokens = getSequenceStepTokens(step);
+          if (!tokens.length) return false;
+          const next = new Set();
+          positions.forEach((pos) => {
+            tokens.forEach((token) => {
+              if (actual.startsWith(token, pos)) {
+                next.add(pos + token.length);
+              }
+            });
+          });
+          positions = next;
+          if (!positions.size) return false;
+        }
+        return positions.has(actual.length);
+      }
+
+      function buildSequenceStepKey(step) {
+        if (!step) return "";
+        const category = step.category ? String(step.category).toLowerCase() : "";
+        const label = step.label ? String(step.label).toLowerCase() : "";
+        return `${category}:${label}`;
+      }
+
+      function pickSequenceStepItem(pool, avoidKey = "") {
+        const categories = Array.isArray(pool) ? pool.filter((key) => dataSets[key]) : [];
+        if (!categories.length) return null;
+        let lastCandidate = null;
+        const maxAttempts = 8;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          const category = categories[Math.floor(Math.random() * categories.length)];
+          const list = dataSets[category];
+          if (!Array.isArray(list) || !list.length) continue;
+          const rawItem = list[Math.floor(Math.random() * list.length)];
+          const item = typeof rawItem === "string" ? { label: rawItem } : { ...rawItem };
+          const candidate = { ...item, category };
+          lastCandidate = candidate;
+          if (!avoidKey || buildSequenceStepKey(candidate) !== avoidKey) {
+            return candidate;
+          }
+        }
+        return lastCandidate;
       }
 
       function pickBackgroundColorAvoiding(previousLabel) {
@@ -2631,7 +2837,8 @@ const revealInput = document.getElementById("revealTime");
           }
         }
         const rotated = applyRotationChallenges(built, options);
-        const result = applyNumberChallenges(rotated, options);
+        const numbered = applyNumberChallenges(rotated, options);
+        const result = applySequenceModifier(numbered, options);
         if ((enforceAnswerInitials || enforceUniqueInitials) && Array.isArray(result)) {
           const currentInitials = result.map(buildAnswerInitial);
           if (enforceUniqueInitials) {
@@ -2670,6 +2877,102 @@ const revealInput = document.getElementById("revealTime");
       }
 
 
+      function applyCardContent(card, item, show, index) {
+        card.classList.remove("background-color", "card--text-color");
+        card.style.background = "";
+        card.style.color = "";
+        applyCardColorVisionAssist(card, null, null);
+        if (show) {
+          if (item.specialType === "cat") {
+            const src = item.specialImage || pickRareCatImage();
+            card.innerHTML = `
+              <img class="cat-image" src="${src}" alt="Cat" />
+            `;
+          } else if (item.category === "directions") {
+            const rotation = getDirectionRotation(item.label);
+            card.innerHTML = `
+              <img
+                class="direction-arrow"
+                src="imgs/arrow.png"
+                alt="${item.label}"
+                style="transform: rotate(${rotation}deg);"
+              />
+            `;
+          } else if (item.category === "diagonal") {
+            const rotation = getDiagonalRotation(item.label);
+            card.innerHTML = `
+              <img
+                class="direction-arrow"
+                src="imgs/arrow.png"
+                alt="${item.label}"
+                style="transform: rotate(${rotation}deg);"
+              />
+            `;
+          } else if (item.category === "greekLetters") {
+            const symbol = item.symbol || item.label;
+            card.innerHTML = `${symbol}`;
+          } else if (item.category === "shapes") {
+            card.innerHTML = `${renderShapeSVG(item.shape)}`;
+          } else if (item.category === "fruits") {
+            const src = item.image || "";
+            card.innerHTML = `
+              <img class="fruit-image" src="${src}" alt="${item.label}" />
+            `;
+          } else {
+            const cardLabel = item.textLabel ?? item.label;
+            const symbol = item.symbol ? `${item.symbol} ` : "";
+            card.innerHTML = `${symbol}${cardLabel}`;
+          }
+          let fillCue = null;
+          let textCue = null;
+          if (item.specialType !== "cat") {
+            if (item.color) {
+              fillCue = getAccessibleColorEntry(item.label, item.color);
+              card.style.background = fillCue.color;
+              if (!item.textColorHex) {
+                card.style.color = "#000";
+              }
+            } else if (item.backgroundColorHex) {
+              fillCue = getAccessibleColorEntry(item.backgroundColorLabel, item.backgroundColorHex);
+              card.style.background = fillCue.color;
+              if (!item.textColorHex) {
+                card.style.color = "#000";
+              }
+              card.classList.add("background-color");
+            }
+            if (item.textColorHex) {
+              textCue = getAccessibleColorEntry(item.textColorLabel, item.textColorHex);
+              card.style.color = textCue.color;
+              card.classList.add("card--text-color");
+            }
+            applyCardColorVisionAssist(card, fillCue, textCue);
+          }
+          return;
+        }
+        const safeIndex = Number.isFinite(index) ? index : 0;
+        const cardLabel = `Card ${safeIndex + 1}`;
+        const categoryLabel = item.specialType === "cat" ? "Cat" : formatCategoryLabel(item.category);
+        if (item.specialType === "cat") {
+          card.innerHTML = `
+            <small>${cardLabel}</small>
+            <span>Cat</span>
+          `;
+        } else if (item.recallHint) {
+          const hintHtml = String(item.recallHint)
+            .replace(/\u21bb/g, '<span class="rotation-icon">\u21bb</span>')
+            .replace(/\u21ba/g, '<span class="rotation-icon">\u21ba</span>');
+          card.innerHTML = `
+            <small>${cardLabel}</small>
+            <span>${hintHtml}</span>
+          `;
+        } else {
+          card.innerHTML = `
+            <small>${cardLabel}</small>
+            <span>${categoryLabel}</span>
+          `;
+        }
+      }
+
       function renderCards(show) {
         cardGrid.innerHTML = "";
         const glitchEnabled = show && getChallengeOptions(round).enableGlitch;
@@ -2681,99 +2984,73 @@ const revealInput = document.getElementById("revealTime");
           if (glitchEnabled) {
             card.classList.add("glitch", "glitch-tv");
           }
+          if (show && item.sequenceSteps && item.sequenceSteps.length) {
+            card.dataset.sequence = "true";
+          }
           card.style.order = index;
           card.dataset.index = index;
-          if (show) {
-            if (item.specialType === "cat") {
-              const src = item.specialImage || pickRareCatImage();
-              card.innerHTML = `
-                <img class="cat-image" src="${src}" alt="Cat" />
-              `;
-            } else if (item.category === "directions") {
-              const rotation = getDirectionRotation(item.label);
-              card.innerHTML = `
-                <img
-                  class="direction-arrow"
-                  src="imgs/arrow.png"
-                  alt="${item.label}"
-                  style="transform: rotate(${rotation}deg);"
-                />
-              `;
-            } else if (item.category === "diagonal") {
-              const rotation = getDiagonalRotation(item.label);
-              card.innerHTML = `
-                <img
-                  class="direction-arrow"
-                  src="imgs/arrow.png"
-                  alt="${item.label}"
-                  style="transform: rotate(${rotation}deg);"
-                />
-              `;
-            } else if (item.category === "greekLetters") {
-              const symbol = item.symbol || item.label;
-              card.innerHTML = `${symbol}`;
-            } else if (item.category === "shapes") {
-              card.innerHTML = `${renderShapeSVG(item.shape)}`;
-            } else if (item.category === "fruits") {
-              const src = item.image || "";
-              card.innerHTML = `
-                <img class="fruit-image" src="${src}" alt="${item.label}" />
-              `;
+          const displayItem =
+            show && item.sequenceSteps && item.sequenceSteps.length ? item.sequenceSteps[0] : item;
+          applyCardContent(card, displayItem, show, index);
+          cardGrid.appendChild(card);
+        });
+      }
+
+      function updateSequenceModifierCards(stepIndex) {
+        if (!sequenceModifierActive || !cardGrid) return;
+        const cards = Array.from(cardGrid.querySelectorAll(".card"));
+        const sourceItems = sequenceModifierItems || roundItems;
+        cards.forEach((card) => {
+          const idx = Number(card.dataset.index);
+          if (!Number.isFinite(idx)) return;
+          const item = sourceItems[idx];
+          if (!item || !Array.isArray(item.sequenceSteps) || !item.sequenceSteps.length) return;
+          const stepItem = item.sequenceSteps[stepIndex] || item.sequenceSteps[item.sequenceSteps.length - 1];
+          applyCardContent(card, stepItem, true, idx);
+        });
+      }
+
+      function stopSequenceModifier() {
+        sequenceModifierActive = false;
+        sequenceModifierStepIndex = 0;
+        sequenceModifierItems = null;
+        if (sequenceModifierTimer) {
+          clearTimeout(sequenceModifierTimer);
+          sequenceModifierTimer = null;
+        }
+      }
+
+      function startSequenceModifier(itemsOverride = null) {
+        stopSequenceModifier();
+        if (!sequenceModifierConfig || !sequenceModifierConfig.steps) return;
+        sequenceModifierItems = Array.isArray(itemsOverride) ? itemsOverride : null;
+        const sourceItems = sequenceModifierItems || roundItems;
+        const hasSequence = Array.isArray(sourceItems) &&
+          sourceItems.some((item) => item && Array.isArray(item.sequenceSteps) && item.sequenceSteps.length);
+        if (!hasSequence) return;
+        const stepMs = Math.max(0, sequenceModifierConfig.stepSeconds * 1000);
+        const holdMs = Math.max(0, sequenceModifierConfig.stepHoldSeconds * 1000);
+        const finalHoldMs = Math.max(0, sequenceModifierConfig.finalHoldSeconds * 1000);
+        sequenceModifierActive = true;
+        sequenceModifierStepIndex = 0;
+        updateSequenceModifierCards(sequenceModifierStepIndex);
+        const scheduleNext = () => {
+          if (!sequenceModifierActive) return;
+          const isLast = sequenceModifierStepIndex >= sequenceModifierConfig.steps - 1;
+          const delay = stepMs + (isLast ? finalHoldMs : holdMs);
+          sequenceModifierTimer = window.setTimeout(() => {
+            if (!sequenceModifierActive) return;
+            if (isLast) {
+              sequenceModifierStepIndex = 0;
             } else {
-              const cardLabel = item.textLabel ?? item.label;
-              const symbol = item.symbol ? `${item.symbol} ` : "";
-              card.innerHTML = `${symbol}${cardLabel}`;
+              sequenceModifierStepIndex += 1;
             }
-            let fillCue = null;
-            let textCue = null;
-            if (item.specialType !== "cat") {
-              if (item.color) {
-                fillCue = getAccessibleColorEntry(item.label, item.color);
-                card.style.background = fillCue.color;
-                if (!item.textColorHex) {
-                  card.style.color = "#000";
-                }
-              } else if (item.backgroundColorHex) {
-                fillCue = getAccessibleColorEntry(item.backgroundColorLabel, item.backgroundColorHex);
-                card.style.background = fillCue.color;
-                if (!item.textColorHex) {
-                  card.style.color = "#000";
-                }
-                card.classList.add("background-color");
-              }
-              if (item.textColorHex) {
-                textCue = getAccessibleColorEntry(item.textColorLabel, item.textColorHex);
-                card.style.color = textCue.color;
-                card.classList.add("card--text-color");
-              }
-              applyCardColorVisionAssist(card, fillCue, textCue);
-            }
-          } else {
-            const cardLabel = `Card ${index + 1}`;
-            const categoryLabel = item.specialType === "cat" ? "Cat" : formatCategoryLabel(item.category);
-            if (item.specialType === "cat") {
-              card.innerHTML = `
-                <small>${cardLabel}</small>
-                <span>Cat</span>
-              `;
-            } else if (item.recallHint) {
-              const hintHtml = String(item.recallHint)
-                .replace(/\u21bb/g, '<span class="rotation-icon">\u21bb</span>')
-                .replace(/\u21ba/g, '<span class="rotation-icon">\u21ba</span>');
-              card.innerHTML = `
-                <small>${cardLabel}</small>
-                <span>${hintHtml}</span>
-              `;
-            } else {
-              card.innerHTML = `
-                <small>${cardLabel}</small>
-                <span>${categoryLabel}</span>
-              `;
-            }
-          }
-        cardGrid.appendChild(card);
-      });
-    }
+            updateSequenceModifierCards(sequenceModifierStepIndex);
+            scheduleNext();
+          }, delay);
+        };
+        scheduleNext();
+      }
 
       window.refreshRenderedCardsForAppearance = function refreshRenderedCardsForAppearance() {
         if (!cardGrid || !cardGrid.children.length) return;
@@ -2791,6 +3068,9 @@ const revealInput = document.getElementById("revealTime");
           input.type = "text";
           input.placeholder = "";
           input.dataset.index = index;
+          if (item && Array.isArray(item.sequenceSteps) && item.sequenceSteps.length) {
+            input.dataset.sequence = "true";
+          }
           wrapper.appendChild(input);
           inputGrid.appendChild(wrapper);
         });

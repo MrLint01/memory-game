@@ -321,6 +321,7 @@
           roundItems = swapOrder.map((idx) => originalItems[idx]);
         }
         renderCards(true);
+        startSequenceModifier(roundItems);
         if (promptGrid) {
           promptGrid.innerHTML = "";
           entries.forEach((entry) => {
@@ -1411,6 +1412,7 @@
         hideAd();
         stopFog();
         stopBlur();
+        stopSequenceModifier();
         stopGlitching();
         if (platformerState.required && !platformerState.completed) {
           platformerState.failed = true;
@@ -1700,6 +1702,7 @@
           return;
         }
         renderCards(true);
+        startSequenceModifier();
         scheduleAd(revealSeconds);
         setTimer(revealSeconds, "Reveal", () => {
           beginRecallPhase();

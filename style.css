@@ -4766,6 +4766,15 @@ body.stage-fail .rotation-icon {
   width: 40px;
   height: 40px;
 }
+.icon-tile img[src$="apple.png"],
+.stage-intro-icon img[src$="apple.png"],
+.achievement-icon__img[src$="apple.png"] {
+  background: #ffffff;
+  border: 2px solid #111111;
+  border-radius: 6px;
+  padding: 4px;
+  box-sizing: border-box;
+}
 .icon-tile span {
   display: block;
   text-align: center;
