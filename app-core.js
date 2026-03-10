@@ -2672,11 +2672,15 @@ const revealInput = document.getElementById("revealTime");
 
       function renderCards(show) {
         cardGrid.innerHTML = "";
+        const glitchEnabled = show && getChallengeOptions(round).enableGlitch;
         roundItems.forEach((item, index) => {
           const card = document.createElement("div");
           const hintClass = !show && item.recallHint ? " hidden-card hint" : " hidden-card";
           card.className = `card ${show ? "" : hintClass}`.trim();
           card.classList.add("card--rise");
+          if (glitchEnabled) {
+            card.classList.add("glitch", "glitch-tv");
+          }
           card.style.order = index;
           card.dataset.index = index;
           if (show) {
