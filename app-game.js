@@ -41,6 +41,150 @@
         }
       }
 
+      const effectAudioClips = {
+        correct: createEffectAudio("audio/correct.wav"),
+        wrong: createEffectAudio("audio/wrong.wav")
+      };
+      let effectsAudioUnlocked = false;
+      let pendingEffectAudio = null;
+      let pendingEffectAudioListenerAttached = false;
+
+      function createEffectAudio(src) {
+        if (typeof Audio === "undefined") return null;
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        audio.addEventListener("error", () => {
+          window.__lastAudioError = audio.error || new Error(`Failed to load ${audio.src}`);
+        });
+        return audio;
+      }
+
+      function getEffectMixVolume() {
+        if (typeof window.getAudioMix === "function") {
+          const mix = window.getAudioMix() || {};
+          const master = Number.isFinite(mix.master) ? mix.master : 1;
+          const effects = Number.isFinite(mix.effects) ? mix.effects : 1;
+          return Math.max(0, Math.min(1, master)) * Math.max(0, Math.min(1, effects));
+        }
+        return 1;
+      }
+
+      function unlockEffectAudio() {
+        if (effectsAudioUnlocked) return;
+        effectsAudioUnlocked = true;
+        Object.values(effectAudioClips).forEach((audio) => {
+          if (!audio) return;
+          try {
+            audio.muted = true;
+            audio.volume = 0;
+            const playResult = audio.play();
+            if (playResult && typeof playResult.then === "function") {
+              playResult
+                .then(() => {
+                  audio.pause();
+                  audio.currentTime = 0;
+                  audio.muted = false;
+                })
+                .catch(() => {
+                  audio.muted = false;
+                });
+            } else {
+              audio.pause();
+              audio.currentTime = 0;
+              audio.muted = false;
+            }
+          } catch (error) {
+            audio.muted = false;
+          }
+        });
+      }
+
+      function playEffectAudio(audio) {
+        if (!audio) return;
+        const volume = getEffectMixVolume();
+        if (volume <= 0) return;
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+          audio.volume = volume;
+          const playResult = audio.play();
+          if (playResult && typeof playResult.catch === "function") {
+            playResult.catch((error) => {
+              window.__lastAudioError = error;
+              pendingEffectAudio = audio;
+              queuePendingEffectAudio();
+            });
+          }
+        } catch (error) {
+          window.__lastAudioError = error;
+          pendingEffectAudio = audio;
+          queuePendingEffectAudio();
+        }
+      }
+
+      function playRoundCorrectSound() {
+        playEffectAudio(effectAudioClips.correct);
+      }
+      function playRoundWrongSound() {
+        playEffectAudio(effectAudioClips.wrong);
+      }
+
+      function getEffectAudioState(audio) {
+        if (!audio) {
+          return {
+            available: false
+          };
+        }
+        return {
+          available: true,
+          src: audio.currentSrc || audio.src,
+          readyState: audio.readyState,
+          networkState: audio.networkState,
+          paused: audio.paused,
+          muted: audio.muted,
+          volume: audio.volume,
+          error: audio.error
+            ? { code: audio.error.code, message: audio.error.message || null }
+            : null
+        };
+      }
+
+      window.playCorrectSound = playRoundCorrectSound;
+      window.getCorrectSoundState = () => getEffectAudioState(effectAudioClips.correct);
+      window.playWrongSound = playRoundWrongSound;
+      window.getWrongSoundState = () => getEffectAudioState(effectAudioClips.wrong);
+
+      function queuePendingEffectAudio() {
+        if (pendingEffectAudioListenerAttached) return;
+        pendingEffectAudioListenerAttached = true;
+        const handler = () => {
+          pendingEffectAudioListenerAttached = false;
+          const audio = pendingEffectAudio;
+          pendingEffectAudio = null;
+          if (!audio) return;
+          try {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+            audio.volume = getEffectMixVolume();
+            const playResult = audio.play();
+            if (playResult && typeof playResult.catch === "function") {
+              playResult.catch((error) => {
+                window.__lastAudioError = error;
+              });
+            }
+          } catch (error) {
+            window.__lastAudioError = error;
+          }
+        };
+        document.addEventListener("pointerdown", handler, { capture: true, once: true });
+        document.addEventListener("keydown", handler, { capture: true, once: true });
+      }
+
+      document.addEventListener("pointerdown", unlockEffectAudio, { capture: true, once: true });
+      document.addEventListener("keydown", unlockEffectAudio, { capture: true, once: true });
+
       function setModalState(modal, open) {
         if (!modal) return;
         if (open) {
@@ -1185,6 +1329,7 @@
         window.__lastAllCorrect = allCorrect;
         updatePlatformerVisibility(false);
         if (allCorrect) {
+          playRoundCorrectSound();
           const flowToken = roundFlowToken;
           await playSuccessAnimation();
           if (flowToken !== roundFlowToken) {
@@ -1283,6 +1428,7 @@
           startRound();
           return;
         }
+        playRoundWrongSound();
         if (gameMode === "stages") {
           lockInputs(true);
           const swapOrder = swapMap ? swapMap.slice() : null;
@@ -1416,6 +1562,7 @@
         stopGlitching();
         if (platformerState.required && !platformerState.completed) {
           platformerState.failed = true;
+          playRoundWrongSound();
           lockInputs(true);
           renderCards(true);
           if (submitBtn) {

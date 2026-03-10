@@ -350,6 +350,8 @@ const revealInput = document.getElementById("revealTime");
       let priorRoundStageId = null;
       let lastBackgroundColorLabel = null;
       let lastBackgroundColorStageId = null;
+      let backgroundColorHistory = null;
+      let backgroundColorHistoryStageId = null;
       let gameMode = "practice";
       let pausedState = null;
       let timerState = null;
@@ -1822,8 +1824,20 @@ const revealInput = document.getElementById("revealTime");
               options && options.backgroundColorUniqueLabelsPerRound && options._backgroundColorUsedLabels
                 ? options._backgroundColorUsedLabels
                 : null;
+            const historyLabels =
+              options && options._backgroundColorHistory ? options._backgroundColorHistory : null;
+            let combinedUsedLabels = null;
+            if (historyLabels && historyLabels.size) {
+              combinedUsedLabels = new Set(historyLabels);
+            }
+            if (usedLabels && usedLabels.size) {
+              if (!combinedUsedLabels) {
+                combinedUsedLabels = new Set();
+              }
+              usedLabels.forEach((label) => combinedUsedLabels.add(label));
+            }
             const backgroundColor = pickBackgroundColorWithUsed(
-              usedLabels,
+              combinedUsedLabels || usedLabels,
               noRepeatBackgroundAcrossRounds ? previousBackgroundLabel : null
             ) || (noRepeatBackgroundAcrossRounds
               ? (pickBackgroundColorAvoiding(previousBackgroundLabel) || pickBackgroundColor())
@@ -1835,6 +1849,9 @@ const revealInput = document.getElementById("revealTime");
             }
             if (usedLabels && backgroundColor.label) {
               usedLabels.add(String(backgroundColor.label).toLowerCase());
+            }
+            if (historyLabels && backgroundColor.label) {
+              historyLabels.add(String(backgroundColor.label).toLowerCase());
             }
             if (noRepeatBackgroundAcrossRounds && backgroundColor.label && stage) {
               lastBackgroundColorLabel = backgroundColor.label;
@@ -2415,6 +2432,13 @@ const revealInput = document.getElementById("revealTime");
             rotatePromptHistoryStageId = stage.id;
           }
           options._rotatePromptHistory = rotatePromptHistory;
+        }
+        if (gameMode === "stages" && stage && stage.noRepeatBackgroundAcrossRounds) {
+          if (backgroundColorHistoryStageId !== stage.id || round === 1) {
+            backgroundColorHistory = new Set();
+            backgroundColorHistoryStageId = stage.id;
+          }
+          options._backgroundColorHistory = backgroundColorHistory;
         }
         const enforceAnswerInitials =
           gameMode === "stages" && stage && stage.noRepeatAnswerInitialsAcrossRounds === true;

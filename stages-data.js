@@ -8,7 +8,7 @@
       rounds: 3,
       cards: 2,
       noRepeatAcrossRounds: true,
-      tabTutorialEnabled: true,
+      tabTutorialEnabled: false,
       revealSeconds: 5,
       recallSeconds: 30,
       categories: ["numbers"],
