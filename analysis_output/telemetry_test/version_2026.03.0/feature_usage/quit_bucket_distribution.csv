@@ -1,0 +1,4 @@
+reason,sessions
+inactivity_timeout,24
+close_tab_mid_level,15
+menu_quit,6

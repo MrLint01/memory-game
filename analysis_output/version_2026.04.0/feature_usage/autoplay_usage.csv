@@ -1,0 +1,13 @@
+label,unique_players
+splash_start | manual,32
+stage_preview_start | manual,29
+result_auto_advance_scheduled | auto,28
+stage_preview_open | manual,28
+first_level_countdown | auto,27
+splash_start | auto,27
+first_level_countdown | manual,23
+stage_preview_open | auto,22
+result_auto_advance_triggered | auto,22
+result_auto_advance_cancelled | manual,19
+stage_preview_autostart_cancelled | manual,17
+stage_preview_start | auto,10

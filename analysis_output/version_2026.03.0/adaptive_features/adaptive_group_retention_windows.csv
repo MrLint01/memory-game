@@ -1,0 +1,7 @@
+adaptive_group,window,percent
+A,within_1d,0.0
+A,within_3d,25.0
+A,within_7d,25.0
+B,within_1d,10.526315789473683
+B,within_3d,10.526315789473683
+B,within_7d,10.526315789473683

@@ -1,0 +1,2 @@
+Players who completed L1 but not L2: 7
+Players who completed L2 but not L3: 6
