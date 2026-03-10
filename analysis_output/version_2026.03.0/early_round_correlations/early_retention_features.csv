@@ -5,7 +5,7 @@ player_id_norm,retention_seconds,l1_attempts_before_first_completion,l1_failed_f
 1baa6b31-4819-4fe1-91a7-3bf8e145de7f,1750.33,6.0,True,False,1.05,7.0,True,False,5.69,0.0,False,True,8.52
 233287c4-2f3c-4973-9584-3a4045947568,0.0,0.0,,,,0.0,,,,0.0,,,
 2c1abc5d-3e89-4da2-aacf-f07dd8c6a514,19.08,0.0,,,,0.0,False,True,8.06,0.0,False,True,7.77
-3deb0762-2c72-4f4f-b2d9-8f91f4b9c4c4,13.42,0.0,False,True,2.84,0.0,False,True,4.5,0.0,False,True,4.13
+3deb0762-2c72-4f4f-b2d9-8f91f4b9c4c4,16.65,0.0,False,True,2.84,0.0,False,True,4.5,0.0,False,True,4.13
 3e81b174-3199-4d1a-bd59-525263eb97b2,0.0,0.0,,,,0.0,,,,0.0,,,
 4282b745-8061-42c3-b298-1648bbdddb98,12.3,1.0,True,False,12.3,0.0,,,,0.0,,,
 46205f6d-00a0-4c6d-8654-e8c6e899bec3,3.14,0.0,False,True,3.14,0.0,,,,0.0,,,
@@ -32,5 +32,7 @@ c3942ac4-c075-4a2d-b9f0-31f146a94d55,135.34,2.0,True,False,1.61,0.0,False,True,1
 cfc8ae67-c748-498d-bb20-d4345b6f8893,61.0,1.0,True,False,61.0,0.0,,,,0.0,,,
 db270b62-178f-47c4-8cfa-3ac38d7e7e40,488.16,0.0,False,True,5.41,8.0,True,False,1.1,4.0,True,False,1.85
 e650bd39-6d90-414e-b03d-8b9f64f6e51c,25.55,0.0,False,True,25.55,0.0,,,,0.0,,,
+ea76136b-fccd-4151-a1b4-b3aa54f70c28,60.01,1.0,True,False,60.01,0.0,,,,0.0,,,
+eb3777d7-d723-4990-a9ec-28a450518035,0.0,0.0,,,,0.0,,,,0.0,,,
 f262c6d0-a799-451c-9daa-f56f7f857801,0.0,0.0,,,,0.0,,,,0.0,,,
 id-1772570177848-66309bf8e036d,0.0,0.0,,,,0.0,,,,0.0,,,

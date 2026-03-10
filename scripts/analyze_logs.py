@@ -324,12 +324,87 @@ def save_grouped_bar(frame: pd.DataFrame, path: Path, title: str, xlabel: str, y
     plt.close()
 
 
+def save_multi_line_percent(frame: pd.DataFrame, path: Path, title: str, xlabel: str, ylabel: str, ylim: Optional[tuple[float, float]] = None) -> None:
+    if frame.empty:
+        return
+    plt.figure(figsize=(10, 6))
+    for column in frame.columns:
+        plt.plot(frame.index, frame[column], marker="o", label=str(column))
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.legend()
+    plt.grid(True, alpha=0.25)
+    plt.tight_layout()
+    plt.savefig(path, dpi=120)
+    plt.close()
+
+
+def infer_adaptive_cohorts_from_attempts(attempts_with_player: pd.DataFrame) -> pd.DataFrame:
+    required = {"player_id_norm", "level_number", "passed"}
+    if attempts_with_player.empty or not required <= set(attempts_with_player.columns):
+        return pd.DataFrame(columns=["player_id_norm", "adaptive_group", "group_assigned_ts"])
+
+    early_attempts = attempts_with_player.dropna(subset=["player_id_norm", "level_number"]).copy()
+    early_attempts["level_number"] = pd.to_numeric(early_attempts["level_number"], errors="coerce")
+    early_attempts = early_attempts[early_attempts["level_number"].isin([1, 2])].copy()
+    if early_attempts.empty:
+        return pd.DataFrame(columns=["player_id_norm", "adaptive_group", "group_assigned_ts"])
+
+    early_attempts["passed_flag"] = bool_series(early_attempts["passed"])
+    early_attempts = sort_attempts_for_sequence(early_attempts)
+    if "created_at" in early_attempts.columns:
+        early_attempts["attempt_ts"] = pd.to_datetime(early_attempts["created_at"], utc=True, errors="coerce")
+    else:
+        early_attempts["attempt_ts"] = pd.NaT
+
+    rows: list[dict[str, Any]] = []
+    for player_id, group in early_attempts.groupby("player_id_norm", sort=False):
+        failed_rows = group[~group["passed_flag"]]
+        passed_level_2_rows = group[(group["level_number"] == 2) & group["passed_flag"]]
+        failed_first_two = not failed_rows.empty
+        completed_level_2 = not passed_level_2_rows.empty
+
+        adaptive_group = None
+        assigned_ts = pd.NaT
+        if failed_first_two:
+            adaptive_group = "B"
+            if "attempt_ts" in failed_rows.columns and failed_rows["attempt_ts"].notna().any():
+                assigned_ts = failed_rows["attempt_ts"].dropna().iloc[0]
+        elif completed_level_2:
+            adaptive_group = "A"
+            if "attempt_ts" in passed_level_2_rows.columns and passed_level_2_rows["attempt_ts"].notna().any():
+                assigned_ts = passed_level_2_rows["attempt_ts"].dropna().iloc[0]
+        else:
+            adaptive_group = "unassigned"
+            if "attempt_ts" in group.columns and group["attempt_ts"].notna().any():
+                assigned_ts = group["attempt_ts"].dropna().iloc[-1]
+
+        rows.append({
+            "player_id_norm": str(player_id),
+            "adaptive_group": adaptive_group,
+            "group_assigned_ts": assigned_ts,
+        })
+
+    return pd.DataFrame(rows)
+
+
 def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataFrame, events: pd.DataFrame, outdir: Path, summary: list[str]) -> None:
     if events.empty and sessions.empty:
         return
 
     feature_dir = outdir / "feature_usage"
     feature_dir.mkdir(parents=True, exist_ok=True)
+    adaptive_dir = outdir / "adaptive_features"
+    adaptive_dir.mkdir(parents=True, exist_ok=True)
+    adaptive_cohorts = infer_adaptive_cohorts_from_attempts(attempts_with_player)
+    adaptive_group_lookup = (
+        adaptive_cohorts.set_index("player_id_norm")["adaptive_group"]
+        if not adaptive_cohorts.empty
+        else pd.Series(dtype="object")
+    )
 
     events_with_player = add_player_id_to_events(events, sessions) if not events.empty else pd.DataFrame()
     total_players = 0
@@ -472,17 +547,19 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
             save_bar(quit_counts, feature_dir / "quit_bucket_distribution.png", "Quit Distribution", "Quit Bucket", "Sessions")
             quit_counts.rename("sessions").to_csv(feature_dir / "quit_bucket_distribution.csv")
 
-            if "adaptive_group" in quit_latest.columns:
+            if "player_id_norm" in quit_latest.columns and not adaptive_group_lookup.empty:
+                quit_latest = quit_latest.copy()
+                quit_latest["adaptive_group_reconstructed"] = quit_latest["player_id_norm"].astype(str).map(adaptive_group_lookup)
                 adaptive_quit = (
-                    quit_latest[quit_latest["adaptive_group"].astype(str).isin(["A", "B"])]
-                    .groupby(["adaptive_group", bucket_col])
+                    quit_latest[quit_latest["adaptive_group_reconstructed"].astype(str).isin(["A", "B"])]
+                    .groupby(["adaptive_group_reconstructed", bucket_col])
                     .size()
                     .unstack(fill_value=0)
                     .sort_index()
                 )
                 save_stacked_bar(
                     adaptive_quit,
-                    feature_dir / "adaptive_group_quit_buckets.png",
+                    adaptive_dir / "adaptive_group_quit_buckets.png",
                     "Quit Buckets by Adaptive Group",
                     "Adaptive Group",
                     "Sessions",
@@ -501,37 +578,32 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                 bins=20,
             )
 
-        if "adaptive_group" in sessions.columns:
-            adaptive_sessions = sessions[sessions["adaptive_group"].astype(str).isin(["A", "B"])].copy()
+        if not adaptive_cohorts.empty:
+            session_player_col = pick_player_column(sessions)
+            adaptive_sessions = sessions.copy()
+            if session_player_col is not None and not adaptive_sessions.empty:
+                adaptive_sessions["player_id_norm"] = adaptive_sessions[session_player_col].astype(str)
+                adaptive_sessions["adaptive_group_reconstructed"] = adaptive_sessions["player_id_norm"].map(adaptive_group_lookup)
+                adaptive_sessions = adaptive_sessions[adaptive_sessions["adaptive_group_reconstructed"].astype(str).isin(["A", "B"])].copy()
+            else:
+                adaptive_sessions = pd.DataFrame()
+
             if not adaptive_sessions.empty:
-                avg_playtime = adaptive_sessions.groupby("adaptive_group")["total_playtime_seconds"].mean().sort_index()
-                save_bar(avg_playtime, feature_dir / "adaptive_group_avg_playtime.png", "Average Playtime by Adaptive Group", "Adaptive Group", "Seconds")
-                avg_level = adaptive_sessions.groupby("adaptive_group")["last_level_completed"].mean().sort_index()
-                save_bar(avg_level, feature_dir / "adaptive_group_avg_last_level.png", "Average Last Level Completed by Adaptive Group", "Adaptive Group", "Level")
-                avg_playtime.rename("avg_playtime_seconds").to_csv(feature_dir / "adaptive_group_avg_playtime.csv")
-                avg_level.rename("avg_last_level_completed").to_csv(feature_dir / "adaptive_group_avg_last_level.csv")
+                avg_playtime = adaptive_sessions.groupby("adaptive_group_reconstructed")["total_playtime_seconds"].mean().sort_index()
+                save_bar(avg_playtime, adaptive_dir / "adaptive_group_avg_playtime.png", "Average Playtime by Adaptive Group", "Adaptive Group", "Seconds")
+                avg_level = adaptive_sessions.groupby("adaptive_group_reconstructed")["last_level_completed"].mean().sort_index()
+                save_bar(avg_level, adaptive_dir / "adaptive_group_avg_last_level.png", "Average Last Level Completed by Adaptive Group", "Adaptive Group", "Level")
+                avg_playtime.rename("avg_playtime_seconds").to_csv(adaptive_dir / "adaptive_group_avg_playtime.csv")
+                avg_level.rename("avg_last_level_completed").to_csv(adaptive_dir / "adaptive_group_avg_last_level.csv")
 
                 player_col = pick_player_column(adaptive_sessions)
                 if player_col:
                     adaptive_sessions["reached_level_3"] = pd.to_numeric(adaptive_sessions["last_level_completed"], errors="coerce").fillna(0) >= 3
-                    level3_pct = adaptive_sessions.groupby("adaptive_group")["reached_level_3"].mean().mul(100.0).sort_index()
-                    save_bar(level3_pct, feature_dir / "adaptive_group_reached_level3_percent.png", "Percent Reaching Level 3 by Adaptive Group", "Adaptive Group", "Percent", (0, 100))
-                    level3_pct.rename("percent").to_csv(feature_dir / "adaptive_group_reached_level3_percent.csv")
+                    level3_pct = adaptive_sessions.groupby("adaptive_group_reconstructed")["reached_level_3"].mean().mul(100.0).sort_index()
+                    save_bar(level3_pct, adaptive_dir / "adaptive_group_reached_level3_percent.png", "Percent Reaching Level 3 by Adaptive Group", "Adaptive Group", "Percent", (0, 100))
+                    level3_pct.rename("percent").to_csv(adaptive_dir / "adaptive_group_reached_level3_percent.csv")
 
-                    adaptive_ts = pd.Series(pd.NaT, index=adaptive_sessions.index, dtype="datetime64[ns, UTC]")
-                    for col in ["started_at", "created_at", "updated_at"]:
-                        if col in adaptive_sessions.columns:
-                            adaptive_ts = adaptive_ts.combine_first(pd.to_datetime(adaptive_sessions[col], utc=True, errors="coerce"))
-                    if player_col and adaptive_ts.notna().any():
-                        adaptive_sessions = adaptive_sessions.copy()
-                        adaptive_sessions["player_id_norm"] = adaptive_sessions[player_col].astype(str)
-                        adaptive_sessions["session_ts"] = adaptive_ts
-                        adaptive_sessions = adaptive_sessions.dropna(subset=["player_id_norm", "session_ts"]).sort_values("session_ts")
-
-                        first_group = adaptive_sessions.groupby("player_id_norm", as_index=False).head(1).copy()
-                        first_group = first_group[["player_id_norm", "adaptive_group", "session_ts"]]
-                        first_group = first_group.rename(columns={"session_ts": "group_assigned_ts"})
-
+                    if adaptive_cohorts["group_assigned_ts"].notna().any():
                         all_sessions = sessions.copy()
                         all_player_col = pick_player_column(all_sessions)
                         all_ts = pd.Series(pd.NaT, index=all_sessions.index, dtype="datetime64[ns, UTC]")
@@ -543,6 +615,7 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                             all_sessions["session_ts"] = all_ts
                             all_sessions = all_sessions.dropna(subset=["player_id_norm", "session_ts"]).copy()
 
+                            first_group = adaptive_cohorts[adaptive_cohorts["adaptive_group"].isin(["A", "B"])].copy()
                             player_summary = first_group.copy()
                             merged = all_sessions.merge(first_group, on="player_id_norm", how="inner")
                             merged["day_delta"] = (
@@ -562,7 +635,7 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                                 )
                                 player_summary[f"returned_within_{days}d"] = player_summary["player_id_norm"].map(returned).fillna(False)
 
-                            player_summary.to_csv(feature_dir / "adaptive_group_player_retention.csv", index=False)
+                            player_summary.to_csv(adaptive_dir / "adaptive_group_player_retention.csv", index=False)
 
                             retention_rows: list[dict[str, Any]] = []
                             for group, group_rows in player_summary.groupby("adaptive_group"):
@@ -578,14 +651,86 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                                     })
                             if retention_rows:
                                 retention_df = pd.DataFrame(retention_rows)
-                                retention_df.to_csv(feature_dir / "adaptive_group_retention_windows.csv", index=False)
+                                retention_df.to_csv(adaptive_dir / "adaptive_group_retention_windows.csv", index=False)
                                 retention_plot = retention_df.pivot(index="window", columns="adaptive_group", values="percent").sort_index()
                                 save_grouped_bar(
                                     retention_plot,
-                                    feature_dir / "adaptive_group_retention_windows.png",
+                                    adaptive_dir / "adaptive_group_retention_windows.png",
                                     "Adaptive Group Return Within N Days",
                                     "Window",
                                     "Percent of Players",
+                                    (0, 100),
+                                )
+
+        if {"player_id_norm", "time_seconds"} <= set(attempts_with_player.columns) and not adaptive_cohorts.empty:
+                player_retention = (
+                    attempts_with_player.dropna(subset=["player_id_norm"]).copy()
+                    .assign(time_seconds=pd.to_numeric(attempts_with_player["time_seconds"], errors="coerce"))
+                    .dropna(subset=["time_seconds"])
+                    .groupby("player_id_norm")["time_seconds"]
+                    .sum()
+                    .astype(float)
+                )
+
+                cohort = pd.DataFrame(index=player_retention.index.astype(str))
+                cohort.index.name = "player_id_norm"
+                cohort["retention_seconds"] = player_retention
+                cohort["adaptive_retention_group"] = cohort.index.map(adaptive_group_lookup)
+
+                cohort = cohort[cohort["adaptive_retention_group"].isin(["A", "B", "unassigned"])].copy()
+                if not cohort.empty:
+                    cohort.reset_index().to_csv(adaptive_dir / "adaptive_retention_time_cohorts.csv", index=False)
+                    retention_rows: list[dict[str, Any]] = []
+                    max_minutes = int(np.ceil(cohort["retention_seconds"].max() / 60.0)) if not cohort.empty else 0
+                    for group_name, group_rows in cohort.groupby("adaptive_retention_group"):
+                        seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
+                        if seconds.empty:
+                            continue
+                        for minute in range(0, max(1, max_minutes) + 1):
+                            retention_rows.append({
+                                "adaptive_group": group_name,
+                                "minute": minute,
+                                "percent": float((seconds >= (minute * 60.0)).mean() * 100.0),
+                            })
+                    if retention_rows:
+                        retention_curve_df = pd.DataFrame(retention_rows)
+                        retention_curve_df.to_csv(adaptive_dir / "adaptive_group_retention_by_time.csv", index=False)
+                        retention_curve_plot = retention_curve_df.pivot(index="minute", columns="adaptive_group", values="percent")
+                        retention_curve_plot = retention_curve_plot.reindex(columns=["unassigned", "B", "A"]).dropna(axis=1, how="all")
+                        save_multi_line_percent(
+                            retention_curve_plot,
+                            adaptive_dir / "adaptive_group_retention_by_time.png",
+                            "Retention by Time for Adaptive Cohorts",
+                            "Gameplay time (minutes threshold)",
+                            "Retention (%)",
+                            (0, 100),
+                        )
+
+                        total_players_denominator = int(cohort.shape[0])
+                        if total_players_denominator > 0:
+                            retention_all_rows: list[dict[str, Any]] = []
+                            for group_name, group_rows in cohort.groupby("adaptive_retention_group"):
+                                seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
+                                if seconds.empty:
+                                    continue
+                                for minute in range(0, max(1, max_minutes) + 1):
+                                    retained_count = int((seconds >= (minute * 60.0)).sum())
+                                    retention_all_rows.append({
+                                        "adaptive_group": group_name,
+                                        "minute": minute,
+                                        "percent_all_players": float((retained_count / total_players_denominator) * 100.0),
+                                    })
+                            if retention_all_rows:
+                                retention_all_df = pd.DataFrame(retention_all_rows)
+                                retention_all_df.to_csv(adaptive_dir / "adaptive_group_retention_by_time_all_players.csv", index=False)
+                                retention_all_plot = retention_all_df.pivot(index="minute", columns="adaptive_group", values="percent_all_players")
+                                retention_all_plot = retention_all_plot.reindex(columns=["unassigned", "B", "A"]).dropna(axis=1, how="all")
+                                save_multi_line_percent(
+                                    retention_all_plot,
+                                    adaptive_dir / "adaptive_group_retention_by_time_all_players.png",
+                                    "Retention by Time for Adaptive Cohorts (% of All Cohort Players)",
+                                    "Gameplay time (minutes threshold)",
+                                    "Percent of All Three-Group Players (%)",
                                     (0, 100),
                                 )
 

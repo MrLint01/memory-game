@@ -195,7 +195,7 @@ function buildLeaderboardPlacementAchievementDefinitions() {
   return [5, 4, 3, 2, 1].map((place, index) => ({
     id: `leaderboard_place_${place}`,
     title: place === 1 ? "Podium Peak" : `Top ${place}`,
-    description: `Reach rank ${place} or better on a leaderboard.`,
+    description: `Finish exactly rank ${place} on a leaderboard.`,
     iconSrc: "imgs/leaderboard.png",
     iconBadge: getAchievementRomanTier(index)
   }));
@@ -364,6 +364,9 @@ const LEGACY_ACHIEVEMENT_MODIFIER_MAP = {
 let achievementOverviewCache = null;
 let achievementProfileCache = null;
 const pendingAchievementUpdates = [];
+window.flashRecallPendingAchievementUnlocks = Array.isArray(window.flashRecallPendingAchievementUnlocks)
+  ? window.flashRecallPendingAchievementUnlocks
+  : [];
 let leaderboardReadBudget = { totalReads: 0, blocked: false };
 
 function loadLeaderboardReadBudget() {
@@ -617,6 +620,7 @@ function getDefaultAchievementProfile() {
     monochrome_win: false,
     leaderboard_top_5: false,
     leaderboard_first_place: false,
+    leaderboard_placements: {},
     used_modifiers: {},
     card_type_counts: {},
     modifier_variant_counts: {},
@@ -664,6 +668,7 @@ function normalizeAchievementProfile(raw) {
   base.monochrome_win = Boolean(source.monochrome_win);
   base.leaderboard_top_5 = Boolean(source.leaderboard_top_5);
   base.leaderboard_first_place = Boolean(source.leaderboard_first_place);
+  base.leaderboard_placements = normalizeAchievementCounterMap(source.leaderboard_placements);
   base.used_modifiers = source.used_modifiers && typeof source.used_modifiers === "object"
     ? { ...source.used_modifiers }
     : {};
@@ -833,6 +838,7 @@ function normalizeAchievementUpdate(update = {}) {
     monochromeWin: false,
     leaderboardTop5: false,
     leaderboardFirstPlace: false,
+    leaderboardPlacements: [],
     usedModifiers: [],
     cardTypeCounts: {},
     modifierVariantCounts: {}
@@ -873,6 +879,13 @@ function normalizeAchievementUpdate(update = {}) {
   base.monochromeWin = Boolean(update.monochromeWin);
   base.leaderboardTop5 = Boolean(update.leaderboardTop5);
   base.leaderboardFirstPlace = Boolean(update.leaderboardFirstPlace);
+  base.leaderboardPlacements = Array.isArray(update.leaderboardPlacements)
+    ? Array.from(new Set(
+      update.leaderboardPlacements
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value >= 1 && value <= 5)
+    ))
+    : [];
   base.usedModifiers = Array.isArray(update.usedModifiers)
     ? Array.from(new Set(update.usedModifiers.filter((key) => typeof key === "string" && ACHIEVEMENT_MODIFIER_MAP[key])))
     : [];
@@ -951,6 +964,7 @@ function mergeAchievementUpdateInputs(...updates) {
     merged.monochromeWin = merged.monochromeWin || update.monochromeWin;
     merged.leaderboardTop5 = merged.leaderboardTop5 || update.leaderboardTop5;
     merged.leaderboardFirstPlace = merged.leaderboardFirstPlace || update.leaderboardFirstPlace;
+    merged.leaderboardPlacements = Array.from(new Set(merged.leaderboardPlacements.concat(update.leaderboardPlacements)));
     merged.usedModifiers = Array.from(new Set(merged.usedModifiers.concat(update.usedModifiers)));
     merged.cardTypeCounts = {
       ...merged.cardTypeCounts,
@@ -1061,6 +1075,9 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   next.monochrome_win = next.monochrome_win || normalized.monochromeWin;
   next.leaderboard_top_5 = next.leaderboard_top_5 || normalized.leaderboardTop5;
   next.leaderboard_first_place = next.leaderboard_first_place || normalized.leaderboardFirstPlace;
+  normalized.leaderboardPlacements.forEach((place) => {
+    next.leaderboard_placements[place] = 1;
+  });
   normalized.usedModifiers.forEach((modifierKey) => {
     next.used_modifiers[modifierKey] = true;
   });
@@ -1140,13 +1157,12 @@ function getAchievementUnlockIds(profile) {
   if (profile.total_stars >= 50) unlocks.push("stars_total_50");
   if (profile.total_stars >= 100) unlocks.push("stars_total_100");
   if (profile.total_stars >= 150) unlocks.push("stars_total_150");
-  if (profile.best_leaderboard_rank > 0) {
-    for (let place = 5; place >= 1; place -= 1) {
-      if (profile.best_leaderboard_rank <= place) {
-        unlocks.push(`leaderboard_place_${place}`);
-      }
+  Object.keys(profile.leaderboard_placements || {}).forEach((place) => {
+    const numericPlace = Number(place);
+    if (Number.isInteger(numericPlace) && numericPlace >= 1 && numericPlace <= 5) {
+      unlocks.push(`leaderboard_place_${numericPlace}`);
     }
-  }
+  });
   if (profile.total_time_seconds >= 10 * 60) unlocks.push("time_minutes_10");
   if (profile.total_time_seconds >= 100 * 60) unlocks.push("time_minutes_100");
   if (profile.theme_changed) unlocks.push("theme_changed");
@@ -1175,6 +1191,19 @@ function setAchievementOverviewCache(profile, totalPlayers, countsById = null) {
   };
 }
 
+function dispatchAchievementUnlockNotifications(items) {
+  const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  if (!safeItems.length) return;
+  if (window.flashRecallAchievementNotificationsReady) {
+    window.dispatchEvent(new CustomEvent("flashrecall:achievements-unlocked", {
+      detail: { items: safeItems }
+    }));
+    return;
+  }
+  window.flashRecallPendingAchievementUnlocks = window.flashRecallPendingAchievementUnlocks || [];
+  window.flashRecallPendingAchievementUnlocks.push(...safeItems);
+}
+
 async function applyAchievementUpdate(update = {}, options = {}) {
   const normalizedUpdate = normalizeAchievementUpdate(update);
   const suppressNotifications = Boolean(options && options.suppressNotifications);
@@ -1194,9 +1223,15 @@ async function applyAchievementUpdate(update = {}, options = {}) {
       const summarySnap = await transaction.get(summaryRef);
       const existingProfile = normalizeAchievementProfile(profileSnap.exists ? profileSnap.data() : null);
       const nextProfile = mergeAchievementProfileWithUpdate(existingProfile, normalizedUpdate);
-      const nextUnlockedMap = { ...existingProfile.unlocked };
       const achievementIds = getAchievementUnlockIds(nextProfile);
-      const newlyUnlocked = achievementIds.filter((id) => !existingProfile.unlocked[id]);
+      const validExistingUnlocked = Object.keys(existingProfile.unlocked || {}).reduce((acc, id) => {
+        if (achievementIds.includes(id)) {
+          acc[id] = true;
+        }
+        return acc;
+      }, {});
+      const nextUnlockedMap = { ...validExistingUnlocked };
+      const newlyUnlocked = achievementIds.filter((id) => !validExistingUnlocked[id]);
       newlyUnlocked.forEach((id) => {
         nextUnlockedMap[id] = true;
       });
@@ -1230,6 +1265,7 @@ async function applyAchievementUpdate(update = {}, options = {}) {
         monochrome_win: nextProfile.monochrome_win,
         leaderboard_top_5: nextProfile.leaderboard_top_5,
         leaderboard_first_place: nextProfile.leaderboard_first_place,
+        leaderboard_placements: nextProfile.leaderboard_placements,
         used_modifiers: nextProfile.used_modifiers,
         card_type_counts: nextProfile.card_type_counts,
         modifier_variant_counts: nextProfile.modifier_variant_counts,
@@ -1301,9 +1337,7 @@ async function applyAchievementUpdate(update = {}, options = {}) {
             difficultyColor: getAchievementDifficultyColor(difficultyScore)
           };
         });
-      window.dispatchEvent(new CustomEvent("flashrecall:achievements-unlocked", {
-        detail: { items }
-      }));
+      dispatchAchievementUnlockNotifications(items);
     }
     return result;
   } catch (error) {
@@ -1326,7 +1360,8 @@ async function updateLeaderboardAchievementFlags(stageId, stageVersion, playerTi
   if (Number.isFinite(Number(rankData.rank)) && Number(rankData.rank) > 0) {
     update.bestLeaderboardRank = Number(rankData.rank);
   }
-  if (rankData.rank <= 5) {
+  if (Number.isInteger(Number(rankData.rank)) && Number(rankData.rank) >= 1 && Number(rankData.rank) <= 5) {
+    update.leaderboardPlacements = [Number(rankData.rank)];
     update.leaderboardTop5 = true;
   }
   if (rankData.rank === 1) {
@@ -2403,7 +2438,7 @@ async function initializeFirebase() {
           await createNewSession();
         }
         await syncLocalBestTimesOnce(false, { suppressNotifications: true });
-        await syncAchievementsFromLocal({ firstSteps: true }, { suppressNotifications: true });
+        await syncAchievementsFromLocal({ firstSteps: true });
       } else {
         try {
           await firebase.auth().signInAnonymously();

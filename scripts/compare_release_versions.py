@@ -213,6 +213,157 @@ def plot_two_lines(out_png: Path, title: str, xlabel: str, old_label: str, new_l
     plt.close()
 
 
+def load_adaptive_retention_csv(version_dir: Path, filename: str, value_col: str) -> pd.DataFrame:
+    path = version_dir / "adaptive_features" / filename
+    if not path.exists():
+        return pd.DataFrame()
+    df = normalize_columns(pd.read_csv(path))
+    required = {"adaptive_group", "minute", value_col}
+    if not required <= set(df.columns):
+        return pd.DataFrame()
+    return df
+
+
+def plot_adaptive_six_lines(
+    out_png: Path,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    old_label: str,
+    new_label: str,
+    old_df: pd.DataFrame,
+    new_df: pd.DataFrame,
+    value_col: str,
+) -> None:
+    if old_df.empty and new_df.empty:
+        return
+
+    plt.figure(figsize=(11, 6))
+    styles = {
+        "unassigned": ("#9c755f", "o"),
+        "B": ("#e15759", "s"),
+        "A": ("#4e79a7", "^"),
+    }
+    plotted = False
+
+    for version_label, df, linestyle in [
+        (old_label, old_df, "--"),
+        (new_label, new_df, "-"),
+    ]:
+        if df.empty:
+            continue
+        for group_name in ["unassigned", "B", "A"]:
+            g = df[df["adaptive_group"].astype(str) == group_name].copy()
+            if g.empty:
+                continue
+            g["minute"] = pd.to_numeric(g["minute"], errors="coerce")
+            g[value_col] = pd.to_numeric(g[value_col], errors="coerce")
+            g = g.dropna(subset=["minute", value_col]).sort_values("minute")
+            if g.empty:
+                continue
+            color, marker = styles[group_name]
+            plt.plot(
+                g["minute"],
+                g[value_col],
+                linestyle=linestyle,
+                marker=marker,
+                color=color,
+                label=f"{version_label} {group_name}",
+            )
+            plotted = True
+
+    if not plotted:
+        plt.close()
+        return
+
+    plt.ylim(0, 100)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend(ncol=2)
+    plt.grid(True, alpha=0.25)
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=130)
+    plt.close()
+
+
+def plot_adaptive_by_group_panels(
+    out_png: Path,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    old_label: str,
+    new_label: str,
+    old_df: pd.DataFrame,
+    new_df: pd.DataFrame,
+    value_col: str,
+) -> None:
+    if old_df.empty and new_df.empty:
+        return
+
+    groups = ["unassigned", "B", "A"]
+    colors = {old_label: "#5b8ff9", new_label: "#5ad8a6"}
+    fig, axes = plt.subplots(len(groups), 1, figsize=(10, 11), sharex=True, sharey=True)
+    plotted_any = False
+
+    for ax, group_name in zip(axes, groups):
+        group_plotted = False
+        for version_label, df, marker, linestyle in [
+            (old_label, old_df, "o", "--"),
+            (new_label, new_df, "^", "-"),
+        ]:
+            if df.empty:
+                continue
+            g = df[df["adaptive_group"].astype(str) == group_name].copy()
+            if g.empty:
+                continue
+            g["minute"] = pd.to_numeric(g["minute"], errors="coerce")
+            g[value_col] = pd.to_numeric(g[value_col], errors="coerce")
+            g = g.dropna(subset=["minute", value_col]).sort_values("minute")
+            if g.empty:
+                continue
+            ax.plot(
+                g["minute"],
+                g[value_col],
+                marker=marker,
+                linestyle=linestyle,
+                color=colors[version_label],
+                label=version_label,
+            )
+            group_plotted = True
+            plotted_any = True
+        ax.set_title(f"{group_name} cohort")
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(0, 100)
+        ax.grid(True, alpha=0.25)
+        if group_plotted:
+            ax.legend()
+
+    if not plotted_any:
+        plt.close(fig)
+        return
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title)
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    fig.savefig(out_png, dpi=130)
+    plt.close(fig)
+
+
+def get_adaptive_cohort_counts(version_dir: Path) -> dict[str, int]:
+    path = version_dir / "adaptive_features" / "adaptive_retention_time_cohorts.csv"
+    counts = {"unassigned": 0, "B": 0, "A": 0}
+    if not path.exists():
+        return counts
+    df = normalize_columns(pd.read_csv(path))
+    if "adaptive_retention_group" not in df.columns:
+        return counts
+    grouped = df["adaptive_retention_group"].astype(str).value_counts()
+    for key in counts:
+        counts[key] = int(grouped.get(key, 0))
+    return counts
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Compare release versions with retention curves")
     p.add_argument("--combined", type=Path, default=None, help="Optional combined export JSON (fallback to csv inputs if omitted)")
@@ -274,6 +425,75 @@ def main() -> None:
         retention_curve_time(new_stats["total_playtime_seconds"]),
     )
 
+    old_adaptive_retention = load_adaptive_retention_csv(
+        old_dir,
+        "adaptive_group_retention_by_time.csv",
+        "percent",
+    )
+    new_adaptive_retention = load_adaptive_retention_csv(
+        new_dir,
+        "adaptive_group_retention_by_time.csv",
+        "percent",
+    )
+    plot_adaptive_six_lines(
+        outdir / "adaptive_group_retention_by_time_comparison.png",
+        "Adaptive Cohort Retention by Time",
+        "Gameplay time (minutes threshold)",
+        "Retention (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_retention,
+        new_adaptive_retention,
+        "percent",
+    )
+    plot_adaptive_by_group_panels(
+        outdir / "adaptive_group_retention_by_time_comparison_by_group.png",
+        "Adaptive Cohort Retention by Time (By Group Panels)",
+        "Gameplay time (minutes threshold)",
+        "Retention (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_retention,
+        new_adaptive_retention,
+        "percent",
+    )
+
+    old_adaptive_all = load_adaptive_retention_csv(
+        old_dir,
+        "adaptive_group_retention_by_time_all_players.csv",
+        "percent_all_players",
+    )
+    new_adaptive_all = load_adaptive_retention_csv(
+        new_dir,
+        "adaptive_group_retention_by_time_all_players.csv",
+        "percent_all_players",
+    )
+    plot_adaptive_six_lines(
+        outdir / "adaptive_group_retention_by_time_all_players_comparison.png",
+        "Adaptive Cohort Retention by Time (% of All Cohort Players)",
+        "Gameplay time (minutes threshold)",
+        "Percent of All Three-Group Players (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_all,
+        new_adaptive_all,
+        "percent_all_players",
+    )
+    plot_adaptive_by_group_panels(
+        outdir / "adaptive_group_retention_by_time_all_players_comparison_by_group.png",
+        "Adaptive Cohort Retention by Time (% of All Cohort Players, By Group Panels)",
+        "Gameplay time (minutes threshold)",
+        "Percent of All Three-Group Players (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_all,
+        new_adaptive_all,
+        "percent_all_players",
+    )
+
+    old_adaptive_counts = get_adaptive_cohort_counts(old_dir)
+    new_adaptive_counts = get_adaptive_cohort_counts(new_dir)
+
     def retention_pct(stats: pd.DataFrame, min_completed_levels: int = 2) -> float:
         if stats.empty:
             return 0.0
@@ -296,6 +516,16 @@ def main() -> None:
         f"new_median_highest_level: {new_stats['highest_level_completed'].median() if len(new_stats) else 0}",
         f"old_median_levels_completed_count: {old_stats['levels_completed_count'].median() if len(old_stats) else 0}",
         f"new_median_levels_completed_count: {new_stats['levels_completed_count'].median() if len(new_stats) else 0}",
+        f"old_adaptive_unassigned_players: {old_adaptive_counts['unassigned']}",
+        f"old_adaptive_b_players: {old_adaptive_counts['B']}",
+        f"old_adaptive_a_players: {old_adaptive_counts['A']}",
+        f"new_adaptive_unassigned_players: {new_adaptive_counts['unassigned']}",
+        f"new_adaptive_b_players: {new_adaptive_counts['B']}",
+        f"new_adaptive_a_players: {new_adaptive_counts['A']}",
+        f"adaptive_time_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_comparison.png').name}",
+        f"adaptive_time_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_by_group.png').name}",
+        f"adaptive_time_all_players_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison.png').name}",
+        f"adaptive_time_all_players_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_by_group.png').name}",
     ]
     (outdir / "summary.txt").write_text("\n".join(map(str, summary)) + "\n", encoding="utf-8")
     old_stats.to_csv(outdir / "old_version_player_stats.csv", index=False)

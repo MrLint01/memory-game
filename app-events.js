@@ -103,6 +103,7 @@
         autoAdvanceNext: true,
         enterToNext: true,
         flashWarningEnabled: true,
+        sandboxUnlockConfirmEnabled: true,
         ...(settingsDefaults.controls || {})
       };
       const defaultAudioSettings = {
@@ -250,21 +251,22 @@
 
       function shouldConfirmSandboxUnlock() {
         try {
-          return window.localStorage.getItem(SANDBOX_UNLOCK_CONFIRM_KEY) !== "skip";
+          const raw = window.localStorage.getItem(SANDBOX_UNLOCK_CONFIRM_KEY);
+          if (raw === null) return Boolean(defaultControlSettings.sandboxUnlockConfirmEnabled);
+          return raw !== "0" && raw !== "skip";
         } catch {
-          return true;
+          return Boolean(defaultControlSettings.sandboxUnlockConfirmEnabled);
         }
       }
 
       function setSandboxUnlockConfirmPreference(shouldAsk) {
         try {
-          if (shouldAsk) {
-            window.localStorage.removeItem(SANDBOX_UNLOCK_CONFIRM_KEY);
-          } else {
-            window.localStorage.setItem(SANDBOX_UNLOCK_CONFIRM_KEY, "skip");
-          }
+          window.localStorage.setItem(SANDBOX_UNLOCK_CONFIRM_KEY, shouldAsk ? "1" : "0");
         } catch {
           // ignore storage errors
+        }
+        if (sandboxUnlockWarningToggle) {
+          sandboxUnlockWarningToggle.checked = Boolean(shouldAsk);
         }
       }
 
@@ -581,6 +583,7 @@
           auto_start_stage_preview_enabled: Boolean(stageIntroAutoStartEnabled),
           enter_to_next_enabled: Boolean(enterToNextEnabled),
           flash_warning_enabled: Boolean(flashWarningEnabled),
+          sandbox_unlock_confirm_enabled: shouldConfirmSandboxUnlock(),
           leaderboards_enabled: Boolean(leaderboardsEnabled),
           keybind_retry: keybinds.retry || defaultKeybinds.retry,
           keybind_stage_next: keybinds.stageNext || defaultKeybinds.stageNext,
@@ -2832,6 +2835,23 @@ function runFlashCountdown(onComplete) {
           });
         });
       }
+      if (sandboxUnlockWarningToggle) {
+        const savedSandboxUnlockWarning = window.localStorage.getItem(SANDBOX_UNLOCK_CONFIRM_KEY);
+        if (savedSandboxUnlockWarning !== null) {
+          sandboxUnlockWarningToggle.checked = savedSandboxUnlockWarning !== "0" && savedSandboxUnlockWarning !== "skip";
+        } else {
+          sandboxUnlockWarningToggle.checked = Boolean(defaultControlSettings.sandboxUnlockConfirmEnabled);
+        }
+        sandboxUnlockWarningToggle.addEventListener("change", () => {
+          setSandboxUnlockConfirmPreference(sandboxUnlockWarningToggle.checked);
+          logSettingChange("sandbox_unlock_confirm_enabled", sandboxUnlockWarningToggle.checked, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "sandbox_unlock_confirm_enabled"
+          });
+        });
+      }
       if (flashStageModal) {
         flashStageModal.addEventListener("click", (event) => {
           if (event.target === flashStageModal) {
@@ -3298,6 +3318,7 @@ function runFlashCountdown(onComplete) {
           };
           window.localStorage.removeItem("flashRecallStats");
           window.localStorage.removeItem(FLASH_WARNING_KEY);
+          window.localStorage.removeItem(SANDBOX_UNLOCK_CONFIRM_KEY);
           window.localStorage.removeItem("flashRecallSandboxUnlocks");
           window.localStorage.removeItem("flashRecallPlayerName");
           window.localStorage.removeItem("flashRecallPlayerNamePrompted");
@@ -3368,6 +3389,10 @@ function runFlashCountdown(onComplete) {
           }
           if (photosensitivityWarningToggle) {
             setFlashWarningEnabled(Boolean(defaultControlSettings.flashWarningEnabled), false);
+          }
+          if (sandboxUnlockWarningToggle) {
+            sandboxUnlockWarningToggle.checked = Boolean(defaultControlSettings.sandboxUnlockConfirmEnabled);
+            setSandboxUnlockConfirmPreference(sandboxUnlockWarningToggle.checked);
           }
           if (leaderboardsEnabledToggle) {
             leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
@@ -3802,6 +3827,19 @@ function runFlashCountdown(onComplete) {
         });
       }
 
+      function getAchievementOverviewFallbackResult(errorMessage) {
+        const catalog = typeof window.getAchievementCatalog === "function"
+          ? window.getAchievementCatalog()
+          : [];
+        return {
+          items: catalog.map((item) => ({ ...item, unlocked: false })),
+          unlockedCount: 0,
+          totalCount: catalog.length,
+          totalPlayers: 0,
+          errorMessage: errorMessage || ""
+        };
+      }
+
       async function openAchievementsModal() {
         if (!achievementsModal || !achievementsList) return;
         logUiInteraction("achievements_open", {
@@ -3819,10 +3857,7 @@ function runFlashCountdown(onComplete) {
         setModalState(achievementsModal, true);
 
         if (typeof window.fetchAchievementOverview !== "function") {
-          renderAchievementsOverview({
-            items: [],
-            errorMessage: "Achievements are unavailable."
-          });
+          renderAchievementsOverview(getAchievementOverviewFallbackResult("Achievements are unavailable."));
           return;
         }
 
@@ -3830,10 +3865,7 @@ function runFlashCountdown(onComplete) {
           const result = await window.fetchAchievementOverview({ refresh: true });
           renderAchievementsOverview(result);
         } catch (error) {
-          renderAchievementsOverview({
-            items: [],
-            errorMessage: "Could not load achievements right now."
-          });
+          renderAchievementsOverview(getAchievementOverviewFallbackResult("Could not load achievements right now."));
         }
       }
 
@@ -4136,6 +4168,13 @@ function runFlashCountdown(onComplete) {
           showAchievementUnlockToast(item);
         });
       });
+      window.flashRecallAchievementNotificationsReady = true;
+      if (Array.isArray(window.flashRecallPendingAchievementUnlocks) && window.flashRecallPendingAchievementUnlocks.length) {
+        const pendingItems = window.flashRecallPendingAchievementUnlocks.splice(0);
+        pendingItems.forEach((item) => {
+          showAchievementUnlockToast(item);
+        });
+      }
       if (statsLeaderboardClose && statsLeaderboardModal) {
         statsLeaderboardClose.addEventListener("click", () => {
           logUiInteraction("stats_leaderboard_close", {

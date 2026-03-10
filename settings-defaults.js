@@ -31,6 +31,7 @@
       autoStartStagePreview: true,
       enterToNext: false,
       flashWarningEnabled: true,
+      sandboxUnlockConfirmEnabled: true,
       leaderboardsEnabled: true
     },
     audio: {
