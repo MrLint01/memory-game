@@ -38,6 +38,7 @@
       const AUDIO_MASTER_KEY = "flashRecallAudioMasterVolume";
       const AUDIO_MUSIC_KEY = "flashRecallAudioMusicVolume";
       const AUDIO_EFFECTS_KEY = "flashRecallAudioEffectsVolume";
+      const AUDIO_MIGRATION_KEY = "flashRecallAudioDefaults2026a";
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
       const SANDBOX_UNLOCK_CONFIRM_KEY = "flashRecallSandboxUnlockConfirm";
       const LEADERBOARDS_ENABLED_STORAGE_KEY = "flashRecallLeaderboardsEnabled";
@@ -359,6 +360,25 @@
           music: normalizeAudioVolume(savedMusic, normalizeAudioVolume(defaultAudioSettings.music, 80)),
           effects: normalizeAudioVolume(savedEffects, normalizeAudioVolume(defaultAudioSettings.effects, 80))
         };
+      }
+
+      function migrateAudioDefaultsIfNeeded() {
+        try {
+          if (window.localStorage.getItem(AUDIO_MIGRATION_KEY) === "1") return;
+          const savedMaster = window.localStorage.getItem(AUDIO_MASTER_KEY);
+          const savedMusic = window.localStorage.getItem(AUDIO_MUSIC_KEY);
+          const savedEffects = window.localStorage.getItem(AUDIO_EFFECTS_KEY);
+          const allPresent = savedMaster !== null && savedMusic !== null && savedEffects !== null;
+          const allZero = savedMaster === "0" && savedMusic === "0" && savedEffects === "0";
+          if (allPresent && allZero) {
+            window.localStorage.setItem(AUDIO_MASTER_KEY, String(defaultAudioSettings.master));
+            window.localStorage.setItem(AUDIO_MUSIC_KEY, String(defaultAudioSettings.music));
+            window.localStorage.setItem(AUDIO_EFFECTS_KEY, String(defaultAudioSettings.effects));
+          }
+          window.localStorage.setItem(AUDIO_MIGRATION_KEY, "1");
+        } catch {
+          // ignore storage errors
+        }
       }
 
       function setAudioSliderValue(labelEl, value) {
@@ -4338,7 +4358,7 @@ function runFlashCountdown(onComplete) {
             leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
             leaderboardsEnabled = leaderboardsEnabledToggle.checked;
           }
-          applyAudioSettings(defaultAudioSettings, false);
+            applyAudioSettings(defaultAudioSettings, true);
           keybinds = { ...defaultKeybinds };
           activeRebindAction = null;
           refreshKeybindButtons();
@@ -6137,10 +6157,11 @@ function runFlashCountdown(onComplete) {
           storedAppearance.colorVision
         );
       }
-      {
-        const storedAudio = getStoredAudioSettings();
-        applyAudioSettings(storedAudio, false);
-      }
+        {
+          migrateAudioDefaultsIfNeeded();
+          const storedAudio = getStoredAudioSettings();
+          applyAudioSettings(storedAudio, false);
+        }
 
       if (audioMasterVolume && audioMusicVolume && audioEffectsVolume) {
         const syncAudioSettings = () => {
