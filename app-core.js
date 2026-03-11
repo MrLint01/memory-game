@@ -103,7 +103,6 @@ const revealInput = document.getElementById("revealTime");
       const audioEffectsValue = document.getElementById("audioEffectsValue");
       const audioTestSfx = document.getElementById("audioTestSfx");
       const audioResetDefaults = document.getElementById("audioResetDefaults");
-      const audioStatus = document.getElementById("audioStatus");
       const keybindStatus = document.getElementById("keybindStatus");
       const keybindRetry = document.getElementById("keybindRetry");
       const keybindStageNext = document.getElementById("keybindStageNext");
