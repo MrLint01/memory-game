@@ -2174,6 +2174,42 @@ body[data-state="result"] #resultsPanel .stage-next-wrap {
   align-items: center;
   position: relative;
 }
+body.stage-fail .stage-retry-wrap {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+body.stage-fail .stage-retry-timer {
+  width: 52px;
+  height: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-muted);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.35rem);
+  transform: translateX(-50%);
+  overflow: hidden;
+}
+body.stage-fail .stage-retry-timer__fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform-origin: left;
+  transform: scaleX(1);
+  transition: transform 3000ms linear;
+}
+body.stage-fail .stage-retry-timer.is-running .stage-retry-timer__fill {
+  transform: scaleX(0);
+}
+body.stage-fail .stage-retry-timer.is-canceled .stage-retry-timer__fill {
+  transition: none !important;
+  transform: scaleX(0) !important;
+}
+body.stage-fail .stage-retry-timer.is-canceled,
+body.stage-fail .stage-retry-timer.is-disabled,
+body.stage-fail .stage-retry-timer.is-waiting {
+  display: none;
+}
 body[data-state="result"] #resultsPanel .stage-next-timer {
   width: 52px;
   height: 6px;
