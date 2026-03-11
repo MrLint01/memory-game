@@ -43,7 +43,9 @@
 
       const effectAudioClips = {
         correct: createEffectAudio("audio/correct.wav"),
-        wrong: createEffectAudio("audio/wrong.wav")
+        wrong: createEffectAudio("audio/funny-fail.wav"),
+        button: createEffectAudio("audio/button-click.wav"),
+        levelComplete: createEffectAudio("audio/level-completed.wav")
       };
       let effectsAudioUnlocked = false;
       let pendingEffectAudio = null;
@@ -129,6 +131,12 @@
       function playRoundWrongSound() {
         playEffectAudio(effectAudioClips.wrong);
       }
+      function playButtonClickSound() {
+        playEffectAudio(effectAudioClips.button);
+      }
+      function playLevelCompletedSound() {
+        playEffectAudio(effectAudioClips.levelComplete);
+      }
 
       function getEffectAudioState(audio) {
         if (!audio) {
@@ -184,6 +192,24 @@
 
       document.addEventListener("pointerdown", unlockEffectAudio, { capture: true, once: true });
       document.addEventListener("keydown", unlockEffectAudio, { capture: true, once: true });
+      function shouldPlayButtonClick(event) {
+        if (!event) return false;
+        if (event.pointerType && event.pointerType !== "mouse") return false;
+        const target = event.target && event.target.closest
+          ? event.target.closest("button, [role=\"button\"]")
+          : null;
+        if (!target) return false;
+        if (target.disabled || target.getAttribute("aria-disabled") === "true") return false;
+        return true;
+      }
+      document.addEventListener(
+        "pointerdown",
+        (event) => {
+          if (!shouldPlayButtonClick(event)) return;
+          playButtonClickSound();
+        },
+        { capture: true }
+      );
 
       function setModalState(modal, open) {
         if (!modal) return;
@@ -1449,6 +1475,10 @@
                   : null;
                 trackLevelSession(stageState.index, true, stars, elapsedSeconds, entries, "level_end", activeContext || {});
               }
+              playLevelCompletedSound();
+              if (typeof window.setBackgroundMusicMode === "function") {
+                window.setBackgroundMusicMode("off");
+              }
               lastCompletedLevel = stageState.index + 1;
               lockInputs(true);
               renderCards(true);
@@ -1499,6 +1529,9 @@
         }
         playRoundWrongSound();
         if (gameMode === "stages") {
+          if (typeof window.setBackgroundMusicMode === "function") {
+            window.setBackgroundMusicMode("off");
+          }
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           lockInputs(true);
           const swapOrder = swapMap ? swapMap.slice() : null;
@@ -1551,6 +1584,9 @@
           return;
         }
         if (gameMode === "practice") {
+          if (typeof window.setBackgroundMusicMode === "function") {
+            window.setBackgroundMusicMode("off");
+          }
           if (typeof trackRoundCompletion === "function") {
             trackRoundCompletion(round, false, roundTimeSpent, {
               mode: gameMode
@@ -1577,6 +1613,9 @@
           refreshResultAutoActionCountdown();
           updateScore();
           return;
+        }
+        if (typeof window.setBackgroundMusicMode === "function") {
+          window.setBackgroundMusicMode("off");
         }
         lockInputs(true);
         swapActive = false;
@@ -1636,6 +1675,9 @@
         if (platformerState.required && !platformerState.completed) {
           platformerState.failed = true;
           playRoundWrongSound();
+          if (typeof window.setBackgroundMusicMode === "function") {
+            window.setBackgroundMusicMode("off");
+          }
           lockInputs(true);
           renderCards(true);
           if (submitBtn) {
@@ -1854,6 +1896,9 @@
         }
         if (typeof window.clearFirstLetterHint === "function") {
           window.clearFirstLetterHint();
+        }
+        if (typeof window.setBackgroundMusicMode === "function") {
+          window.setBackgroundMusicMode("level");
         }
         document.body.classList.remove("stage-fail");
         if (gameMode === "stages" && !options.__flashOverride) {

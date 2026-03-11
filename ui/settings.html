@@ -4,7 +4,7 @@
     <div class="settings-tabs" role="tablist" aria-label="Settings tabs">
       <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-settings-tab="general">General</button>
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="controls">Controls</button>
-      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="audio" hidden aria-hidden="true" tabindex="-1">Audio</button>
+      <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="audio">Audio</button>
       <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="appearance">Appearance</button>
     </div>
     <hr class="settings-divider" />
@@ -190,6 +190,18 @@
                 <span id="audioEffectsValue" class="audio-dial-value">80%</span>
               </label>
               <input id="audioEffectsVolume" type="range" min="0" max="100" step="1" value="80" />
+            </div>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Audio tools</label>
+          <div class="audio-dial-grid">
+            <div class="audio-dial-row">
+              <button id="audioTestSfx" class="secondary" type="button">Test effects</button>
+              <button id="audioResetDefaults" class="secondary" type="button">Reset audio defaults</button>
+            </div>
+            <div class="audio-dial-row">
+              <div id="audioStatus" class="small" aria-live="polite"></div>
             </div>
           </div>
         </div>

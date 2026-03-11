@@ -16,7 +16,7 @@ window.FLASH_RECALL_PLAYER_NAME_DATA = {
     w: { adjectives: ["Witty", "Wild", "Warm"], animals: ["Wolf", "Whale", "Wombat"] }
   },
   rareGeneratedNames: [
-    { id: "red_penguin", name: "Red Penguin", chanceDivisor: 3 }
+    { id: "red_penguin", name: "Red Penguin", chanceDivisor: 128 }
   ],
   worldClassClimbers: [
     "Alex Honnold",

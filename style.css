@@ -435,6 +435,30 @@ body[data-theme="prism-parade"]::before {
   }
 }
 
+@keyframes prismTextShift {
+  0% {
+    color: #ff5f97;
+  }
+  20% {
+    color: #ff9f1c;
+  }
+  40% {
+    color: #ffd84d;
+  }
+  60% {
+    color: #45d483;
+  }
+  80% {
+    color: #58b7ff;
+  }
+  90% {
+    color: #8d6bff;
+  }
+  100% {
+    color: #ff5f97;
+  }
+}
+
 @keyframes prismOutlineShiftRaised {
   0% {
     border-color: #ff5f97;
@@ -511,10 +535,15 @@ body[data-theme="prism-parade"][data-view="stages"] {
     linear-gradient(135deg, #ffd2e8 0%, #ffe9b8 22%, #def7bf 44%, #cff1ff 66%, #e5d6ff 84%, #ffd7ef 100%);
 }
 
-body[data-theme="prism-parade"][data-view="stages"] main {
-  border: 2px solid rgba(138, 85, 195, 0.78);
-  box-shadow: none;
+body[data-theme="prism-parade"][data-view="stages"] .stages-screen {
   animation: prismOutlineShiftFlat 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
+}
+
+body[data-theme="prism-parade"][data-view="stages"] main {
+  border: none;
+  box-shadow: none;
+  animation: none;
 }
 
 body[data-theme="prism-parade"][data-view="stages"] main::before,
@@ -535,12 +564,14 @@ body[data-theme="prism-parade"][data-view="stages"] .stage-board {
 
 body[data-theme="prism-parade"][data-view="stages"] main::before {
   animation: prismRainbowShift 18s ease-in-out infinite alternate;
+  animation-delay: calc(-1s * var(--prism-phase-18, 0));
 }
 
 body[data-theme="prism-parade"][data-view="stages"] .stage-board {
   border: none;
   box-shadow: none;
   animation: prismRainbowShift 18s ease-in-out infinite alternate;
+  animation-delay: calc(-1s * var(--prism-phase-18, 0));
 }
 
 body[data-theme="prism-parade"][data-view="stages"] .stages-progress,
@@ -548,6 +579,7 @@ body[data-theme="prism-parade"][data-view="stages"] .stages-total,
 body[data-theme="prism-parade"][data-view="stages"] #stagesBack,
 body[data-theme="prism-parade"][data-view="stages"] .stages-footer {
   animation: prismOutlineShiftFlat 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
 }
 
 body[data-theme="prism-parade"][data-view="stages"] main::before {
@@ -557,23 +589,52 @@ body[data-theme="prism-parade"][data-view="stages"] main::before {
 body[data-theme="prism-parade"][data-view="stages"] .stages-page-next,
 body[data-theme="prism-parade"][data-view="stages"] .stages-page-prev {
   animation: prismArrowShift 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
 }
 
 body[data-theme="prism-parade"][data-view="stages"] .stage-card {
   animation: prismOutlineShiftRaised 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-stage-phase-14, 0));
 }
 
 body[data-theme="prism-parade"][data-view="stages"] .stage-card--animate {
   animation: stageCardPop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both, prismOutlineShiftRaised 14s linear infinite;
-  animation-delay: var(--stage-anim-delay, 0ms), 0ms;
+  animation-delay: var(--stage-anim-delay, 0ms), calc(-1s * var(--prism-stage-phase-14, 0));
 }
 
 body[data-theme="prism-parade"][data-view="stages"] .stage-card--fadein {
   animation: stageCardFadeIn 220ms ease-out both, prismOutlineShiftRaised 14s linear infinite;
+  animation-delay: 0ms, calc(-1s * var(--prism-stage-phase-14, 0));
+}
+
+body[data-theme="prism-parade"][data-view="home"] .title__text {
+  animation: prismTextShift 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
+}
+
+body[data-theme="prism-parade"][data-view="home"] .title__shine {
+  animation: prismTextShift 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
+}
+
+body[data-theme="prism-parade"][data-view="home"] .mode-card {
+  animation: prismOutlineShiftRaised 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
+}
+
+body[data-theme="prism-parade"][data-view="home"] .mode-card.primary {
+  animation: playPulsePrism 2.2s ease-in-out infinite, prismOutlineShiftRaised 14s linear infinite;
+  animation-delay: 0ms, calc(-1s * var(--prism-phase-14, 0));
+}
+
+body[data-theme="prism-parade"][data-view="home"] .quick-actions .quick-action {
+  animation: prismOutlineShiftFlat 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
 }
 
 body[data-theme="prism-parade"][data-view="home"] main {
   animation: prismHomePulse 3.8s ease-in-out infinite, prismOutlineShiftFlat 14s linear infinite;
+  animation-delay: 0ms, calc(-1s * var(--prism-phase-14, 0));
 }
 
 body[data-theme="prism-parade"][data-view="home"].home-anim main {
@@ -581,6 +642,7 @@ body[data-theme="prism-parade"][data-view="home"].home-anim main {
     homePanelFade 400ms ease-out both,
     prismHomePulse 3.8s ease-in-out infinite,
     prismOutlineShiftFlat 14s linear infinite;
+  animation-delay: 0ms, 0ms, calc(-1s * var(--prism-phase-14, 0));
 }
 
 body[data-theme] .stage-intro-chip,
@@ -908,6 +970,16 @@ h1 {
   50% {
     transform: translateY(-2px);
     box-shadow: 6px 6px 0 var(--border);
+  }
+}
+
+@keyframes playPulsePrism {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2978,11 +3050,13 @@ body[data-state="paused"] .hud-pause {
   position: relative;
   transform-style: preserve-3d;
 }
-.home-anim .mode-card {
-  animation: none;
+body[data-theme="prism-parade"][data-view="home"].home-anim .mode-card {
+  animation: prismOutlineShiftRaised 14s linear infinite;
+  animation-delay: calc(-1s * var(--prism-phase-14, 0));
 }
-.home-anim .mode-card.primary {
-  animation: playPulse 2.2s ease-in-out infinite;
+body[data-theme="prism-parade"][data-view="home"].home-anim .mode-card.primary {
+  animation: playPulsePrism 2.2s ease-in-out infinite, prismOutlineShiftRaised 14s linear infinite;
+  animation-delay: 0ms, calc(-1s * var(--prism-phase-14, 0));
 }
 .mode-card span.mode-card__lock {
   display: none;
