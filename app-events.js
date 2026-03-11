@@ -852,7 +852,7 @@
       let splashStartInProgress = false;
       let splashAnyKeyProgress = 0;
       let splashAnyKeyAwaitingEnter = false;
-      const SPLASH_AUTO_START_MS = 5000;
+      const SPLASH_AUTO_START_MS = 3000;
       const SPLASH_ANY_KEY_SEQUENCE = "any key";
 
       function updateSplashAutoStartLabel(remainingMs = SPLASH_AUTO_START_MS) {

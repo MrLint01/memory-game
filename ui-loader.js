@@ -32,6 +32,7 @@
     'data.js',
     'sandbox-unlocks.js',
     'stages-instructions.js',
+    'stages-instructions-B.js',
     'stages-data.js',
     'stages-data-B.js',
     'stages-mode.js',

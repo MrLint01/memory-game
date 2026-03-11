@@ -11,16 +11,16 @@
       tabTutorialEnabled: false,
       revealSeconds: 5,
       recallSeconds: 30,
-      categories: ["numbers", "letters", "directions"],
+      categories: ["numbers", "letters", "shapes"],
       cardCounts: {},
       roundOverrides: {
         1: { cards: { counts: { numbers: 1 } } },
         2: { cards: { counts: { letters: 1 } } },
-        3: { cards: { counts: { directions: 1 } } }
+        3: { cards: { counts: { shapes: 1 } } }
       },
       modifiers: {},
       starTimes: { platinum: 1.5, gold: 3, silver: 10, bronze: 20 },
-      instructions: window.stageInstructions ? window.stageInstructions[1] || [] : []
+      instructions: window.stageInstructionsB ? window.stageInstructionsB[1] || [] : []
     }
   ];
   window.stagesConfigB = stagesConfigB;
