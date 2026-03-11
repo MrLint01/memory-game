@@ -1641,6 +1641,11 @@ body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   pointer-events: none;
   z-index: 50;
 }
+.stage-instructions--turbo {
+  align-items: flex-end;
+  justify-content: flex-start;
+  min-height: 260px;
+}
 .stage-instruction {
   position: relative;
   padding: 0.9rem 1.2rem;
@@ -1661,11 +1666,86 @@ body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   justify-content: center;
   z-index: 50;
 }
+.stage-instruction--turbo {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: translateY(10px);
+}
+.stage-instruction__turbo-layout {
+  display: grid;
+  grid-template-columns: minmax(128px, 170px) minmax(0, 1fr);
+  gap: 0.32rem;
+  align-items: center;
+  width: 100%;
+}
+.stage-instruction__turbo-image {
+  width: clamp(132px, 18vw, 184px);
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  align-self: center;
+  filter: drop-shadow(0 8px 16px rgba(15, 23, 42, 0.14));
+}
+.stage-instruction__bubble {
+  position: relative;
+  width: 100%;
+  max-width: 68rem;
+  display: flex;
+  align-items: center;
+  padding: 1rem 2rem 1.08rem;
+  border: 2px solid var(--border);
+  border-radius: 32px 32px 32px 14px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  min-height: 7rem;
+}
+.stage-instruction__bubble::before {
+  content: "";
+  position: absolute;
+  left: -29px;
+  top: 22px;
+  width: 31px;
+  height: 20px;
+  background: var(--border);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+.stage-instruction__bubble::after {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 24px;
+  width: 27px;
+  height: 16px;
+  background: var(--panel);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
 .stage-instruction__text {
   display: inline-block;
   max-width: 100%;
   white-space: pre-wrap;
   text-align: center;
+}
+.stage-instruction__text--turbo {
+  display: block;
+  font-size: clamp(1.2rem, 2vw, 1.75rem);
+  line-height: 1.4;
+  text-align: left;
+}
+.stage-instruction--typing .stage-instruction__text--turbo::after {
+  content: "";
+  display: inline-block;
+  width: 0.11em;
+  height: 1em;
+  margin-left: 0.08em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: turbo-speech-caret 0.9s steps(1, end) infinite;
 }
 .stage-instruction-panel {
   display: none;
@@ -1679,6 +1759,9 @@ body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   z-index: 60;
   pointer-events: none;
 }
+.stage-instruction-panel--turbo {
+  z-index: 70;
+}
 .stage-instruction.is-visible {
   opacity: 1;
   transform: translateY(0);
@@ -1686,6 +1769,45 @@ body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
 .stage-instruction.is-hidden {
   opacity: 0;
   transform: translateY(-6px);
+}
+@keyframes turbo-speech-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (max-width: 720px) {
+  .stage-instructions--turbo {
+    align-items: flex-end;
+    min-height: 220px;
+  }
+  .stage-instruction__turbo-layout {
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 0.24rem;
+    align-items: center;
+  }
+  .stage-instruction__bubble {
+    max-width: none;
+    padding: 0.8rem 1.3rem 0.9rem;
+    border-radius: 24px 24px 24px 12px;
+    min-height: 5.8rem;
+  }
+  .stage-instruction__bubble::before {
+    left: -23px;
+    top: 18px;
+    width: 25px;
+    height: 16px;
+  }
+  .stage-instruction__bubble::after {
+    left: -20px;
+    top: 20px;
+    width: 22px;
+    height: 13px;
+  }
 }
       .stage .status,
       .stage .actions,
@@ -5564,6 +5686,15 @@ body[data-theme] .stage-instruction,
 body[data-theme] .hud-round,
 body[data-theme] .hud-timer,
 body[data-theme] .timer-bar {
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--border);
+}
+body[data-theme] .stage-instruction--turbo {
+  background: transparent;
+  border-color: transparent;
+}
+body[data-theme] .stage-instruction--turbo .stage-instruction__bubble {
   background: var(--panel);
   color: var(--ink);
   border-color: var(--border);

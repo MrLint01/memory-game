@@ -18,6 +18,7 @@ const revealInput = document.getElementById("revealTime");
       const stageList = document.getElementById("stageList");
       const stageInstructions = document.getElementById("stageInstructions");
       const stageInstructionPanel = document.getElementById("stageInstructionPanel");
+      const TURBO_TUTORIAL_IMAGE_SRC = "imgs/Sloths/transparent/turbo_waving.png";
       const hudCluster = document.getElementById("hudCluster");
       const submitBtn = document.getElementById("submitBtn");
       const nextBtn = document.getElementById("nextBtn");
@@ -754,6 +755,26 @@ const revealInput = document.getElementById("revealTime");
 
       function positionStageInstructionPanel() {
         if (!stageInstructionPanel || !stagePanel) return;
+        const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        const isTurboTutorial =
+          gameMode === "stages" && stage && String(stage.stageType || "").toLowerCase() === "tutorial";
+        if (isTurboTutorial) {
+          const viewportPadding = window.innerWidth <= 720 ? 14 : 20;
+          const bottomOffset = window.innerWidth <= 720 ? -24 : -40;
+          const stageRect = stagePanel.getBoundingClientRect();
+          const maxPanelWidth = Math.max(280, window.innerWidth - viewportPadding * 2);
+          const panelWidth = Math.min(maxPanelWidth, Math.max(620, stageRect.width * 0.94));
+          const left = Math.max(
+            viewportPadding,
+            Math.min(stageRect.left + 8, window.innerWidth - viewportPadding - panelWidth)
+          );
+          stageInstructionPanel.style.left = `${Math.round(left)}px`;
+          stageInstructionPanel.style.top = "";
+          stageInstructionPanel.style.bottom = `${bottomOffset}px`;
+          stageInstructionPanel.style.width = `${Math.round(panelWidth)}px`;
+          stageInstructionPanel.style.transform = "none";
+          return;
+        }
         const anchor = timerBar ? timerBar.getBoundingClientRect() : stagePanel.getBoundingClientRect();
         const baseRect = stagePanel.getBoundingClientRect();
         const gap =
@@ -840,6 +861,12 @@ const revealInput = document.getElementById("revealTime");
           positionStageInstructionPanel();
         }
         const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        const isTurboTutorial =
+          gameMode === "stages" && stage && String(stage.stageType || "").toLowerCase() === "tutorial";
+        stageInstructions.classList.toggle("stage-instructions--turbo", Boolean(isTurboTutorial));
+        if (stageInstructionPanel) {
+          stageInstructionPanel.classList.toggle("stage-instruction-panel--turbo", Boolean(isTurboTutorial));
+        }
         if (!stage || !window.getStageInstructionSlides) return;
         const instructionData = window.getStageInstructionSlides(stage);
         const slides = instructionData && instructionData.slides ? instructionData.slides : [];
@@ -869,9 +896,69 @@ const revealInput = document.getElementById("revealTime");
       function scheduleInstructionEntries(entries) {
         const renderToken = stageInstructionToken;
         const fadeMs = 500;
+        const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        const isTurboTutorial =
+          gameMode === "stages" && stage && String(stage.stageType || "").toLowerCase() === "tutorial";
+        const buildInstructionFragments = (rawText) => {
+          return String(rawText || "")
+            .split("**")
+            .map((text, index) => ({ text, strong: index % 2 === 1 }))
+            .filter((fragment) => fragment.text);
+        };
+        const renderInstructionText = (targetEl, rawText, visibleChars = Number.POSITIVE_INFINITY) => {
+          if (!targetEl) return 0;
+          const fragments = buildInstructionFragments(rawText);
+          targetEl.replaceChildren();
+          let remaining = Number.isFinite(visibleChars) ? Math.max(0, visibleChars) : Number.POSITIVE_INFINITY;
+          let written = 0;
+          fragments.forEach((fragment) => {
+            if (remaining <= 0) return;
+            const fullText = String(fragment.text || "");
+            const nextText = Number.isFinite(remaining) ? fullText.slice(0, remaining) : fullText;
+            if (!nextText) return;
+            const node = fragment.strong ? document.createElement("strong") : document.createElement("span");
+            node.textContent = nextText;
+            targetEl.appendChild(node);
+            written += nextText.length;
+            if (Number.isFinite(remaining)) {
+              remaining -= nextText.length;
+            }
+          });
+          return written;
+        };
+        const startInstructionTypewriter = (targetEl, rawText, box, entryDuration) => {
+          const totalChars = renderInstructionText(targetEl, rawText, Number.POSITIVE_INFINITY);
+          renderInstructionText(targetEl, rawText, 0);
+          if (!totalChars) return 0;
+          const availableDuration = Number.isFinite(Number(entryDuration)) ? Math.max(700, Number(entryDuration) - 500) : null;
+          const typingDuration = availableDuration === null
+            ? clamp(totalChars * 56, 1400, 4400)
+            : clamp(Math.min(totalChars * 56, availableDuration), 1000, 4400);
+          const msPerChar = Math.max(16, typingDuration / totalChars);
+          box.classList.add("stage-instruction--typing");
+          const startedAt = performance.now();
+          const timerId = window.setInterval(() => {
+            if (renderToken !== stageInstructionToken) {
+              clearInterval(timerId);
+              return;
+            }
+            const elapsed = performance.now() - startedAt;
+            const visibleChars = Math.min(totalChars, Math.max(1, Math.floor(elapsed / msPerChar) + 1));
+            renderInstructionText(targetEl, rawText, visibleChars);
+            if (visibleChars >= totalChars) {
+              clearInterval(timerId);
+              box.classList.remove("stage-instruction--typing");
+            }
+          }, 24);
+          stageInstructionTimers.push(timerId);
+          return typingDuration;
+        };
         const showEntry = (entry) => {
           if (renderToken !== stageInstructionToken) return;
           if (!entry || typeof entry.text !== "string" || !entry.text.trim()) return;
+          if (isTurboTutorial) {
+            stageInstructions.querySelectorAll(".stage-instruction--turbo").forEach((existing) => existing.remove());
+          }
           const box = document.createElement("div");
           box.className = "stage-instruction";
           if (entry.className) {
@@ -881,32 +968,53 @@ const revealInput = document.getElementById("revealTime");
               .forEach((cls) => box.classList.add(cls));
           }
           const rawText = entry.text;
-          const safeText = String(rawText).replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const formatted = safeText.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-          box.innerHTML = `<span class="stage-instruction__text">${formatted}</span>`;
-          const left = toInstructionPos(entry.x, "x");
-          const top = toInstructionPos(entry.y, "y");
-          const width = toInstructionPos(entry.w, "x");
-          const height = toInstructionPos(entry.h, "x");
-          if (width !== null) box.style.width = width;
-          if (entry.align) {
-            box.style.textAlign = entry.align;
-          }
-          if (entry.size) {
-            box.style.fontSize = entry.size;
-          }
-          if (entry.color) {
-            const theme = String(document.body && document.body.dataset ? document.body.dataset.theme || "" : "");
-            const forceThemeInk = theme.startsWith("night-");
-            box.style.color = forceThemeInk ? "var(--ink)" : entry.color;
+          let typedDuration = 0;
+          if (isTurboTutorial) {
+            box.classList.add("stage-instruction--turbo");
+            box.innerHTML = `
+              <div class="stage-instruction__turbo-layout">
+                <img class="stage-instruction__turbo-image" src="${TURBO_TUTORIAL_IMAGE_SRC}" alt="Turbo the Sloth" />
+                <div class="stage-instruction__bubble">
+                  <span class="stage-instruction__text stage-instruction__text--turbo"></span>
+                </div>
+              </div>
+            `;
+            if (entry.size) {
+              box.style.fontSize = entry.size;
+            }
+          } else {
+            const safeText = String(rawText).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const formatted = safeText.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+            box.innerHTML = `<span class="stage-instruction__text">${formatted}</span>`;
+            const width = toInstructionPos(entry.w, "x");
+            if (width !== null) box.style.width = width;
+            if (entry.align) {
+              box.style.textAlign = entry.align;
+            }
+            if (entry.size) {
+              box.style.fontSize = entry.size;
+            }
+            if (entry.color) {
+              const theme = String(document.body && document.body.dataset ? document.body.dataset.theme || "" : "");
+              const forceThemeInk = theme.startsWith("night-");
+              box.style.color = forceThemeInk ? "var(--ink)" : entry.color;
+            }
           }
           stageInstructions.appendChild(box);
+          if (isTurboTutorial) {
+            const textEl = box.querySelector(".stage-instruction__text");
+            typedDuration = startInstructionTypewriter(textEl, rawText, box, entry.duration);
+          }
           requestAnimationFrame(() => {
             if (renderToken !== stageInstructionToken) return;
             box.classList.add("is-visible");
           });
           const duration = Number(entry.duration);
-          if (Number.isFinite(duration) && duration > 0) {
+          const resolvedDuration =
+            Number.isFinite(duration) && duration > 0
+              ? (isTurboTutorial ? Math.max(duration, Math.round(typedDuration + 650)) : duration)
+              : 0;
+          if (resolvedDuration > 0) {
             const hideId = window.setTimeout(() => {
               if (renderToken !== stageInstructionToken) return;
               box.classList.remove("is-visible");
@@ -916,7 +1024,7 @@ const revealInput = document.getElementById("revealTime");
                 box.remove();
               }, fadeMs);
               stageInstructionTimers.push(removeId);
-            }, duration);
+            }, resolvedDuration);
             stageInstructionTimers.push(hideId);
           }
         };
