@@ -521,11 +521,16 @@
                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(${menuKey})</span>
                </button>
-               <button id="stageRetryButton" class="secondary icon-button button-entice" type="button" aria-label="Retry (${retryKey})">
-                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
-                 <span class="action-countdown" aria-live="polite"></span>
-                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
-               </button>`
+               <div class="stage-retry-wrap">
+                 <div class="stage-retry-timer" aria-hidden="true">
+                   <span class="stage-retry-timer__fill"></span>
+                 </div>
+                 <button id="stageRetryButton" class="secondary icon-button button-entice" type="button" aria-label="Retry (${retryKey})">
+                   <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                   <span class="action-countdown" aria-live="polite"></span>
+                   <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
+                 </button>
+               </div>`
             : `<button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
                  <img class="action-icon" src="imgs/settings_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(${practiceSettingsKey})</span>
@@ -551,6 +556,67 @@
           </div>
         `;
         resultsPanel.classList.add("show");
+
+        if (mode === "stages") {
+          const autoRetryDelayMs = 4500;
+          if (autoRetryTimerId) {
+            clearTimeout(autoRetryTimerId);
+            autoRetryTimerId = null;
+          }
+          const retryTimer = document.querySelector(".stage-retry-timer");
+          const retryTimerFill = retryTimer
+            ? retryTimer.querySelector(".stage-retry-timer__fill")
+            : null;
+          const startAutoRetry = () => {
+            const autoRetryEnabledNow = typeof autoRetryEnabled === "undefined"
+              ? true
+              : autoRetryEnabled;
+            if (!autoRetryEnabledNow) {
+              if (retryTimer) {
+                retryTimer.classList.add("is-disabled");
+              }
+              return;
+            }
+            if (retryTimer) {
+              retryTimer.classList.remove("is-running", "is-canceled", "is-disabled", "is-waiting");
+            }
+            if (retryTimerFill) {
+              retryTimerFill.style.removeProperty("transition");
+              retryTimerFill.style.removeProperty("transition-duration");
+              retryTimerFill.style.removeProperty("transform");
+              retryTimerFill.style.transitionDuration = `${autoRetryDelayMs}ms`;
+            }
+            requestAnimationFrame(() => {
+              if (retryTimer) {
+                retryTimer.classList.add("is-running");
+              }
+            });
+            autoRetryTimerId = window.setTimeout(() => {
+              autoRetryTimerId = null;
+              const retryBtn = document.getElementById("stageRetryButton");
+              if (retryBtn) {
+                retryBtn.click();
+              }
+            }, autoRetryDelayMs);
+          };
+          const cancelAutoRetryFromResults = () => {
+            if (autoRetryTimerId) {
+              clearTimeout(autoRetryTimerId);
+              autoRetryTimerId = null;
+            }
+            if (retryTimer) {
+              retryTimer.classList.remove("is-running", "is-waiting");
+              retryTimer.classList.add("is-canceled");
+            }
+            if (retryTimerFill) {
+              retryTimerFill.style.transition = "none";
+              retryTimerFill.style.transform = "scaleX(0)";
+              void retryTimerFill.offsetWidth;
+            }
+          };
+          window.cancelAutoRetryFromResults = cancelAutoRetryFromResults;
+          startAutoRetry();
+        }
       }
 
       function getStageStars(elapsedSeconds, stage) {
@@ -1341,6 +1407,9 @@
             if (round >= stageRounds) {
               stageState.completed = true;
               stageState.failed = false;
+              if (stage && stage.id === 1) {
+                markStage1RecallLockSeen();
+              }
               const elapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
                 ? stageState.elapsedSeconds
                 : (performance.now() - (stageState.startTime || performance.now())) / 1000;
@@ -1430,6 +1499,7 @@
         }
         playRoundWrongSound();
         if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           lockInputs(true);
           const swapOrder = swapMap ? swapMap.slice() : null;
           swapActive = false;
@@ -1456,6 +1526,9 @@
           stageState.failed = true;
           stageState.completed = false;
           stageState.active = false;
+          if (stage && stage.id === 1) {
+            markStage1RecallLockSeen();
+          }
           stopStageStopwatch();
           streak = 0;
           // Analytics: Track level failure
@@ -1577,6 +1650,7 @@
             }
           }
           if (gameMode === "stages") {
+            const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
             const entries = roundItems.map((item) => ({
               expected: buildExpectedLabel(item),
               actual: "",
@@ -1585,6 +1659,9 @@
             stageState.failed = true;
             stageState.completed = false;
             stageState.active = false;
+            if (stage && stage.id === 1) {
+              markStage1RecallLockSeen();
+            }
             streak = 0;
             stopStageStopwatch();
             const failedElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
@@ -1640,8 +1717,28 @@
         }
         const startRecall = () => {
           lockInputs(false);
-          if (submitBtn) {
-            submitBtn.disabled = false;
+          const recallSubmitDelayMs = 150;
+          const isStage1 =
+            gameMode === "stages" &&
+            typeof window.getStageConfig === "function" &&
+            (window.getStageConfig(stageState.index) || {}).id === 1;
+          const recallLockSeen = hasStage1RecallLockSeen();
+          const shouldApplySubmitLock = isStage1 && !recallLockSeen;
+          if (shouldApplySubmitLock) {
+            recallSubmitLockUntil = performance.now() + recallSubmitDelayMs;
+            if (submitBtn) {
+              submitBtn.disabled = true;
+              setTimeout(() => {
+                if (phase === "recall" && submitBtn) {
+                  submitBtn.disabled = false;
+                }
+              }, recallSubmitDelayMs);
+            }
+          } else {
+            recallSubmitLockUntil = 0;
+            if (submitBtn) {
+              submitBtn.disabled = false;
+            }
           }
           setPhase("Type what you saw", "recall");
           focusFirstInput();
@@ -1686,6 +1783,30 @@
         swapStartRecall = null;
         swapCleanup = null;
         startRecall();
+      }
+
+      const STAGE1_RECALL_LOCK_KEY = "flashRecallStage1RecallLockUsed";
+      function hasStage1RecallLockSeen() {
+        try {
+          if (window.localStorage.getItem(STAGE1_RECALL_LOCK_KEY) === "1") {
+            stage1RecallSubmitLockUsed = true;
+            return true;
+          }
+        } catch {
+          // ignore storage errors
+        }
+        stage1RecallSubmitLockUsed = false;
+        return false;
+      }
+
+      function markStage1RecallLockSeen() {
+        if (stage1RecallSubmitLockUsed) return;
+        stage1RecallSubmitLockUsed = true;
+        try {
+          window.localStorage.setItem(STAGE1_RECALL_LOCK_KEY, "1");
+        } catch {
+          // ignore storage errors
+        }
       }
 
       function isSequenceStage() {

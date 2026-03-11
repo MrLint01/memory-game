@@ -109,6 +109,7 @@ const revealInput = document.getElementById("revealTime");
       const keybindResetDefaults = document.getElementById("keybindResetDefaults");
       const flashCountdownToggle = document.getElementById("flashCountdownToggle");
       const enterToNextToggle = document.getElementById("enterToNextToggle");
+      const autoRetryToggle = document.getElementById("autoRetryToggle");
       const referenceModal = document.getElementById("referenceModal");
       const referenceClose = document.getElementById("referenceClose");
 
@@ -355,6 +356,8 @@ const revealInput = document.getElementById("revealTime");
       let gameMode = "practice";
       let pausedState = null;
       let timerState = null;
+      let recallSubmitLockUntil = 0;
+      let stage1RecallSubmitLockUsed = false;
       const platformerState = {
         enabled: false,
         completed: false,
@@ -370,6 +373,8 @@ const revealInput = document.getElementById("revealTime");
       let adTimer = null;
       let autoAdvanceNextTimerId = null;
       let autoAdvanceNextEnabled = true;
+      let autoRetryTimerId = null;
+      let autoRetryEnabled = true;
       let stageIntroAutoStartEnabled = true;
       let stageIntroAutoStartTimerId = null;
       let adEnabled = false;

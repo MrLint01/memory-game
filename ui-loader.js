@@ -33,6 +33,7 @@
     'sandbox-unlocks.js',
     'stages-instructions.js',
     'stages-data.js',
+    'stages-data-B.js',
     'stages-mode.js',
     'app-core.js',
     'modifiers/background-color.js',

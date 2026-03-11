@@ -368,7 +368,7 @@
       name: "Stage 18",
       stageType: "challenge",
       rounds: 1,
-      cards: 4,
+      cards: 3,
       noRepeatAcrossRounds: true,
       revealSeconds: 10,
       recallSeconds: 30,
