@@ -1,13 +1,13 @@
 label,event_count
-stage_preview_open | manual,354
-result_auto_advance_scheduled | auto,281
-stage_preview_start | manual,277
-result_auto_advance_cancelled | manual,156
-result_auto_advance_triggered | auto,72
-stage_preview_open | auto,72
-splash_start | manual,57
-stage_preview_autostart_cancelled | manual,47
-first_level_countdown | auto,27
-splash_start | auto,27
-first_level_countdown | manual,23
-stage_preview_start | auto,15
+stage_preview_open | manual,639
+result_auto_advance_scheduled | auto,444
+stage_preview_start | manual,441
+result_auto_advance_cancelled | manual,233
+result_auto_advance_triggered | auto,112
+stage_preview_open | auto,112
+splash_start | manual,76
+stage_preview_autostart_cancelled | manual,73
+first_level_countdown | auto,33
+splash_start | auto,33
+first_level_countdown | manual,31
+stage_preview_start | auto,26

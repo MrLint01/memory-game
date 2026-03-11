@@ -1,8 +1,8 @@
 setting_name,unique_players
-enter_to_next_enabled,5
-theme_id,4
-color_vision_mode,2
-auto_advance_next_enabled,1
-flash_countdown_enabled,1
+enter_to_next_enabled,9
+theme_id,6
+color_vision_mode,3
+auto_advance_next_enabled,2
+success_animation_enabled,2
 leaderboards_enabled,1
-success_animation_enabled,1
+flash_countdown_enabled,1

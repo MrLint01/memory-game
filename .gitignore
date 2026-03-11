@@ -59,11 +59,11 @@ serviceAccount*.json
 *.key.json
 
 # Generated analysis data
-# prepared_data/
-# analysis_output/
-# data_combined.json
-# data_combined_sample.json
-# *.normalized.csv
+prepared_data/
+analysis_output/
+data_combined.json
+data_combined_sample.json
+*.normalized.csv
 
 __pycache__/
 *.py[cod]

@@ -47,8 +47,7 @@ service cloud.firestore {
         && request.resource.data.auth_uid == request.auth.uid;
       allow update: if request.auth != null
         && request.resource.data.player_id == playerId
-        && request.resource.data.auth_uid == request.auth.uid
-        && (resource.data.auth_uid == null || resource.data.auth_uid == request.auth.uid);
+        && request.resource.data.auth_uid == request.auth.uid;
       allow delete: if false;
     }
 

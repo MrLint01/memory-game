@@ -538,6 +538,239 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
             save_bar(autoplay_event_counts, feature_dir / "autoplay_event_counts.png", "Autoplay Event Counts", "Autoplay Event", "Event Count")
             autoplay_event_counts.rename("event_count").to_csv(feature_dir / "autoplay_event_counts.csv")
 
+        if not autoplay.empty and {"player_id_norm", "current_level_number"} <= set(autoplay.columns):
+            autoplay = add_session_key(autoplay)
+            autoplay["level_number"] = pd.to_numeric(autoplay.get("level_number"), errors="coerce")
+            autoplay["current_level_number"] = pd.to_numeric(autoplay.get("current_level_number"), errors="coerce")
+            autoplay["stage_preview_open_flag"] = bool_series(autoplay["stage_preview_open"]) if "stage_preview_open" in autoplay.columns else False
+            autoplay["current_stage_completed_flag"] = bool_series(autoplay["current_stage_completed"]) if "current_stage_completed" in autoplay.columns else False
+            autoplay["autoplay_mode_norm"] = autoplay.get("autoplay_mode", pd.Series(index=autoplay.index, dtype=object)).astype(str).str.strip().str.lower()
+            autoplay["target_norm"] = autoplay.get("target", pd.Series(index=autoplay.index, dtype=object)).astype(str).str.strip().str.lower()
+            autoplay["preview_start_source_norm"] = autoplay.get("preview_start_source", pd.Series(index=autoplay.index, dtype=object)).astype(str).str.strip().str.lower()
+            autoplay["trigger_source_norm"] = autoplay.get("trigger_source", pd.Series(index=autoplay.index, dtype=object)).astype(str).str.strip().str.lower()
+            autoplay["event_time_ms"] = pd.to_numeric(autoplay.get("event_time_ms"), errors="coerce")
+
+            level_attempts = attempts_with_player.copy()
+            level_attempts["level_number"] = pd.to_numeric(level_attempts.get("level_number"), errors="coerce")
+
+            started_by_level: dict[int, set[str]] = {}
+            for lvl in [1, 2, 3, 4]:
+                started_by_level[lvl] = set(
+                    level_attempts[
+                        level_attempts["level_number"].eq(lvl) & level_attempts["player_id_norm"].notna()
+                    ]["player_id_norm"].astype(str)
+                )
+
+            def classify_transition(
+                rows: pd.DataFrame,
+                eligible_players: set[str],
+                transition_label: str,
+            ) -> dict[str, Any] | None:
+                if not eligible_players:
+                    return None
+                rel = rows[rows["player_id_norm"].astype(str).isin(eligible_players)].copy()
+                if rel.empty:
+                    return {
+                        "transition": transition_label,
+                        "auto_players": 0,
+                        "manual_players": 0,
+                        "eligible_players": len(eligible_players),
+                        "auto_percent": 0.0,
+                        "manual_percent": 0.0,
+                    }
+                rel["sort_time"] = rel["event_time_ms"].fillna(np.inf)
+                first = rel.sort_values(["sort_time"]).groupby("player_id_norm", as_index=False).head(1)
+                auto_players = set(first[first["transition_source"] == "auto"]["player_id_norm"].astype(str))
+                manual_players = set(first[first["transition_source"] == "manual"]["player_id_norm"].astype(str))
+                return {
+                    "transition": transition_label,
+                    "auto_players": len(auto_players),
+                    "manual_players": len(manual_players),
+                    "eligible_players": len(eligible_players),
+                    "auto_percent": (len(auto_players) / len(eligible_players)) * 100.0,
+                    "manual_percent": (len(manual_players) / len(eligible_players)) * 100.0,
+                }
+
+            autoplay_transition_rows: list[dict[str, Any]] = []
+
+            title_rows = autoplay[
+                autoplay["player_id_norm"].notna()
+                & autoplay["current_level_number"].eq(1)
+                & autoplay["target_norm"].isin(["splash_start", "first_level_countdown"])
+            ].copy()
+            title_rows["transition_source"] = np.where(
+                title_rows["autoplay_mode_norm"].eq("auto") & title_rows["trigger_source_norm"].eq("splash_timer"),
+                "auto",
+                np.where(title_rows["autoplay_mode_norm"].eq("manual"), "manual", pd.NA),
+            )
+            title_rows = title_rows.dropna(subset=["transition_source"])
+            title_result = classify_transition(title_rows, started_by_level.get(1, set()), "Title -> Start L1")
+            if title_result is not None:
+                autoplay_transition_rows.append(title_result)
+
+            for lvl in [1, 2, 3]:
+                started_next_level = started_by_level.get(lvl + 1, set())
+
+                preview_rows = autoplay[
+                    autoplay["player_id_norm"].notna()
+                    & autoplay["current_level_number"].eq(lvl)
+                    & autoplay["level_number"].eq(lvl + 1)
+                    & autoplay["target_norm"].eq("stage_preview_open")
+                ].copy()
+                preview_rows["transition_source"] = np.where(
+                    preview_rows["autoplay_mode_norm"].eq("auto"),
+                    "auto",
+                    np.where(preview_rows["autoplay_mode_norm"].eq("manual"), "manual", pd.NA),
+                )
+                preview_rows = preview_rows.dropna(subset=["transition_source"])
+                preview_result = classify_transition(preview_rows, started_next_level, f"After L{lvl}: Show L{lvl + 1}")
+                if preview_result is not None:
+                    autoplay_transition_rows.append(preview_result)
+
+                start_rows = autoplay[
+                    autoplay["player_id_norm"].notna()
+                    & autoplay["current_level_number"].eq(lvl)
+                    & autoplay["level_number"].eq(lvl + 1)
+                    & autoplay["target_norm"].eq("stage_preview_start")
+                ].copy()
+                start_rows["transition_source"] = np.where(
+                    start_rows["autoplay_mode_norm"].eq("auto")
+                    & start_rows["preview_start_source_norm"].eq("auto_preview_timer"),
+                    "auto",
+                    np.where(
+                        start_rows["autoplay_mode_norm"].eq("manual")
+                        & start_rows["preview_start_source_norm"].eq("manual"),
+                        "manual",
+                        pd.NA,
+                    ),
+                )
+                start_rows = start_rows.dropna(subset=["transition_source"])
+                start_result = classify_transition(start_rows, started_next_level, f"After Show L{lvl + 1}: Start L{lvl + 1}")
+                if start_result is not None:
+                    autoplay_transition_rows.append(start_result)
+
+            if autoplay_transition_rows:
+                autoplay_transition_df = pd.DataFrame(autoplay_transition_rows)
+                autoplay_transition_df.to_csv(feature_dir / "autostart_effect_first3_levels.csv", index=False)
+                x = np.arange(len(autoplay_transition_df))
+                plt.figure(figsize=(12, 6))
+                ax = plt.gca()
+                ax.bar(
+                    x,
+                    autoplay_transition_df["auto_percent"],
+                    color="#4e79a7",
+                    label="Auto",
+                )
+                ax.bar(
+                    x,
+                    autoplay_transition_df["manual_percent"],
+                    bottom=autoplay_transition_df["auto_percent"],
+                    color="#9c755f",
+                    label="Manual",
+                )
+                ax.set_title("How Players Reached the Title and First Three Level Transitions")
+                ax.set_xlabel("Transition")
+                ax.set_ylabel("Percent of Players Who Started That Level")
+                ax.set_ylim(0, 100)
+                ax.set_xticks(x)
+                ax.set_xticklabels(autoplay_transition_df["transition"], rotation=25, ha="right")
+                ax.legend()
+                for idx, row in autoplay_transition_df.iterrows():
+                    manual_value = float(row["manual_percent"])
+                    auto_value = float(row["auto_percent"])
+                    if auto_value > 0:
+                        ax.text(idx, auto_value / 2.0, f"{auto_value:.1f}%", ha="center", va="center", fontsize=8, color="white")
+                    if manual_value > 0:
+                        ax.text(idx, auto_value + (manual_value / 2.0), f"{manual_value:.1f}%", ha="center", va="center", fontsize=8, color="white")
+                plt.tight_layout()
+                plt.savefig(feature_dir / "autostart_effect_first3_levels.png", dpi=120)
+                plt.close()
+
+                level_start_events = add_session_key(events_with_player[events_with_player["event_type_norm"] == "level_start"].copy())
+                level_start_events["level_number"] = pd.to_numeric(level_start_events.get("level_number"), errors="coerce")
+                level_start_sessions = {
+                    lvl: set(
+                        level_start_events[
+                            level_start_events["session_key"].notna() & level_start_events["level_number"].eq(lvl)
+                        ]["session_key"].astype(str)
+                    )
+                    for lvl in [1, 2, 3]
+                }
+
+                quit_summary = infer_quit_summary(events, attempts_with_player)
+                mid_quit_sessions_by_level = {
+                    lvl: set(
+                        quit_summary[
+                            quit_summary["session_key"].notna()
+                            & quit_summary["quit_level"].eq(lvl)
+                            & quit_summary["quit_mid_level"]
+                        ]["session_key"].astype(str)
+                    )
+                    for lvl in [1, 2, 3]
+                }
+
+                autoplay_midquit_rows: list[dict[str, Any]] = []
+
+                l1_auto_sessions = set(
+                    title_rows[
+                        title_rows["transition_source"].eq("auto") & title_rows["session_key"].notna()
+                    ]["session_key"].astype(str)
+                ) & level_start_sessions.get(1, set())
+                autoplay_midquit_rows.append(
+                    {
+                        "level": 1,
+                        "autoplay_started_sessions": len(l1_auto_sessions),
+                        "mid_quit_sessions": len(l1_auto_sessions & mid_quit_sessions_by_level.get(1, set())),
+                        "mid_quit_percent": (
+                            (len(l1_auto_sessions & mid_quit_sessions_by_level.get(1, set())) / len(l1_auto_sessions)) * 100.0
+                            if l1_auto_sessions
+                            else 0.0
+                        ),
+                    }
+                )
+
+                for lvl in [2, 3]:
+                    auto_start_rows = autoplay[
+                        autoplay["session_key"].notna()
+                        & autoplay["autoplay_mode_norm"].eq("auto")
+                        & autoplay["target_norm"].eq("stage_preview_start")
+                        & autoplay["preview_start_source_norm"].eq("auto_preview_timer")
+                        & autoplay["current_level_number"].eq(lvl - 1)
+                        & autoplay["level_number"].eq(lvl)
+                    ].copy()
+                    auto_sessions = set(auto_start_rows["session_key"].astype(str)) & level_start_sessions.get(lvl, set())
+                    autoplay_midquit_rows.append(
+                        {
+                            "level": lvl,
+                            "autoplay_started_sessions": len(auto_sessions),
+                            "mid_quit_sessions": len(auto_sessions & mid_quit_sessions_by_level.get(lvl, set())),
+                            "mid_quit_percent": (
+                                (len(auto_sessions & mid_quit_sessions_by_level.get(lvl, set())) / len(auto_sessions)) * 100.0
+                                if auto_sessions
+                                else 0.0
+                            ),
+                        }
+                    )
+
+                autoplay_midquit_df = pd.DataFrame(autoplay_midquit_rows)
+                autoplay_midquit_df.to_csv(feature_dir / "autoplay_midquit_first3_levels.csv", index=False)
+                plt.figure(figsize=(8, 5))
+                ax = plt.gca()
+                ax.bar(
+                    [f"L{int(v)}" for v in autoplay_midquit_df["level"]],
+                    autoplay_midquit_df["mid_quit_percent"],
+                    color=["#4e79a7", "#59a14f", "#e15759"],
+                )
+                ax.set_title("Chance of Mid-Level Quit After Autoplay Start")
+                ax.set_xlabel("Level")
+                ax.set_ylabel("Percent of Autoplay-Started Sessions That Quit Mid-Level")
+                ax.set_ylim(0, 100)
+                for idx, value in enumerate(autoplay_midquit_df["mid_quit_percent"]):
+                    ax.text(idx, value + 1, f"{value:.1f}%", ha="center", va="bottom", fontsize=9)
+                plt.tight_layout()
+                plt.savefig(feature_dir / "autoplay_midquit_first3_levels.png", dpi=120)
+                plt.close()
+
         quit_events = events_with_player[events_with_player["event_type_norm"] == "quit_reason"].copy()
         if not quit_events.empty:
             quit_events = add_session_key(quit_events)
@@ -770,6 +1003,7 @@ def parse_version_key(version: str) -> tuple:
 def analyze_level_dropoff_metrics(
     attempts_with_player: pd.DataFrame,
     player_highest_completed: pd.Series,
+    events: pd.DataFrame,
     outdir: Path
 ) -> None:
     """Generate playtime and retry graphs for players who dropped off between levels."""
@@ -784,6 +1018,122 @@ def analyze_level_dropoff_metrics(
     
     attempts_with_player["passed_flag"] = bool_series(attempts_with_player["passed"])
     attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player["time_seconds"], errors="coerce")
+
+    all_players = set(player_highest_completed.index.astype(str).tolist())
+    level1_attempt_players = set(
+        attempts_with_player[
+            attempts_with_player["level_number"].eq(1)
+            & attempts_with_player["player_id_norm"].notna()
+        ]["player_id_norm"].astype(str).tolist()
+    )
+    level1_completed_players = set(
+        attempts_with_player[
+            attempts_with_player["level_number"].eq(1)
+            & attempts_with_player["passed_flag"]
+            & attempts_with_player["player_id_norm"].notna()
+        ]["player_id_norm"].astype(str).tolist()
+    )
+    level2_attempt_players = set(
+        attempts_with_player[
+            attempts_with_player["level_number"].eq(2)
+            & attempts_with_player["player_id_norm"].notna()
+        ]["player_id_norm"].astype(str).tolist()
+    )
+
+    before_l1_players = all_players - level1_attempt_players
+    started_l1_not_completed_players = level1_attempt_players - level1_completed_players
+    completed_l1_quit_immediately_players = level1_completed_players - level2_attempt_players
+    completed_l1_attempted_l2_players = level1_completed_players & level2_attempt_players
+
+    total_players = len(all_players)
+    if total_players > 0:
+        level1_flow_counts = pd.Series(
+            {
+                "Quit Before L1": len(before_l1_players),
+                "Started L1, Quit Before Finish": len(started_l1_not_completed_players),
+                "Completed L1, Quit Immediately": len(completed_l1_quit_immediately_players),
+                "Completed L1, Attempted L2": len(completed_l1_attempted_l2_players),
+            }
+        )
+        level1_flow_percent = (level1_flow_counts / total_players) * 100.0
+
+        plt.figure(figsize=(9, 5))
+        ax = level1_flow_percent.plot(kind="bar", color=["#9c755f", "#e15759", "#f28e2b", "#4e79a7"])
+        plt.title("Player Flow Around Level 1")
+        plt.xlabel("Player Group")
+        plt.ylabel("Percent of Players")
+        plt.ylim(0, 100)
+        for idx, value in enumerate(level1_flow_percent.values):
+            ax.text(idx, value + 1, f"{value:.1f}%", ha="center", va="bottom", fontsize=9)
+        plt.tight_layout()
+        plt.savefig(dropoff_dir / "level1_player_flow_percent.png", dpi=120)
+        plt.close()
+
+        level1_flow_percent.rename("percent_of_players").to_csv(dropoff_dir / "level1_player_flow_percent.csv")
+
+    level1_noncompleter_players = set(started_l1_not_completed_players)
+    if level1_noncompleter_players:
+        attempts_with_session = add_session_key(attempts_with_player.copy())
+        level1_noncomplete_attempts = attempts_with_session[
+            attempts_with_session["player_id_norm"].astype(str).isin(level1_noncompleter_players)
+            & attempts_with_session["level_number"].eq(1)
+        ].copy()
+        failed_l1_counts = (
+            level1_noncomplete_attempts[~level1_noncomplete_attempts["passed_flag"]]
+            .groupby("player_id_norm")
+            .size()
+        )
+
+        session_player_map = (
+            attempts_with_session[
+                attempts_with_session["session_key"].notna() & attempts_with_session["player_id_norm"].notna()
+            ][["session_key", "player_id_norm"]]
+            .drop_duplicates()
+        )
+        quit_summary = infer_quit_summary(events, attempts_with_player)
+        if not quit_summary.empty and not session_player_map.empty:
+            quit_summary = quit_summary.merge(session_player_map, on="session_key", how="left")
+            level1_mid_quit_players = set(
+                quit_summary[
+                    quit_summary["quit_level"].eq(1)
+                    & quit_summary["quit_mid_level"]
+                    & quit_summary["player_id_norm"].astype(str).isin(level1_noncompleter_players)
+                ]["player_id_norm"].astype(str)
+            )
+        else:
+            level1_mid_quit_players = set()
+
+        multiple_fail_quit_players = {
+            str(pid)
+            for pid, fail_count in failed_l1_counts.items()
+            if str(pid) in level1_noncompleter_players and fail_count >= 2 and str(pid) not in level1_mid_quit_players
+        }
+        single_fail_quit_players = level1_noncompleter_players - level1_mid_quit_players - multiple_fail_quit_players
+
+        level1_quit_breakdown_counts = pd.Series(
+            {
+                "Quit Mid-Level": len(level1_mid_quit_players),
+                "Quit After 1 Failure": len(single_fail_quit_players),
+                "Quit After Multiple Failures": len(multiple_fail_quit_players),
+            }
+        )
+        level1_quit_breakdown_percent = (level1_quit_breakdown_counts / len(level1_noncompleter_players)) * 100.0
+
+        plt.figure(figsize=(9, 5))
+        ax = level1_quit_breakdown_percent.plot(kind="bar", color=["#76b7b2", "#e15759", "#b07aa1"])
+        plt.title("How Level 1 Non-Completers Quit")
+        plt.xlabel("Level 1 Quit Group")
+        plt.ylabel("Percent of Level 1 Non-Completers")
+        plt.ylim(0, 100)
+        for idx, value in enumerate(level1_quit_breakdown_percent.values):
+            ax.text(idx, value + 1, f"{value:.1f}%", ha="center", va="bottom", fontsize=9)
+        plt.tight_layout()
+        plt.savefig(dropoff_dir / "level1_quit_breakdown_percent.png", dpi=120)
+        plt.close()
+
+        level1_quit_breakdown_percent.rename("percent_of_level1_noncompleters").to_csv(
+            dropoff_dir / "level1_quit_breakdown_percent.csv"
+        )
     
     # Helper to get players who completed level X but not level Y
     def get_dropoff_players(completed_level: int, not_completed_level: int) -> set[str]:
@@ -1013,7 +1363,19 @@ def analyze_level_dropoff_metrics(
     summary_lines = [
         f"Players who completed L1 but not L2: {len(l1_dropoff)}",
         f"Players who completed L2 but not L3: {len(l2_dropoff)}",
+        f"Players who quit before level 1: {len(before_l1_players)}",
+        f"Players who started level 1 but did not complete it: {len(started_l1_not_completed_players)}",
+        f"Players who completed level 1 and quit immediately: {len(completed_l1_quit_immediately_players)}",
+        f"Players who completed level 1 and attempted level 2: {len(completed_l1_attempted_l2_players)}",
     ]
+    if level1_noncompleter_players:
+        summary_lines.extend(
+            [
+                f"Level 1 non-completers who quit mid-level: {len(level1_mid_quit_players)}",
+                f"Level 1 non-completers who quit after 1 failure: {len(single_fail_quit_players)}",
+                f"Level 1 non-completers who quit after multiple failures: {len(multiple_fail_quit_players)}",
+            ]
+        )
     (dropoff_dir / "dropoff_summary.txt").write_text("\n".join(summary_lines), encoding="utf-8")
 
 def sort_attempts_for_sequence(attempts_df: pd.DataFrame) -> pd.DataFrame:
@@ -1162,6 +1524,18 @@ def main() -> None:
         summary.append(f"sessions: {len(sessions)}")
         if "player_id" in sessions.columns:
             summary.append(f"unique_players: {sessions['player_id'].nunique()}")
+        if "site_host" in sessions.columns:
+            host_counts = (
+                sessions["site_host"]
+                .astype(str)
+                .replace({"": pd.NA, "nan": pd.NA, "none": pd.NA, "null": pd.NA})
+                .dropna()
+                .value_counts()
+            )
+            if not host_counts.empty:
+                summary.append("site_hosts_by_session_count:")
+                for host, count in host_counts.items():
+                    summary.append(f"  {host}: {int(count)}")
     summary.append("retention_metric: attempts.time_seconds sum per player (strict gameplay-only)")
     attempts_with_player = add_player_id_to_attempts(attempts, sessions)
 
@@ -1371,7 +1745,16 @@ def main() -> None:
     if not player_retention_seconds.empty:
         save_hist_minutes(player_retention_seconds, args.outdir / "session_duration_hist.png", "Total Retention Time Per Unique Player (Inactivity-Excluded)")
         summary.append(f"unique_players_for_duration_hist: {int(player_retention_seconds.shape[0])}")
-        summary.append(f"avg_player_gameplay_minutes: {player_retention_seconds.mean() / 60.0:.2f}")
+        summary.append(f"avg_player_gameplay_minutes_zero_filled: {player_retention_seconds.mean() / 60.0:.2f}")
+        nonzero_player_retention_seconds = player_retention_seconds[player_retention_seconds > 0]
+        summary.append(f"avg_player_gameplay_minutes_nonzero_only: {(nonzero_player_retention_seconds.mean() / 60.0) if not nonzero_player_retention_seconds.empty else 0.0:.2f}")
+        summary.append(f"players_with_nonzero_gameplay_attempt_time: {int(nonzero_player_retention_seconds.shape[0])}")
+
+    if not sessions.empty and "total_playtime_seconds" in sessions.columns:
+        session_total_playtime_seconds = pd.to_numeric(sessions["total_playtime_seconds"], errors="coerce").dropna()
+        if not session_total_playtime_seconds.empty:
+            summary.append(f"avg_session_total_playtime_minutes: {session_total_playtime_seconds.mean() / 60.0:.2f}")
+            summary.append(f"sessions_with_total_playtime: {int(session_total_playtime_seconds.shape[0])}")
 
     # Standardized completion chart: player % with highest completed >= level.
     if not player_highest_completed.empty and max_completed_level >= 1:
@@ -2123,7 +2506,7 @@ def main() -> None:
     else:
         summary.append("sandbox_time_seconds_observed: n/a")
     # Add after the sandbox analysis and before the final summary write
-    analyze_level_dropoff_metrics(attempts_with_player, player_highest_completed, args.outdir)
+    analyze_level_dropoff_metrics(attempts_with_player, player_highest_completed, events, args.outdir)
     analyze_feature_usage(sessions, attempts_with_player, events, args.outdir, summary)
 
     (args.outdir / "summary.txt").write_text("\n".join(summary) + "\n", encoding="utf-8")

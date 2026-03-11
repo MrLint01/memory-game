@@ -1857,7 +1857,7 @@ async function getPlayerRankAndPercentile(stageId, stageVersion, playerTimeMs) {
     
     // Count total active players
     const totalSnapshot = await entriesRef
-      .where('active', '!=', false)
+      .where('active', '==', true)
       .get();
     const totalPlayers = totalSnapshot.size;
     
@@ -1865,7 +1865,7 @@ async function getPlayerRankAndPercentile(stageId, stageVersion, playerTimeMs) {
     
     // Count players faster than this player
     const fasterSnapshot = await entriesRef
-      .where('active', '!=', false)
+      .where('active', '==', true)
       .where('best_time_ms', '<', playerTimeMs)
       .get();
     const fasterCount = fasterSnapshot.size;

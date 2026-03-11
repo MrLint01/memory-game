@@ -3,6 +3,8 @@ Flash Recall Logging Analysis
 version_filter: 2026.03.0
 sessions: 69
 unique_players: 30
+site_hosts_by_session_count:
+  serve.gamejolt.net: 69
 retention_metric: attempts.time_seconds sum per player (strict gameplay-only)
 cumulative_players_points: 37
 cumulative_players_first_seen_utc: 2026-03-03T20:36:19.423000+00:00
@@ -117,7 +119,11 @@ retention_by_levels_completed_count_percent_player:
 retention_by_time_played_percent_player:
   max_minutes: 30
 unique_players_for_duration_hist: 37
-avg_player_gameplay_minutes: 3.71
+avg_player_gameplay_minutes_zero_filled: 3.71
+avg_player_gameplay_minutes_nonzero_only: 5.08
+players_with_nonzero_gameplay_attempt_time: 27
+avg_session_total_playtime_minutes: 7.20
+sessions_with_total_playtime: 69
 level_completion_rate_percent_player_completed:
   level_1: 64.86
   level_2: 48.65
