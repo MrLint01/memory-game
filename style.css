@@ -2994,11 +2994,11 @@ body[data-state="paused"] .hud-pause {
   position: relative;
   transform-style: preserve-3d;
 }
-.home-anim .mode-card {
+body[data-theme="prism-parade"][data-view="home"].home-anim .mode-card {
   animation: prismOutlineShiftRaised 14s linear infinite;
   animation-delay: calc(-1s * var(--prism-phase-14, 0));
 }
-.home-anim .mode-card.primary {
+body[data-theme="prism-parade"][data-view="home"].home-anim .mode-card.primary {
   animation: playPulsePrism 2.2s ease-in-out infinite, prismOutlineShiftRaised 14s linear infinite;
   animation-delay: 0ms, calc(-1s * var(--prism-phase-14, 0));
 }
