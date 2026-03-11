@@ -107,9 +107,9 @@
         ...(settingsDefaults.controls || {})
       };
       const defaultAudioSettings = {
-        master: 100,
-        music: 80,
-        effects: 80,
+        master: 50,
+        music: 100,
+        effects: 100,
         ...(settingsDefaults.audio || {})
       };
       let audioSettings = { ...defaultAudioSettings };
@@ -403,7 +403,6 @@
           }
         }
         emitAudioSettingsChanged();
-        updateAudioStatus();
         applyMusicVolume();
       }
 
@@ -414,43 +413,6 @@
           effects: audioSettings.effects / 100
         };
       };
-      function formatAudioMixValue(value) {
-        if (!Number.isFinite(value)) return "0%";
-        return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
-      }
-      function getAudioStatusMessage() {
-        const mix = typeof window.getAudioMix === "function" ? window.getAudioMix() : null;
-        const master = mix ? mix.master : 0;
-        const effects = mix ? mix.effects : 0;
-        const total = Math.max(0, Math.min(1, master)) * Math.max(0, Math.min(1, effects));
-        if (mix && total <= 0) {
-          return `Effects muted (Master ${formatAudioMixValue(master)}, Effects ${formatAudioMixValue(effects)})`;
-        }
-        const state =
-          typeof window.getCorrectSoundState === "function"
-            ? window.getCorrectSoundState()
-            : null;
-        if (state && !state.available) {
-          return "Audio unavailable in this browser.";
-        }
-        if (state && state.error) {
-          const message = state.error.message ? `: ${state.error.message}` : "";
-          return `Audio error${message}`;
-        }
-        const error = window.__lastAudioError;
-        if (error) {
-          const message = error.message ? `: ${error.message}` : "";
-          return `Last audio error${message}`;
-        }
-        if (mix) {
-          return `Audio ready (Master ${formatAudioMixValue(master)}, Effects ${formatAudioMixValue(effects)})`;
-        }
-        return "Audio status unavailable.";
-      }
-      function updateAudioStatus() {
-        if (!audioStatus) return;
-        audioStatus.textContent = getAudioStatusMessage();
-      }
       const menuMusic = createMusicAudio("audio/stage-background-music.mp3");
       const levelMusic = createMusicAudio("audio/regular-groovy-background.wav");
       let activeMusicMode = null;
@@ -3307,7 +3269,6 @@ function runFlashCountdown(onComplete) {
           refreshKeybindButtons();
           setKeybindStatus("");
           setSettingsTab("general");
-          updateAudioStatus();
           setModalState(settingsModal, true);
         });
       }
@@ -5431,17 +5392,13 @@ function runFlashCountdown(onComplete) {
           });
         });
       }
-      if (audioTestSfx) {
-        audioTestSfx.addEventListener("click", () => {
-          if (typeof window.playCorrectSound === "function") {
-            window.playCorrectSound();
-          }
-          updateAudioStatus();
-        });
-      }
-      window.addEventListener("audio-settings-changed", () => {
-        updateAudioStatus();
-      });
+        if (audioTestSfx) {
+          audioTestSfx.addEventListener("click", () => {
+            if (typeof window.playCorrectSound === "function") {
+              window.playCorrectSound();
+            }
+          });
+        }
 
       updateModeUI();
       updatePracticeLock();
