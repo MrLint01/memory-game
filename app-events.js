@@ -403,6 +403,8 @@
           }
         }
         emitAudioSettingsChanged();
+        updateAudioStatus();
+        applyMusicVolume();
       }
 
       window.getAudioMix = function getAudioMix() {
@@ -412,6 +414,148 @@
           effects: audioSettings.effects / 100
         };
       };
+      function formatAudioMixValue(value) {
+        if (!Number.isFinite(value)) return "0%";
+        return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
+      }
+      function getAudioStatusMessage() {
+        const mix = typeof window.getAudioMix === "function" ? window.getAudioMix() : null;
+        const master = mix ? mix.master : 0;
+        const effects = mix ? mix.effects : 0;
+        const total = Math.max(0, Math.min(1, master)) * Math.max(0, Math.min(1, effects));
+        if (mix && total <= 0) {
+          return `Effects muted (Master ${formatAudioMixValue(master)}, Effects ${formatAudioMixValue(effects)})`;
+        }
+        const state =
+          typeof window.getCorrectSoundState === "function"
+            ? window.getCorrectSoundState()
+            : null;
+        if (state && !state.available) {
+          return "Audio unavailable in this browser.";
+        }
+        if (state && state.error) {
+          const message = state.error.message ? `: ${state.error.message}` : "";
+          return `Audio error${message}`;
+        }
+        const error = window.__lastAudioError;
+        if (error) {
+          const message = error.message ? `: ${error.message}` : "";
+          return `Last audio error${message}`;
+        }
+        if (mix) {
+          return `Audio ready (Master ${formatAudioMixValue(master)}, Effects ${formatAudioMixValue(effects)})`;
+        }
+        return "Audio status unavailable.";
+      }
+      function updateAudioStatus() {
+        if (!audioStatus) return;
+        audioStatus.textContent = getAudioStatusMessage();
+      }
+      const menuMusic = createMusicAudio("audio/stage-background-music.mp3");
+      const levelMusic = createMusicAudio("audio/regular-groovy-background.wav");
+      let activeMusicMode = null;
+      let pendingMusicAudio = null;
+      let pendingMusicListenerAttached = false;
+
+      function createMusicAudio(src) {
+        if (typeof Audio === "undefined") return null;
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        audio.loop = true;
+        audio.addEventListener("error", () => {
+          window.__lastAudioError = audio.error || new Error(`Failed to load ${audio.src}`);
+        });
+        return audio;
+      }
+
+      function getMusicMixVolume() {
+        if (typeof window.getAudioMix === "function") {
+          const mix = window.getAudioMix() || {};
+          const master = Number.isFinite(mix.master) ? mix.master : 1;
+          const music = Number.isFinite(mix.music) ? mix.music : 1;
+          return Math.max(0, Math.min(1, master)) * Math.max(0, Math.min(1, music));
+        }
+        return 1;
+      }
+
+      function applyMusicVolume() {
+        const volume = getMusicMixVolume();
+        [menuMusic, levelMusic].forEach((audio) => {
+          if (!audio) return;
+          audio.volume = Math.max(0, Math.min(1, volume));
+          audio.muted = volume <= 0;
+          if (volume <= 0 && !audio.paused) {
+            audio.pause();
+          }
+        });
+        if (volume > 0 && activeMusicMode) {
+          setBackgroundMusicMode(activeMusicMode);
+        }
+      }
+
+      function stopMusic(audio) {
+        if (!audio) return;
+        audio.pause();
+        audio.currentTime = 0;
+      }
+
+      function queuePendingMusic(audio) {
+        if (pendingMusicListenerAttached) return;
+        pendingMusicListenerAttached = true;
+        pendingMusicAudio = audio;
+        const handler = () => {
+          pendingMusicListenerAttached = false;
+          const nextAudio = pendingMusicAudio;
+          pendingMusicAudio = null;
+          if (!nextAudio) return;
+          playMusic(nextAudio);
+        };
+        document.addEventListener("pointerdown", handler, { capture: true, once: true });
+        document.addEventListener("keydown", handler, { capture: true, once: true });
+      }
+
+      function playMusic(audio) {
+        if (!audio) return;
+        const volume = getMusicMixVolume();
+        if (volume <= 0) return;
+        audio.muted = false;
+        audio.volume = Math.max(0, Math.min(1, volume));
+        try {
+          const playResult = audio.play();
+          if (playResult && typeof playResult.catch === "function") {
+            playResult.catch((error) => {
+              window.__lastAudioError = error;
+              queuePendingMusic(audio);
+            });
+          }
+        } catch (error) {
+          window.__lastAudioError = error;
+          queuePendingMusic(audio);
+        }
+      }
+
+      function setBackgroundMusicMode(mode) {
+        if (mode === activeMusicMode) {
+          if (mode === "menu") playMusic(menuMusic);
+          if (mode === "level") playMusic(levelMusic);
+          return;
+        }
+        activeMusicMode = mode;
+        if (mode === "menu") {
+          stopMusic(levelMusic);
+          playMusic(menuMusic);
+          return;
+        }
+        if (mode === "level") {
+          stopMusic(menuMusic);
+          playMusic(levelMusic);
+          return;
+        }
+        stopMusic(menuMusic);
+        stopMusic(levelMusic);
+      }
+
+      window.setBackgroundMusicMode = setBackgroundMusicMode;
       let splashReturnToHome = false;
       let pendingSplashReveal = false;
       let resetLoadingActive = false;
@@ -1851,6 +1995,7 @@ function runFlashCountdown(onComplete) {
 
       function renderStageList(animate = false) {
         if (!stageList) return;
+        syncPrismParadeStageListPhase();
         if (!window.stageNewSeen) {
           window.stageNewSeen = {};
         }
@@ -2151,6 +2296,24 @@ function runFlashCountdown(onComplete) {
         }, 5000);
       }
 
+      function syncPrismParadePhase() {
+        if (!document.body) return;
+        const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+        const phase14 = now % 14;
+        const phase18 = now % 18;
+        document.body.style.setProperty("--prism-phase-14", phase14.toFixed(3));
+        document.body.style.setProperty("--prism-phase-18", phase18.toFixed(3));
+      }
+
+      function syncPrismParadeStageListPhase() {
+        if (!stageList) return;
+        const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+        const phase14 = now % 14;
+        const phase18 = now % 18;
+        stageList.style.setProperty("--prism-stage-phase-14", phase14.toFixed(3));
+        stageList.style.setProperty("--prism-stage-phase-18", phase18.toFixed(3));
+      }
+
       function openStagesScreen(animate = false) {
         clearResultAutoActionCountdown();
         if (stagesScreen) {
@@ -2165,7 +2328,9 @@ function runFlashCountdown(onComplete) {
           stagesScreen.removeAttribute("aria-hidden");
         }
         document.body.dataset.view = "stages";
+        syncPrismParadePhase();
         startStarShineLoop();
+        setBackgroundMusicMode("menu");
       }
 
       function closeStagesScreen(animateHome = true) {
@@ -2178,6 +2343,8 @@ function runFlashCountdown(onComplete) {
           stagesScreen.setAttribute("aria-hidden", "true");
         }
         document.body.dataset.view = "home";
+        syncPrismParadePhase();
+        setBackgroundMusicMode("menu");
         clearFirstLetterHint();
         clearFlashCountdown();
         if (animateHome) {
@@ -2207,6 +2374,7 @@ function runFlashCountdown(onComplete) {
           mainHeader.style.display = "none";
         }
         document.body.dataset.view = "splash";
+        setBackgroundMusicMode("menu");
         scheduleSplashAutoStart();
       }
 
@@ -2224,6 +2392,7 @@ function runFlashCountdown(onComplete) {
         if (document.body.dataset.view === "splash") {
           document.body.dataset.view = "home";
         }
+        setBackgroundMusicMode("menu");
       }
 
       function openSplashLoading(message = null) {
@@ -2268,6 +2437,7 @@ function runFlashCountdown(onComplete) {
       }
 
       function triggerHomeFadeIn() {
+        syncPrismParadePhase();
         document.body.classList.remove("home-anim");
         void document.body.offsetWidth;
         document.body.classList.add("home-anim");
@@ -2327,6 +2497,7 @@ function runFlashCountdown(onComplete) {
         updateModeUI();
         resetGame();
         closeStagesScreen(false);
+        setBackgroundMusicMode("level");
         if (deferStartRound) {
           setPhase("Get ready", "show");
           return;
@@ -3136,6 +3307,7 @@ function runFlashCountdown(onComplete) {
           refreshKeybindButtons();
           setKeybindStatus("");
           setSettingsTab("general");
+          updateAudioStatus();
           setModalState(settingsModal, true);
         });
       }
@@ -4753,6 +4925,7 @@ function runFlashCountdown(onComplete) {
           resetGame();
           setPhase("Waiting to start", "idle");
           document.body.dataset.view = "home";
+          setBackgroundMusicMode("menu");
           document.body.classList.remove("home-anim");
           void document.body.offsetWidth;
           document.body.classList.add("home-anim");
@@ -4789,6 +4962,7 @@ function runFlashCountdown(onComplete) {
           modeSelect.value = "practice";
           updateModeUI();
           document.body.dataset.view = "home";
+          setBackgroundMusicMode("menu");
           document.body.classList.remove("home-anim");
           void document.body.offsetWidth;
           document.body.classList.add("home-anim");
@@ -5246,6 +5420,28 @@ function runFlashCountdown(onComplete) {
         audioMusicVolume.addEventListener("input", syncAudioSettings);
         audioEffectsVolume.addEventListener("input", syncAudioSettings);
       }
+      if (audioResetDefaults) {
+        audioResetDefaults.addEventListener("click", () => {
+          applyAudioSettings(defaultAudioSettings, true);
+          logSettingChange("audio_defaults_reset", true, {
+            setting_category: "audio"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "audio_defaults_reset"
+          });
+        });
+      }
+      if (audioTestSfx) {
+        audioTestSfx.addEventListener("click", () => {
+          if (typeof window.playCorrectSound === "function") {
+            window.playCorrectSound();
+          }
+          updateAudioStatus();
+        });
+      }
+      window.addEventListener("audio-settings-changed", () => {
+        updateAudioStatus();
+      });
 
       updateModeUI();
       updatePracticeLock();
