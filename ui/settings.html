@@ -12,7 +12,10 @@
       <div class="settings-pane is-active" data-settings-pane="general">
         <div class="control-group" id="playerNameSettingRow">
           <label for="playerNameSetting">Player name</label>
-          <input id="playerNameSetting" type="text" maxlength="16" autocomplete="nickname" />
+          <div class="player-name-field-row">
+            <input id="playerNameSetting" type="text" maxlength="16" autocomplete="nickname" />
+            <button id="playerNameRandomizeSetting" class="secondary player-name-randomize" type="button">Randomize</button>
+          </div>
         </div>
         <div class="control-group control-group--keybinds">
           <label>Accessibility</label>

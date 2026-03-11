@@ -947,6 +947,8 @@ h1 {
   flex-direction: column;
   gap: 1rem;
   animation: splashFadeIn 520ms ease-out both;
+  position: relative;
+  overflow: visible;
 }
 .splash-title {
   font-size: clamp(2.8rem, 7vw, 4.6rem);
@@ -956,6 +958,60 @@ h1 {
   position: relative;
   text-shadow: 3px 3px 0 var(--border);
   display: inline-block;
+}
+.splash-title,
+.splash-message,
+.splash-autostart {
+  position: relative;
+  z-index: 2;
+}
+.splash-turbo-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  pointer-events: none;
+}
+button.splash-turbo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  pointer-events: auto;
+  border: none !important;
+  background: transparent !important;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  cursor: pointer;
+  opacity: 0;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: opacity 320ms ease-out, transform 520ms cubic-bezier(0.2, 0.9, 0.22, 1);
+  overflow: visible;
+  transform-origin: top left;
+  contain: layout paint;
+  backface-visibility: hidden;
+  touch-action: manipulation;
+}
+button.splash-turbo[hidden] {
+  display: none;
+}
+button.splash-turbo:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 72%, white 28%);
+  outline-offset: 6px;
+}
+.splash-turbo__img {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  transform-origin: center center;
+  backface-visibility: hidden;
 }
 .splash-title::before,
 .splash-title::after {
@@ -2344,7 +2400,7 @@ body.pause-active .card * {
         display: grid;
         gap: 0.7rem;
         width: min(320px, calc(100vw - 2rem));
-        z-index: 30;
+        z-index: 1600;
         pointer-events: none;
       }
       .achievement-toast {
@@ -4106,6 +4162,18 @@ body.pause-active .interrupt-close {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.leaderboard-row--rank-1 .leaderboard-name {
+  color: #c08a00;
+  font-weight: 800;
+}
+.leaderboard-row--rank-2 .leaderboard-name {
+  color: #7c8798;
+  font-weight: 800;
+}
+.leaderboard-row--rank-3 .leaderboard-name {
+  color: #9a5f2f;
+  font-weight: 800;
+}
 .leaderboard-row > span:last-child {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -5034,6 +5102,19 @@ body.stage-fail .rotation-icon {
 }
 .player-name-note {
   margin-bottom: 0.85rem;
+}
+.player-name-input--preview {
+  color: var(--muted) !important;
+}
+.player-name-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+.player-name-randomize {
+  min-width: 108px;
+  white-space: nowrap;
 }
 .stat-row {
   display: flex;
