@@ -761,6 +761,13 @@
         return normalized;
       }
 
+      function commitPlayerNameFromSettingsInput() {
+        if (!playerNameSetting) return "";
+        return commitPlayerName(
+          isPlayerNamePreviewActive(playerNameSetting) ? "" : playerNameSetting.value
+        );
+      }
+
       function showContentResetNoticeIfNeeded() {
         if (typeof window.consumeContentResetNotice !== "function") return;
         const notice = window.consumeContentResetNotice();
@@ -1197,10 +1204,13 @@
         }
       }
 
-      function appendLeaderboardDataRow(rows, entry, rank, localName, formatter) {
+      function appendLeaderboardDataRow(rows, entry, rank, localName, formatter, rowClassNames = []) {
         if (!entry) return;
         const row = document.createElement("div");
         row.className = "leaderboard-row leaderboard-row--data";
+        rowClassNames.forEach((className) => {
+          if (className) row.classList.add(className);
+        });
         if (rank <= 3) {
           row.classList.add(`leaderboard-row--rank-${rank}`);
         }
@@ -3496,12 +3506,13 @@ function runFlashCountdown(onComplete) {
         }
         listEl.dataset.lbRetryCount = "0";
         try {
-          const result = await window.fetchStageLeaderboard(stageId, stageVersion, 4, comparisonTimeMs);
+          const result = await window.fetchStageLeaderboard(stageId, stageVersion, 5, comparisonTimeMs);
           const top = result && Array.isArray(result.top) ? result.top : [];
           const context = result && Array.isArray(result.context) ? result.context : [];
           const me = result ? result.me : null;
           const fetchedMeRank = result ? result.meRank : null;
-          const rows = [];
+          const topRows = [];
+          const contextRows = [];
           const localName = getPreferredPlayerDisplayName();
           let meEntry = null;
           let meRank = Number.isFinite(fetchedMeRank) ? fetchedMeRank : null;
@@ -3512,7 +3523,7 @@ function runFlashCountdown(onComplete) {
             }
             const time = Number(entry.best_time_ms);
             const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "\u2014";
-            appendLeaderboardDataRow(rows, entry, idx + 1, localName, (rank, rawName) => {
+            appendLeaderboardDataRow(topRows, entry, idx + 1, localName, (rank, rawName) => {
               const name = truncateLeaderboardName(rawName);
               return `<span>${rank}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
             });
@@ -3522,28 +3533,36 @@ function runFlashCountdown(onComplete) {
               const rank = Number(entry && entry.rank) || 0;
               const time = Number(entry && entry.best_time_ms);
               const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "\u2014";
-              appendLeaderboardDataRow(rows, entry, rank, localName, (resolvedRank, rawName) => {
+              appendLeaderboardDataRow(contextRows, entry, rank, localName, (resolvedRank, rawName) => {
                 const name = truncateLeaderboardName(rawName);
                 return `<span>${resolvedRank}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
-              });
+              }, ["leaderboard-row--context"]);
             });
           } else if (meEntry || me) {
             const source = meEntry || me;
             const time = Number(source.best_time_ms);
             const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "\u2014";
             const rankText = meRank ? String(meRank) : "\u2014";
-            appendLeaderboardDataRow(rows, source, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
+            appendLeaderboardDataRow(contextRows, source, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
               const name = truncateLeaderboardName(rawName);
               return `<span>${resolvedRank || rankText}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
-            });
+            }, ["leaderboard-row--context"]);
           } else {
             const row = document.createElement("div");
-            row.className = "leaderboard-row leaderboard-row--me";
+            row.className = "leaderboard-row leaderboard-row--me leaderboard-row--context";
             row.dataset.playerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
             const name = localName || "You";
             row.innerHTML = `<span>-</span><span class="leaderboard-name">${name}</span><span>-</span>`;
-            rows.push(row);
+            contextRows.push(row);
           }
+          const rows = topRows.slice();
+          if (topRows.length && contextRows.length) {
+            const dividerRow = document.createElement("div");
+            dividerRow.className = "leaderboard-divider";
+            dividerRow.setAttribute("aria-hidden", "true");
+            rows.push(dividerRow);
+          }
+          rows.push(...contextRows);
           if (rows.length) {
             listEl.replaceChildren(headerRow, ...rows);
           } else {
@@ -4068,6 +4087,7 @@ function runFlashCountdown(onComplete) {
           activeRebindAction = null;
           refreshKeybindButtons();
           setKeybindStatus("");
+          commitPlayerNameFromSettingsInput();
           setModalState(settingsModal, false);
         });
       }
@@ -4094,6 +4114,7 @@ function runFlashCountdown(onComplete) {
             activeRebindAction = null;
             refreshKeybindButtons();
             setKeybindStatus("");
+            commitPlayerNameFromSettingsInput();
             setModalState(settingsModal, false);
           }
         });
@@ -4169,9 +4190,6 @@ function runFlashCountdown(onComplete) {
       }
       if (playerNameSetting) {
         updatePlayerNameInputs(getPlayerName());
-        const applyPlayerNameFromSettings = () => {
-          commitPlayerName(isPlayerNamePreviewActive(playerNameSetting) ? "" : playerNameSetting.value);
-        };
         playerNameSetting.addEventListener("pointerdown", (event) => {
           if (!isPlayerNamePreviewActive(playerNameSetting)) return;
           event.preventDefault();
@@ -4184,10 +4202,7 @@ function runFlashCountdown(onComplete) {
           }
         });
         playerNameSetting.addEventListener("blur", () => {
-          applyPlayerNameFromSettings();
-        });
-        playerNameSetting.addEventListener("change", () => {
-          applyPlayerNameFromSettings();
+          restorePlayerNamePreviewState(playerNameSetting);
         });
         playerNameSetting.addEventListener("keydown", (event) => {
           if (isPlayerNamePreviewActive(playerNameSetting) && shouldTreatAsNameEntryKey(event)) {
@@ -4205,7 +4220,6 @@ function runFlashCountdown(onComplete) {
         playerNameRandomizeSetting.addEventListener("click", () => {
           const randomName = applyRandomizedPlayerNameToInput(playerNameSetting);
           if (!randomName || !playerNameSetting) return;
-          commitPlayerName(randomName);
           playerNameSetting.focus();
           playerNameSetting.select();
         });
@@ -4252,6 +4266,7 @@ function runFlashCountdown(onComplete) {
           document.body.dataset.view = "loading";
           resetLoadingActive = true;
           if (settingsModal) {
+            commitPlayerNameFromSettingsInput();
             setModalState(settingsModal, false);
           }
           openSplashLoading("Resetting...");
@@ -4433,9 +4448,6 @@ function runFlashCountdown(onComplete) {
       if (settingsClose) {
         settingsClose.addEventListener("click", () => {
           hideResetConfirmRow();
-          if (playerNameSetting) {
-            commitPlayerName(isPlayerNamePreviewActive(playerNameSetting) ? "" : playerNameSetting.value);
-          }
         });
       }
       document.addEventListener("click", (event) => {
@@ -4502,7 +4514,7 @@ function runFlashCountdown(onComplete) {
           let result = null;
           let attempts = 0;
           do {
-            result = await window.fetchProgressLeaderboard(metric, 4, { refreshIfStale: true });
+            result = await window.fetchProgressLeaderboard(metric, 5, { refreshIfStale: true });
             if (result && result.errorCode !== "not_ready") break;
             attempts += 1;
             if (attempts <= 5) {
@@ -4514,14 +4526,15 @@ function runFlashCountdown(onComplete) {
           const me = result ? result.me : null;
           const meRank = result && Number.isFinite(result.meRank) ? result.meRank : null;
           const localName = getPreferredPlayerDisplayName();
-          const rows = [];
+          const topRows = [];
+          const contextRows = [];
           const mePlayerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
           let meInTop = false;
           top.forEach((entry, idx) => {
             const value = Number(entry[metric]) || 0;
             const isMe = entry.player_id && mePlayerId && entry.player_id === mePlayerId;
             if (isMe) meInTop = true;
-            appendLeaderboardDataRow(rows, entry, idx + 1, localName, (rank, rawName) => {
+            appendLeaderboardDataRow(topRows, entry, idx + 1, localName, (rank, rawName) => {
               return `<span>${rank}</span><span class="leaderboard-name" title="${rawName}">${rawName}</span><span>${value}</span>`;
             });
           });
@@ -4530,25 +4543,33 @@ function runFlashCountdown(onComplete) {
               const rank = Number(entry && entry.rank) || 0;
               const value = Number(entry && entry[metric]);
               const safeValue = Number.isFinite(value) ? value : localValue;
-              appendLeaderboardDataRow(rows, entry, rank, localName, (resolvedRank, rawName) => {
+              appendLeaderboardDataRow(contextRows, entry, rank, localName, (resolvedRank, rawName) => {
                 return `<span>${resolvedRank}</span><span class="leaderboard-name" title="${rawName}">${rawName}</span><span>${safeValue}</span>`;
-              });
+              }, ["leaderboard-row--context"]);
             });
           } else if (me && !meInTop) {
             const value = Number(me[metric]);
             const safeValue = Number.isFinite(value) ? value : localValue;
             const rankText = meRank ? String(meRank) : "\u2014";
-            appendLeaderboardDataRow(rows, me, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
+            appendLeaderboardDataRow(contextRows, me, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
               return `<span>${resolvedRank || rankText}</span><span class="leaderboard-name" title="${rawName}">${rawName}</span><span>${safeValue}</span>`;
-            });
+            }, ["leaderboard-row--context"]);
           } else if (!me) {
             const meRow = document.createElement("div");
-            meRow.className = "leaderboard-row leaderboard-row--me";
+            meRow.className = "leaderboard-row leaderboard-row--me leaderboard-row--context";
             meRow.dataset.playerId = mePlayerId;
             const name = localName || "You";
             meRow.innerHTML = `<span>-</span><span class="leaderboard-name">${name}</span><span>${localValue}</span>`;
-            rows.push(meRow);
+            contextRows.push(meRow);
           }
+          const rows = topRows.slice();
+          if (topRows.length && contextRows.length) {
+            const dividerRow = document.createElement("div");
+            dividerRow.className = "leaderboard-divider";
+            dividerRow.setAttribute("aria-hidden", "true");
+            rows.push(dividerRow);
+          }
+          rows.push(...contextRows);
           listEl.replaceChildren(headerRow, ...rows);
           if (result && result.errorCode) {
             const statusRow = document.createElement("div");
