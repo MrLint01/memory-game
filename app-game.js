@@ -41,6 +41,150 @@
         }
       }
 
+      const effectAudioClips = {
+        correct: createEffectAudio("audio/correct.wav"),
+        wrong: createEffectAudio("audio/wrong.wav")
+      };
+      let effectsAudioUnlocked = false;
+      let pendingEffectAudio = null;
+      let pendingEffectAudioListenerAttached = false;
+
+      function createEffectAudio(src) {
+        if (typeof Audio === "undefined") return null;
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        audio.addEventListener("error", () => {
+          window.__lastAudioError = audio.error || new Error(`Failed to load ${audio.src}`);
+        });
+        return audio;
+      }
+
+      function getEffectMixVolume() {
+        if (typeof window.getAudioMix === "function") {
+          const mix = window.getAudioMix() || {};
+          const master = Number.isFinite(mix.master) ? mix.master : 1;
+          const effects = Number.isFinite(mix.effects) ? mix.effects : 1;
+          return Math.max(0, Math.min(1, master)) * Math.max(0, Math.min(1, effects));
+        }
+        return 1;
+      }
+
+      function unlockEffectAudio() {
+        if (effectsAudioUnlocked) return;
+        effectsAudioUnlocked = true;
+        Object.values(effectAudioClips).forEach((audio) => {
+          if (!audio) return;
+          try {
+            audio.muted = true;
+            audio.volume = 0;
+            const playResult = audio.play();
+            if (playResult && typeof playResult.then === "function") {
+              playResult
+                .then(() => {
+                  audio.pause();
+                  audio.currentTime = 0;
+                  audio.muted = false;
+                })
+                .catch(() => {
+                  audio.muted = false;
+                });
+            } else {
+              audio.pause();
+              audio.currentTime = 0;
+              audio.muted = false;
+            }
+          } catch (error) {
+            audio.muted = false;
+          }
+        });
+      }
+
+      function playEffectAudio(audio) {
+        if (!audio) return;
+        const volume = getEffectMixVolume();
+        if (volume <= 0) return;
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+          audio.volume = volume;
+          const playResult = audio.play();
+          if (playResult && typeof playResult.catch === "function") {
+            playResult.catch((error) => {
+              window.__lastAudioError = error;
+              pendingEffectAudio = audio;
+              queuePendingEffectAudio();
+            });
+          }
+        } catch (error) {
+          window.__lastAudioError = error;
+          pendingEffectAudio = audio;
+          queuePendingEffectAudio();
+        }
+      }
+
+      function playRoundCorrectSound() {
+        playEffectAudio(effectAudioClips.correct);
+      }
+      function playRoundWrongSound() {
+        playEffectAudio(effectAudioClips.wrong);
+      }
+
+      function getEffectAudioState(audio) {
+        if (!audio) {
+          return {
+            available: false
+          };
+        }
+        return {
+          available: true,
+          src: audio.currentSrc || audio.src,
+          readyState: audio.readyState,
+          networkState: audio.networkState,
+          paused: audio.paused,
+          muted: audio.muted,
+          volume: audio.volume,
+          error: audio.error
+            ? { code: audio.error.code, message: audio.error.message || null }
+            : null
+        };
+      }
+
+      window.playCorrectSound = playRoundCorrectSound;
+      window.getCorrectSoundState = () => getEffectAudioState(effectAudioClips.correct);
+      window.playWrongSound = playRoundWrongSound;
+      window.getWrongSoundState = () => getEffectAudioState(effectAudioClips.wrong);
+
+      function queuePendingEffectAudio() {
+        if (pendingEffectAudioListenerAttached) return;
+        pendingEffectAudioListenerAttached = true;
+        const handler = () => {
+          pendingEffectAudioListenerAttached = false;
+          const audio = pendingEffectAudio;
+          pendingEffectAudio = null;
+          if (!audio) return;
+          try {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+            audio.volume = getEffectMixVolume();
+            const playResult = audio.play();
+            if (playResult && typeof playResult.catch === "function") {
+              playResult.catch((error) => {
+                window.__lastAudioError = error;
+              });
+            }
+          } catch (error) {
+            window.__lastAudioError = error;
+          }
+        };
+        document.addEventListener("pointerdown", handler, { capture: true, once: true });
+        document.addEventListener("keydown", handler, { capture: true, once: true });
+      }
+
+      document.addEventListener("pointerdown", unlockEffectAudio, { capture: true, once: true });
+      document.addEventListener("keydown", unlockEffectAudio, { capture: true, once: true });
+
       function setModalState(modal, open) {
         if (!modal) return;
         if (open) {
@@ -377,11 +521,16 @@
                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(${menuKey})</span>
                </button>
-               <button id="stageRetryButton" class="secondary icon-button button-entice" type="button" aria-label="Retry (${retryKey})">
-                 <img class="action-icon" src="imgs/retry_button.png" alt="" />
-                 <span class="action-countdown" aria-live="polite"></span>
-                 <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
-               </button>`
+               <div class="stage-retry-wrap">
+                 <div class="stage-retry-timer" aria-hidden="true">
+                   <span class="stage-retry-timer__fill"></span>
+                 </div>
+                 <button id="stageRetryButton" class="secondary icon-button button-entice" type="button" aria-label="Retry (${retryKey})">
+                   <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                   <span class="action-countdown" aria-live="polite"></span>
+                   <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
+                 </button>
+               </div>`
             : `<button id="practiceSettingsButton" class="secondary icon-button" type="button" aria-label="Sandbox settings">
                  <img class="action-icon" src="imgs/settings_button.png" alt="" />
                  <span class="action-key-hint" aria-hidden="true">(${practiceSettingsKey})</span>
@@ -407,6 +556,67 @@
           </div>
         `;
         resultsPanel.classList.add("show");
+
+        if (mode === "stages") {
+          const autoRetryDelayMs = 4500;
+          if (autoRetryTimerId) {
+            clearTimeout(autoRetryTimerId);
+            autoRetryTimerId = null;
+          }
+          const retryTimer = document.querySelector(".stage-retry-timer");
+          const retryTimerFill = retryTimer
+            ? retryTimer.querySelector(".stage-retry-timer__fill")
+            : null;
+          const startAutoRetry = () => {
+            const autoRetryEnabledNow = typeof autoRetryEnabled === "undefined"
+              ? true
+              : autoRetryEnabled;
+            if (!autoRetryEnabledNow) {
+              if (retryTimer) {
+                retryTimer.classList.add("is-disabled");
+              }
+              return;
+            }
+            if (retryTimer) {
+              retryTimer.classList.remove("is-running", "is-canceled", "is-disabled", "is-waiting");
+            }
+            if (retryTimerFill) {
+              retryTimerFill.style.removeProperty("transition");
+              retryTimerFill.style.removeProperty("transition-duration");
+              retryTimerFill.style.removeProperty("transform");
+              retryTimerFill.style.transitionDuration = `${autoRetryDelayMs}ms`;
+            }
+            requestAnimationFrame(() => {
+              if (retryTimer) {
+                retryTimer.classList.add("is-running");
+              }
+            });
+            autoRetryTimerId = window.setTimeout(() => {
+              autoRetryTimerId = null;
+              const retryBtn = document.getElementById("stageRetryButton");
+              if (retryBtn) {
+                retryBtn.click();
+              }
+            }, autoRetryDelayMs);
+          };
+          const cancelAutoRetryFromResults = () => {
+            if (autoRetryTimerId) {
+              clearTimeout(autoRetryTimerId);
+              autoRetryTimerId = null;
+            }
+            if (retryTimer) {
+              retryTimer.classList.remove("is-running", "is-waiting");
+              retryTimer.classList.add("is-canceled");
+            }
+            if (retryTimerFill) {
+              retryTimerFill.style.transition = "none";
+              retryTimerFill.style.transform = "scaleX(0)";
+              void retryTimerFill.offsetWidth;
+            }
+          };
+          window.cancelAutoRetryFromResults = cancelAutoRetryFromResults;
+          startAutoRetry();
+        }
       }
 
       function getStageStars(elapsedSeconds, stage) {
@@ -1185,6 +1395,7 @@
         window.__lastAllCorrect = allCorrect;
         updatePlatformerVisibility(false);
         if (allCorrect) {
+          playRoundCorrectSound();
           const flowToken = roundFlowToken;
           await playSuccessAnimation();
           if (flowToken !== roundFlowToken) {
@@ -1196,6 +1407,9 @@
             if (round >= stageRounds) {
               stageState.completed = true;
               stageState.failed = false;
+              if (stage && stage.id === 1) {
+                markStage1RecallLockSeen();
+              }
               const elapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
                 ? stageState.elapsedSeconds
                 : (performance.now() - (stageState.startTime || performance.now())) / 1000;
@@ -1283,7 +1497,9 @@
           startRound();
           return;
         }
+        playRoundWrongSound();
         if (gameMode === "stages") {
+          const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           lockInputs(true);
           const swapOrder = swapMap ? swapMap.slice() : null;
           swapActive = false;
@@ -1310,6 +1526,9 @@
           stageState.failed = true;
           stageState.completed = false;
           stageState.active = false;
+          if (stage && stage.id === 1) {
+            markStage1RecallLockSeen();
+          }
           stopStageStopwatch();
           streak = 0;
           // Analytics: Track level failure
@@ -1416,6 +1635,7 @@
         stopGlitching();
         if (platformerState.required && !platformerState.completed) {
           platformerState.failed = true;
+          playRoundWrongSound();
           lockInputs(true);
           renderCards(true);
           if (submitBtn) {
@@ -1430,6 +1650,7 @@
             }
           }
           if (gameMode === "stages") {
+            const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
             const entries = roundItems.map((item) => ({
               expected: buildExpectedLabel(item),
               actual: "",
@@ -1438,6 +1659,9 @@
             stageState.failed = true;
             stageState.completed = false;
             stageState.active = false;
+            if (stage && stage.id === 1) {
+              markStage1RecallLockSeen();
+            }
             streak = 0;
             stopStageStopwatch();
             const failedElapsedSeconds = Number.isFinite(stageState.elapsedSeconds)
@@ -1493,8 +1717,28 @@
         }
         const startRecall = () => {
           lockInputs(false);
-          if (submitBtn) {
-            submitBtn.disabled = false;
+          const recallSubmitDelayMs = 150;
+          const isStage1 =
+            gameMode === "stages" &&
+            typeof window.getStageConfig === "function" &&
+            (window.getStageConfig(stageState.index) || {}).id === 1;
+          const recallLockSeen = hasStage1RecallLockSeen();
+          const shouldApplySubmitLock = isStage1 && !recallLockSeen;
+          if (shouldApplySubmitLock) {
+            recallSubmitLockUntil = performance.now() + recallSubmitDelayMs;
+            if (submitBtn) {
+              submitBtn.disabled = true;
+              setTimeout(() => {
+                if (phase === "recall" && submitBtn) {
+                  submitBtn.disabled = false;
+                }
+              }, recallSubmitDelayMs);
+            }
+          } else {
+            recallSubmitLockUntil = 0;
+            if (submitBtn) {
+              submitBtn.disabled = false;
+            }
           }
           setPhase("Type what you saw", "recall");
           focusFirstInput();
@@ -1539,6 +1783,30 @@
         swapStartRecall = null;
         swapCleanup = null;
         startRecall();
+      }
+
+      const STAGE1_RECALL_LOCK_KEY = "flashRecallStage1RecallLockUsed";
+      function hasStage1RecallLockSeen() {
+        try {
+          if (window.localStorage.getItem(STAGE1_RECALL_LOCK_KEY) === "1") {
+            stage1RecallSubmitLockUsed = true;
+            return true;
+          }
+        } catch {
+          // ignore storage errors
+        }
+        stage1RecallSubmitLockUsed = false;
+        return false;
+      }
+
+      function markStage1RecallLockSeen() {
+        if (stage1RecallSubmitLockUsed) return;
+        stage1RecallSubmitLockUsed = true;
+        try {
+          window.localStorage.setItem(STAGE1_RECALL_LOCK_KEY, "1");
+        } catch {
+          // ignore storage errors
+        }
       }
 
       function isSequenceStage() {

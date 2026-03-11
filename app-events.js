@@ -580,6 +580,7 @@
           success_animation_enabled: Boolean(successAnimationEnabled),
           flash_countdown_enabled: Boolean(flashCountdownEnabled),
           auto_advance_next_enabled: Boolean(autoAdvanceNextEnabled),
+          auto_retry_enabled: Boolean(autoRetryEnabled),
           auto_start_stage_preview_enabled: Boolean(stageIntroAutoStartEnabled),
           enter_to_next_enabled: Boolean(enterToNextEnabled),
           flash_warning_enabled: Boolean(flashWarningEnabled),
@@ -1544,6 +1545,22 @@ function runFlashCountdown(onComplete) {
       function cancelStageNextAutoAdvanceBar() {
         const timer = document.querySelector("#resultsPanel .stage-next-timer");
         const fill = timer ? timer.querySelector(".stage-next-timer__fill") : null;
+        if (timer) {
+          timer.classList.remove("is-running");
+          timer.classList.remove("is-waiting");
+          timer.classList.add("is-canceled");
+          timer.classList.add("is-disabled");
+        }
+        if (fill) {
+          fill.style.transition = "none";
+          fill.style.transform = "scaleX(0)";
+          void fill.offsetWidth;
+        }
+      }
+
+      function cancelStageRetryAutoAdvanceBar() {
+        const timer = document.querySelector(".stage-retry-timer");
+        const fill = timer ? timer.querySelector(".stage-retry-timer__fill") : null;
         if (timer) {
           timer.classList.remove("is-running");
           timer.classList.remove("is-waiting");
@@ -3026,13 +3043,6 @@ function runFlashCountdown(onComplete) {
                 tabTutorialShownRound = round;
                 tabTutorialActive = true;
                 tabTutorialDisabledInputs = [];
-                inputGrid.querySelectorAll('input[data-index]').forEach((field) => {
-                  const idx = Number(field.dataset.index);
-                  if (Number.isFinite(idx) && idx > 0 && !field.disabled) {
-                    field.disabled = true;
-                    tabTutorialDisabledInputs.push(field);
-                  }
-                });
               }
             }
           }
@@ -3058,9 +3068,8 @@ function runFlashCountdown(onComplete) {
           if (!targetInput) return;
           const idx = Number(targetInput.dataset.index);
           if (Number.isFinite(idx) && idx > 0) {
-            event.preventDefault();
-            const firstInput = inputGrid.querySelector('input[data-index="0"]');
-            if (firstInput) firstInput.focus();
+            showTabKeyHint();
+            tabTutorialActive = false;
           }
         });
         inputGrid.addEventListener("focusin", (event) => {
@@ -3069,8 +3078,8 @@ function runFlashCountdown(onComplete) {
           if (!targetInput) return;
           const idx = Number(targetInput.dataset.index);
           if (Number.isFinite(idx) && idx > 0) {
-            const firstInput = inputGrid.querySelector('input[data-index="0"]');
-            if (firstInput) firstInput.focus();
+            showTabKeyHint();
+            tabTutorialActive = false;
           }
         });
       }
@@ -3185,8 +3194,15 @@ function runFlashCountdown(onComplete) {
           }
         });
         playerNameInput.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" && playerNameSave && !playerNameSave.disabled) {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          if (playerNameSave && !playerNameSave.disabled) {
             playerNameSave.click();
+          } else if (playerNameSkip) {
+            playerNameSkip.click();
+          } else {
+            markPlayerNamePrompted();
+            closePlayerNameModal();
           }
         });
       }
@@ -3333,7 +3349,9 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallSuccessAnimation");
           window.localStorage.removeItem("flashRecallFlashCountdown");
           window.localStorage.removeItem("flashRecallAutoAdvanceNext");
+          window.localStorage.removeItem("flashRecallAutoRetry");
           window.localStorage.removeItem("flashRecallEnterToNext");
+          window.localStorage.removeItem("flashRecallStage1RecallLockUsed");
           window.localStorage.removeItem(LEADERBOARDS_ENABLED_STORAGE_KEY);
           window.localStorage.removeItem(ADAPTIVE_PROFILE_KEY);
           window.localStorage.removeItem(AUDIO_MASTER_KEY);
@@ -3377,6 +3395,15 @@ function runFlashCountdown(onComplete) {
               clearTimeout(autoAdvanceNextTimerId);
               autoAdvanceNextTimerId = null;
               cancelStageNextAutoAdvanceBar();
+            }
+          }
+          if (autoRetryToggle) {
+            autoRetryToggle.checked = Boolean(defaultControlSettings.autoRetry);
+            autoRetryEnabled = autoRetryToggle.checked;
+            if (!autoRetryEnabled && autoRetryTimerId) {
+              clearTimeout(autoRetryTimerId);
+              autoRetryTimerId = null;
+              cancelStageRetryAutoAdvanceBar();
             }
           }
           if (autoStartStagePreviewToggle) {
@@ -4657,6 +4684,13 @@ function runFlashCountdown(onComplete) {
           autoAdvanceNextTimerId = null;
           cancelStageNextAutoAdvanceBar();
         }
+        if (autoRetryTimerId) {
+          clearTimeout(autoRetryTimerId);
+          autoRetryTimerId = null;
+        }
+        if (typeof window.cancelAutoRetryFromResults === "function") {
+          window.cancelAutoRetryFromResults();
+        }
         const menuButton = event.target.closest("#stageMenuButton, #stageBackButton");
         if (menuButton) {
           logUiInteraction("stage_menu", {
@@ -4843,9 +4877,16 @@ function runFlashCountdown(onComplete) {
             closePlayerNameModal();
             return;
           }
-          if (event.key === "Enter" && playerNameSave && !playerNameSave.disabled) {
+          if (event.key === "Enter") {
             event.preventDefault();
-            playerNameSave.click();
+            if (playerNameSave && !playerNameSave.disabled) {
+              playerNameSave.click();
+            } else if (playerNameSkip) {
+              playerNameSkip.click();
+            } else {
+              markPlayerNamePrompted();
+              closePlayerNameModal();
+            }
             return;
           }
           return;
@@ -5020,6 +5061,10 @@ function runFlashCountdown(onComplete) {
           event.preventDefault();
           return;
         }
+        if (event.key === "Enter" && phase === "recall" && performance.now() < recallSubmitLockUntil) {
+          event.preventDefault();
+          return;
+        }
         if (event.key !== "Enter") return;
         if (phase === "recall" && (swapTimeoutId || swapStartRecall)) {
           event.preventDefault();
@@ -5131,7 +5176,15 @@ function runFlashCountdown(onComplete) {
 
       document.addEventListener("pointerdown", (event) => {
         if (!tabTutorialActive) return;
-        showTabKeyHint();
+        const targetInput = event.target && event.target.closest
+          ? event.target.closest("input[data-index]")
+          : null;
+        if (!targetInput) return;
+        const idx = Number(targetInput.dataset.index);
+        if (Number.isFinite(idx) && idx > 0) {
+          showTabKeyHint();
+          tabTutorialActive = false;
+        }
       }, { capture: true });
 
       loadKeybinds();
@@ -5299,6 +5352,38 @@ function runFlashCountdown(onComplete) {
       } else {
         autoAdvanceNextEnabled = Boolean(defaultControlSettings.autoAdvanceNext);
       }
+      if (autoRetryToggle) {
+        const storageKey = "flashRecallAutoRetry";
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          autoRetryToggle.checked = saved === "1";
+        } else {
+          autoRetryToggle.checked = Boolean(defaultControlSettings.autoRetry);
+        }
+        autoRetryEnabled = autoRetryToggle.checked;
+        autoRetryToggle.addEventListener("change", () => {
+          autoRetryEnabled = autoRetryToggle.checked;
+          window.localStorage.setItem(storageKey, autoRetryEnabled ? "1" : "0");
+          logSettingChange("auto_retry_enabled", autoRetryEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "auto_retry_enabled"
+          });
+          if (!autoRetryEnabled && autoRetryTimerId) {
+            logAutoplayEvent("result_auto_retry_cancelled", {
+              autoplay_mode: "manual",
+              cancel_source: "settings_toggle",
+              level_number: Number.isFinite(stageState && stageState.index) ? stageState.index + 1 : null
+            }, { immediate: true });
+            clearTimeout(autoRetryTimerId);
+            autoRetryTimerId = null;
+            cancelStageRetryAutoAdvanceBar();
+          }
+        });
+      } else {
+        autoRetryEnabled = Boolean(defaultControlSettings.autoRetry);
+      }
       if (autoStartStagePreviewToggle) {
         const storageKey = "flashRecallAutoStartStagePreview";
         const saved = window.localStorage.getItem(storageKey);
@@ -5454,7 +5539,3 @@ function runFlashCountdown(onComplete) {
         }
       }
       window.clearTabKeyHint = clearTabKeyHint;
-
-
-
-
