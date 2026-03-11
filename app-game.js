@@ -1931,6 +1931,9 @@
                 stage_name: stage && stage.name ? stage.name : null
               });
             }
+            if (typeof window.scheduleSlothJumpscareForStage === "function") {
+              window.scheduleSlothJumpscareForStage();
+            }
           }
           const stageRounds = stage.rounds || 1;
           if (advanceRound && round >= stageRounds) {
