@@ -9,14 +9,14 @@
       cards: 1,
       noRepeatAcrossRounds: true,
       tabTutorialEnabled: false,
-      revealSeconds: 5,
+      revealSeconds: 10,
       recallSeconds: 30,
       categories: ["numbers", "letters", "shapes"],
       cardCounts: {},
       roundOverrides: {
-        1: { cards: { counts: { numbers: 1 } } },
-        2: { cards: { counts: { letters: 1 } } },
-        3: { cards: { counts: { shapes: 1 } } }
+        1: { cards: { total: 1, counts: { numbers: 1 } } },
+        2: { cards: { total: 2, counts: { letters: 2 } } },
+        3: { cards: { total: 2, counts: { shapes: 2 } } }
       },
       modifiers: {},
       starTimes: { platinum: 1.5, gold: 3, silver: 10, bronze: 20 },

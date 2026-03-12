@@ -957,6 +957,7 @@
         if (!settingsModal) return;
         const tabButtons = settingsModal.querySelectorAll("[data-settings-tab]");
         const tabPanes = settingsModal.querySelectorAll("[data-settings-pane]");
+        const turboArt = settingsModal.querySelector(".modal-card__turbo-art--settings");
         tabButtons.forEach((button) => {
           const isActive = button.getAttribute("data-settings-tab") === tabName;
           button.classList.toggle("is-active", isActive);
@@ -971,6 +972,9 @@
             pane.setAttribute("hidden", "");
           }
         });
+        if (turboArt) {
+          turboArt.hidden = tabName !== "general";
+        }
       }
 
       function markPlayerNamePrompted() {
@@ -2109,8 +2113,8 @@
       };
 
       function resetGame() {
-        if (typeof window.resetRareEventGracePeriod === "function") {
-          window.resetRareEventGracePeriod();
+        if (typeof window.pauseRareEventGracePeriod === "function") {
+          window.pauseRareEventGracePeriod();
         }
         bumpRoundFlowToken();
         clearScheduledSlothJumpscare();
@@ -2171,8 +2175,8 @@
       }
 
       function resetForRetryRound() {
-        if (typeof window.resetRareEventGracePeriod === "function") {
-          window.resetRareEventGracePeriod();
+        if (typeof window.pauseRareEventGracePeriod === "function") {
+          window.pauseRareEventGracePeriod();
         }
         bumpRoundFlowToken();
         if (successAnimationActive) {
@@ -2345,7 +2349,7 @@
       const JUMPSCARE_LEVEL_CHANCE = 1 / 500;
       const JUMPSCARE_DURATION_MS = 2000;
       const JUMPSCARE_DELAY_MIN_MS = 1000;
-      const JUMPSCARE_DELAY_MAX_MS = 4000;
+      const JUMPSCARE_DELAY_MAX_MS = 3000;
       const JUMPSCARE_ZOOM_DURATION_MS = 1000;
       const JUMPSCARE_FADE_DURATION_MS = 260;
       const JUMPSCARE_START_SCALE = 1;
@@ -2457,6 +2461,12 @@
         ) {
           return;
         }
+        if (
+          typeof window.hasRareEventGracePeriodElapsed === "function" &&
+          !window.hasRareEventGracePeriodElapsed()
+        ) {
+          return;
+        }
         if (Math.random() >= JUMPSCARE_LEVEL_CHANCE) {
           return;
         }
@@ -2464,11 +2474,6 @@
         const scheduledAttempt = Number(stageState.attempts) || 0;
         const delayRange = Math.max(0, JUMPSCARE_DELAY_MAX_MS - JUMPSCARE_DELAY_MIN_MS);
         const randomDelayMs = JUMPSCARE_DELAY_MIN_MS + Math.round(Math.random() * delayRange);
-        const rareEventGraceRemainingMs =
-          typeof window.getRareEventGraceRemainingMs === "function"
-            ? Math.max(0, Number(window.getRareEventGraceRemainingMs()) || 0)
-            : 0;
-        const delayMs = rareEventGraceRemainingMs + randomDelayMs;
         jumpscareScheduleTimeout = window.setTimeout(() => {
           jumpscareScheduleTimeout = null;
           if (
@@ -2476,13 +2481,12 @@
             !stageState.active ||
             phase === "result" ||
             stageState.index !== scheduledStageIndex ||
-            (Number(stageState.attempts) || 0) !== scheduledAttempt ||
-            (typeof window.hasRareEventGracePeriodElapsed === "function" && !window.hasRareEventGracePeriodElapsed())
+            (Number(stageState.attempts) || 0) !== scheduledAttempt
           ) {
             return;
           }
           showSlothJumpscare().catch(() => {});
-        }, delayMs);
+        }, randomDelayMs);
       }
       window.scheduleSlothJumpscareForStage = scheduleSlothJumpscareForStage;
 
@@ -3877,12 +3881,17 @@ function runFlashCountdown(onComplete) {
         const wrapEl = getResultCompetitionWrapElement(stageId, stageVersion);
         const turboEl = getResultCompetitionTurboElement(stageId, stageVersion);
         const bubbleEl = wrapEl ? wrapEl.querySelector(".stage-complete__competitive-bubble") : null;
+        const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
         if (wrapEl) {
           wrapEl.hidden = false;
           wrapEl.classList.remove("stage-complete__competitive-wrap--final-flyaway");
         }
         if (bubbleEl) {
           bubbleEl.hidden = false;
+          bubbleEl.classList.remove("is-fading-in", "is-fading-out");
+        }
+        if (messageEl) {
+          messageEl.dataset.currentMessage = messageEl.textContent || "";
         }
         if (turboEl) {
           turboEl.classList.remove("is-angel");
@@ -3931,16 +3940,50 @@ function runFlashCountdown(onComplete) {
         }, Math.max(0, Number(delayMs) || 0));
       }
 
+      const RESULT_COMPETITIVE_FADE_MS = 260;
+      let resultCompetitionFadeToken = 0;
       function setResultCompetitionMessage(stageId, stageVersion, message, messageColor = "") {
         const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
         if (!messageEl) return;
         const wrapEl = messageEl.closest(".stage-complete__competitive-wrap");
         const bubbleEl = wrapEl ? wrapEl.querySelector(".stage-complete__competitive-bubble") : null;
-        messageEl.textContent = message;
-        if (messageColor) {
-          messageEl.style.color = messageColor;
+        const nextMessage = String(message || "");
+        const previousMessage = String(messageEl.dataset.currentMessage || messageEl.textContent || "");
+        const shouldAnimate = previousMessage && previousMessage !== nextMessage;
+        const applyMessage = () => {
+          messageEl.textContent = nextMessage;
+          messageEl.dataset.currentMessage = nextMessage;
+          if (messageColor) {
+            messageEl.style.color = messageColor;
+          } else {
+            messageEl.style.removeProperty("color");
+          }
+        };
+        if (shouldAnimate) {
+          resultCompetitionFadeToken += 1;
+          const fadeToken = resultCompetitionFadeToken;
+          if (bubbleEl) {
+            bubbleEl.classList.add("is-fading-out");
+            bubbleEl.classList.remove("is-fading-in");
+          }
+          window.setTimeout(() => {
+            if (fadeToken !== resultCompetitionFadeToken) return;
+            applyMessage();
+            if (bubbleEl) {
+              bubbleEl.classList.remove("is-fading-out");
+              bubbleEl.classList.add("is-fading-in");
+              requestAnimationFrame(() => {
+                if (fadeToken !== resultCompetitionFadeToken) return;
+                bubbleEl.classList.remove("is-fading-in");
+              });
+            }
+          }, RESULT_COMPETITIVE_FADE_MS);
         } else {
-          messageEl.style.removeProperty("color");
+          applyMessage();
+          if (bubbleEl) {
+            bubbleEl.classList.remove("is-fading-out");
+            bubbleEl.classList.remove("is-fading-in");
+          }
         }
         if (wrapEl) {
           wrapEl.hidden = false;
@@ -4095,7 +4138,9 @@ function runFlashCountdown(onComplete) {
         resetResultCompetitionSpeaker(stageId, stageVersion);
         if (competitionEl) {
           const initialMessage = String(competitionEl.dataset.initialMessage || "").trim();
-          competitionEl.textContent = initialMessage || competitionEl.textContent || "Good job completing the level!";
+          const resolvedMessage = initialMessage || competitionEl.textContent || "Good job completing the level!";
+          competitionEl.textContent = resolvedMessage;
+          competitionEl.dataset.currentMessage = resolvedMessage;
           competitionEl.hidden = false;
         }
         const leaderboardReady = typeof window.getLeaderboardReady === "function"

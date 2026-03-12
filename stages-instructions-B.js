@@ -11,7 +11,7 @@
           "size": "2rem",
           "color": "#111827",
           "at": 0,
-          "duration": 6500
+          "duration": 2000
         },
         {
           "text": "Press **RETURN/ENTER** when ready.",
@@ -21,7 +21,7 @@
           "h": 0.82,
           "size": "2rem",
           "color": "#111827",
-          "at": 5200
+          "at": 2500
         }
       ],
       [
@@ -80,7 +80,18 @@
           "size": "2rem",
           "color": "#111827",
           "at": 0,
-          "duration": 2000
+          "duration": 1000
+        },
+        {
+          "text": "**SHORTCUT:** Press **TAB** to move to the next card.",
+          "x": 0,
+          "y": 130,
+          "w": 100,
+          "h": 0.7,
+          "size": "2rem",
+          "color": "#111827",
+          "at": 1500,
+          "duration": 3000
         },
         {
           "text": "Press **RETURN/ENTER** when ready.",
@@ -90,7 +101,7 @@
           "h": 0.7,
           "size": "2rem",
           "color": "#111827",
-          "at": 2500
+          "at": 5000
         }
       ],
       [

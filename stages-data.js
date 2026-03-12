@@ -9,7 +9,7 @@
       cards: 1,
       noRepeatAcrossRounds: true,
       tabTutorialEnabled: false,
-      revealSeconds: 5,
+      revealSeconds: 10,
       recallSeconds: 30,
       categories: ["numbers"],
       cardCounts: {},
