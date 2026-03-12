@@ -1798,6 +1798,11 @@ body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   font-size: clamp(1.2rem, 2vw, 1.75rem);
   line-height: 1.4;
   text-align: left;
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+.stage-instruction__text--turbo.is-fading {
+  opacity: 0;
 }
 body[data-turbo-story="ascended"] .stage-instruction--turbo .stage-instruction__turbo-layout {
   grid-template-columns: minmax(0, 1fr);

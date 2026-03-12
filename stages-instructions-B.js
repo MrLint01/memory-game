@@ -11,7 +11,7 @@
           "size": "2rem",
           "color": "#111827",
           "at": 0,
-          "duration": 6500
+          "duration": 2000
         },
         {
           "text": "Press **RETURN/ENTER** when ready.",
@@ -21,7 +21,7 @@
           "h": 0.82,
           "size": "2rem",
           "color": "#111827",
-          "at": 5200
+          "at": 2500
         }
       ],
       [
