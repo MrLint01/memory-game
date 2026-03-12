@@ -1679,6 +1679,25 @@ body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   grid-area: bottom;
   transform: translateY(-0.02rem);
 }
+.action-glyph--info {
+  position: relative;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1;
+}
+.action-glyph--info::after {
+  content: "";
+  position: absolute;
+  width: 0.32em;
+  height: 0.32em;
+  border-radius: 999px;
+  background: currentColor;
+  top: 0.05em;
+  left: 50%;
+  transform: translateX(-50%);
+}
 .stage {
   display: grid;
   gap: 1rem;
@@ -3973,12 +3992,11 @@ body[data-turbo-story="ascended"] .stage-card__turbo-guide {
 }
       .quick-actions {
         margin-top: 0.3rem;
-        display: flex;
-        justify-content: space-between;
-        gap: 0.75rem;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) 48px 48px;
+        gap: 0.5rem;
       }
 .quick-action {
-        flex: 1 1 0;
         border: 2px solid var(--border);
         background: var(--panel-muted);
         color: var(--ink);
@@ -3991,12 +4009,26 @@ body[data-turbo-story="ascended"] .stage-card__turbo-guide {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        width: 100%;
+        height: 48px;
       }
-.quick-action--text {
+.quick-action.icon-button {
   width: 100%;
-  min-height: 3.1rem;
-  padding: 0.85rem 1rem;
+  height: 48px;
+}
+.quick-action--square {
+  width: 48px;
+}
+.quick-action--square.quick-action--label {
+  padding: 0.2rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+}
+.quick-action--label {
   font-family: var(--font-display);
+  letter-spacing: 0.14em;
+  font-size: 0.7rem;
 }
 .quick-action:hover {
         transform: translateY(-1px);
