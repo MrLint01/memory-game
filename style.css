@@ -2472,6 +2472,14 @@ body[data-state="result"] #resultsPanel .stage-complete__competitive-bubble {
   border: 2px solid var(--border);
   background: color-mix(in srgb, var(--panel) 90%, #ffffff 10%);
   z-index: 1;
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+body[data-state="result"] #resultsPanel .stage-complete__competitive-bubble.is-fading-out {
+  opacity: 0;
+}
+body[data-state="result"] #resultsPanel .stage-complete__competitive-bubble.is-fading-in {
+  opacity: 0;
 }
 body[data-state="result"] #resultsPanel .stage-complete__competitive-bubble::after {
   content: "";
