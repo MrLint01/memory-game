@@ -957,6 +957,7 @@
         if (!settingsModal) return;
         const tabButtons = settingsModal.querySelectorAll("[data-settings-tab]");
         const tabPanes = settingsModal.querySelectorAll("[data-settings-pane]");
+        const turboArt = settingsModal.querySelector(".modal-card__turbo-art--settings");
         tabButtons.forEach((button) => {
           const isActive = button.getAttribute("data-settings-tab") === tabName;
           button.classList.toggle("is-active", isActive);
@@ -971,6 +972,9 @@
             pane.setAttribute("hidden", "");
           }
         });
+        if (turboArt) {
+          turboArt.hidden = tabName !== "general";
+        }
       }
 
       function markPlayerNamePrompted() {
