@@ -882,35 +882,37 @@
               </div>
               ${buildResultCompetitionSpeakerMarkup(stageId, stageVersion, elapsedSeconds, initialCompetitiveMessage, shouldRunFinalTurboFarewell)}
             </div>
-            <div class="leaderboard-panel" id="stageClearLeaderboard" data-stage-index="${stageState.index}">
-              <div class="leaderboard-panel__title">Leaderboard</div>
-              <div class="leaderboard-list" id="stageClearLeaderboardList">
-                <div class="leaderboard-row">
-                  <span>#</span>
-                  <span>Player</span>
-                  <span>Time</span>
+            <div class="stage-complete__right-column">
+              <div class="leaderboard-panel" id="stageClearLeaderboard" data-stage-index="${stageState.index}">
+                <div class="leaderboard-panel__title">Leaderboard</div>
+                <div class="leaderboard-list" id="stageClearLeaderboardList">
+                  <div class="leaderboard-row">
+                    <span>#</span>
+                    <span>Player</span>
+                    <span>Time</span>
+                  </div>
+                  <div class="leaderboard-row leaderboard-row--empty" id="stageClearLeaderboardEmpty">No data yet</div>
                 </div>
-                <div class="leaderboard-row leaderboard-row--empty" id="stageClearLeaderboardEmpty">No data yet</div>
               </div>
-            </div>
-            <div class="stage-complete__actions">
-              <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (${stageQuitKey})">
-                <img class="action-icon" src="imgs/menu_button.png" alt="" />
-                <span class="action-key-hint" aria-hidden="true">(${stageQuitKey})</span>
-              </button>
-              <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
-                <img class="action-icon" src="imgs/retry_button.png" alt="" />
-                <span class="action-countdown" aria-live="polite"></span>
-                <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
-              </button>
-              <div class="stage-next-wrap">
-                <div class="stage-next-timer" aria-hidden="true">
-                  <span class="stage-next-timer__fill"></span>
-                </div>
-                <button id="stageNextButton" class="secondary icon-button button-entice" type="button" aria-label="Next (${stageNextKey})">
-                  <img class="action-icon" src="imgs/next_button.png" alt="" />
-                  <span class="action-key-hint" aria-hidden="true">(${stageNextKey})</span>
+              <div class="stage-complete__actions">
+                <button id="stageMenuButton" class="secondary icon-button" type="button" aria-label="Menu (${stageQuitKey})">
+                  <img class="action-icon" src="imgs/menu_button.png" alt="" />
+                  <span class="action-key-hint" aria-hidden="true">(${stageQuitKey})</span>
                 </button>
+                <button id="stageRetryButton" class="secondary icon-button" type="button" aria-label="Retry (${retryKey})">
+                  <img class="action-icon" src="imgs/retry_button.png" alt="" />
+                  <span class="action-countdown" aria-live="polite"></span>
+                  <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
+                </button>
+                <div class="stage-next-wrap">
+                  <div class="stage-next-timer" aria-hidden="true">
+                    <span class="stage-next-timer__fill"></span>
+                  </div>
+                  <button id="stageNextButton" class="secondary icon-button button-entice" type="button" aria-label="Next (${stageNextKey})">
+                    <img class="action-icon" src="imgs/next_button.png" alt="" />
+                    <span class="action-key-hint" aria-hidden="true">(${stageNextKey})</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

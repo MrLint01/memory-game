@@ -6165,18 +6165,24 @@ body[data-state="result"] #resultsPanel .stage-complete__left-column {
   text-align: center;
 }
 
-/* Right side: leaderboard */
-body[data-state="result"] #resultsPanel .leaderboard-panel {
+/* Right side: leaderboard + actions */
+body[data-state="result"] #resultsPanel .stage-complete__right-column {
   flex: 0 0 calc(25% - 1rem);
-  width: calc(50% - 1rem);
+  width: calc(25% - 1rem);
   align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+body[data-state="result"] #resultsPanel .stage-complete {
+  padding-inline: 2rem;
+}
+body[data-state="result"] #resultsPanel .leaderboard-panel {
+  width: 100%;
   margin-top: 0;
   margin-bottom: 0;
-  width: 50%;
 }
-
 body[data-state="result"] #resultsPanel .stage-complete__actions {
-  flex: 0 0 100%;
   width: 100%;
 }
 
@@ -6202,7 +6208,8 @@ body[data-state="result"] #resultsPanel .stage-complete__actions {
   }
   body[data-state="result"] #resultsPanel .stage-complete__header,
   body[data-state="result"] #resultsPanel .stage-complete__stars,
-  body[data-state="result"] #resultsPanel .leaderboard-panel {
+  body[data-state="result"] #resultsPanel .leaderboard-panel,
+  body[data-state="result"] #resultsPanel .stage-complete__right-column {
     flex: 0 0 100%;
     width: 100%;
   }
