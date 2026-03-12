@@ -1,9 +1,9 @@
 ,percent_enabled
-leaderboards_enabled,100.0
 auto_start_stage_preview_enabled,100.0
-auto_advance_next_enabled,98.63013698630137
-flash_countdown_enabled,98.63013698630137
-success_animation_enabled,95.8904109589041
-flash_warning_enabled,94.52054794520548
-enter_to_next_enabled,12.32876712328767
-fullscreen_enabled,1.36986301369863
+leaderboards_enabled,100.0
+flash_countdown_enabled,98.7012987012987
+auto_advance_next_enabled,98.7012987012987
+success_animation_enabled,96.1038961038961
+flash_warning_enabled,93.5064935064935
+enter_to_next_enabled,11.688311688311687
+fullscreen_enabled,1.2987012987012987

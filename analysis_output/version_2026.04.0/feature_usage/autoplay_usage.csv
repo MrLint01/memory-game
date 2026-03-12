@@ -1,13 +1,13 @@
 label,unique_players
-stage_preview_open | manual,40
-stage_preview_start | manual,40
-splash_start | manual,40
-result_auto_advance_scheduled | auto,39
-first_level_countdown | auto,33
-splash_start | auto,33
-first_level_countdown | manual,31
-result_auto_advance_cancelled | manual,30
-stage_preview_open | auto,30
-result_auto_advance_triggered | auto,30
+splash_start | manual,42
+stage_preview_open | manual,42
+result_auto_advance_scheduled | auto,41
+stage_preview_start | manual,41
+first_level_countdown | auto,34
+splash_start | auto,34
+first_level_countdown | manual,33
+result_auto_advance_cancelled | manual,32
+result_auto_advance_triggered | auto,31
+stage_preview_open | auto,31
 stage_preview_autostart_cancelled | manual,24
-stage_preview_start | auto,17
+stage_preview_start | auto,18
