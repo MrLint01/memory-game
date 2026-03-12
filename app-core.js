@@ -1007,6 +1007,7 @@ const revealInput = document.getElementById("revealTime");
           return typingDuration;
         };
         let turboEntryToken = 0;
+        let turboHideTimerId = null;
         const turboFadeMs = 260;
         const showEntry = (entry) => {
           if (renderToken !== stageInstructionToken) return;
@@ -1099,6 +1100,10 @@ const revealInput = document.getElementById("revealTime");
             Number.isFinite(duration) && duration > 0
               ? (isTurboTutorial ? Math.max(Math.round(duration * 1.4), Math.round(typedDuration + 1700)) : duration)
               : 0;
+          if (isTurboTutorial && turboHideTimerId) {
+            clearTimeout(turboHideTimerId);
+            turboHideTimerId = null;
+          }
           if (resolvedDuration > 0) {
             const hideId = window.setTimeout(() => {
               if (renderToken !== stageInstructionToken) return;
@@ -1117,6 +1122,9 @@ const revealInput = document.getElementById("revealTime");
                 stageInstructionTimers.push(removeId);
               }
             }, resolvedDuration);
+            if (isTurboTutorial) {
+              turboHideTimerId = hideId;
+            }
             stageInstructionTimers.push(hideId);
           }
         };
