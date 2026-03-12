@@ -33,13 +33,15 @@
     <link rel="preload" href="imgs/menu_button.png" as="image" />
     <link rel="preload" href="imgs/next_button.png" as="image" />
     <link rel="preload" href="imgs/play_button.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_angel.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_catching_branch.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_hanging_happy_splash.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_holding_branch.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_painting.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_tired_splash.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_waving.png" as="image" />
     <link rel="preload" href="imgs/reference_button.png" as="image" />
     <link rel="preload" href="imgs/arrow.png" as="image" />
-    <link rel="preload" href="imgs/apple.png" as="image" />
-    <link rel="preload" href="imgs/banana.png" as="image" />
-    <link rel="preload" href="imgs/grape.png" as="image" />
-    <link rel="preload" href="imgs/strawberry.png" as="image" />
-    <link rel="preload" href="imgs/watermelon.png" as="image" />
     <link rel="preload" href="imgs/icons/card-numbers.svg" as="image" />
     <link rel="preload" href="imgs/icons/card-letters.svg" as="image" />
     <link rel="preload" href="imgs/icons/card-colors.svg" as="image" />
@@ -51,16 +53,8 @@
     <link rel="preload" href="imgs/settings_button.png" as="image" />
     <link rel="preload" href="imgs/stat_button.png" as="image" />
     <link rel="preload" href="imgs/tutorial_icon.png" as="image" />
-    <link rel="preload" href="imgs/Sloths/transparent/turbo_waving.png" as="image" />
+    <link rel="preload" href="imgs/Sloths/transparent/turbo_flag_splash.png" as="image" />
     <link rel="preload" href="imgs/x_button.png" as="image" />
-    <link rel="preload" href="imgs/arrow.png" as="image" />
-    <link rel="preload" href="imgs/icons/card-colors.svg" as="image" />
-    <link rel="preload" href="imgs/icons/card-directions.svg" as="image" />
-    <link rel="preload" href="imgs/icons/card-diagonal.svg" as="image" />
-    <link rel="preload" href="imgs/icons/card-letters.svg" as="image" />
-    <link rel="preload" href="imgs/icons/card-numbers.svg" as="image" />
-    <link rel="preload" href="imgs/icons/card-shapes.svg" as="image" />
-    <link rel="preload" href="imgs/apple.png" as="image" />
     <link rel="preload" href="imgs/icons/mod-ads.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-backgroundcolor.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-fog.svg" as="image" />
@@ -149,8 +143,16 @@
         <aside class="panel">
           <div class="controls">
             <div class="mode-grid">
-              <button id="playStart" class="mode-card primary" type="button">
-                <strong>Play</strong>
+              <button id="playStart" class="mode-card mode-card--turbo primary" type="button">
+                <img
+                  class="mode-card__turbo"
+                  src="imgs/Sloths/transparent/turbo_tired_splash.png"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span class="mode-card__label">
+                  <strong>Play</strong>
+                </span>
               </button>
               <button id="practiceStart" class="mode-card mode-card--locked" type="button" disabled>
                 <strong>Sandbox</strong>
@@ -176,6 +178,9 @@
                 <img class="action-icon" src="imgs/fullscreen_button.png" alt="" />
               </button>
             </div>
+            <button id="creditsOpen" class="quick-action quick-action--text" type="button">
+              Credits
+            </button>
           </div>
         </aside>
         <section class="stage panel">
@@ -452,6 +457,17 @@
               </label>
             </div>
           </div>
+          <div class="sandbox-turbo-story" id="sandboxTurboStory" hidden>
+            <button id="sandboxTurboStoryButton" class="sandbox-turbo-story__button" type="button" aria-label="Turbo">
+              <img
+                id="sandboxTurboStoryImage"
+                class="sandbox-turbo-story__image"
+                src="imgs/Sloths/transparent/turbo_angel.png"
+                alt=""
+                aria-hidden="true"
+              />
+            </button>
+          </div>
         </div>
         <div class="modal-actions">
           <button id="practiceCancel" class="secondary icon-button practice-close" type="button" aria-label="Back">
@@ -470,6 +486,7 @@
     <div data-include="ui/achievements.html"></div>
     <div data-include="ui/stage-intro.html"></div>
     <div data-include="ui/reference.html"></div>
+    <div data-include="ui/credits.html"></div>
     <div class="modal" id="contentResetModal" aria-hidden="true">
       <div class="modal-card modal-card--muted modal-card--reset-notice">
         <button class="interrupt-close icon-button modal-close" id="contentResetClose" type="button" aria-label="Close">

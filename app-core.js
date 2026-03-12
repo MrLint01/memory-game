@@ -18,7 +18,7 @@ const revealInput = document.getElementById("revealTime");
       const stageList = document.getElementById("stageList");
       const stageInstructions = document.getElementById("stageInstructions");
       const stageInstructionPanel = document.getElementById("stageInstructionPanel");
-      const TURBO_TUTORIAL_IMAGE_SRC = "imgs/Sloths/transparent/turbo_waving.png";
+      const TURBO_TUTORIAL_IMAGE_SRC = "imgs/Sloths/transparent/turbo_flag_splash.png";
       const hudCluster = document.getElementById("hudCluster");
       const submitBtn = document.getElementById("submitBtn");
       const nextBtn = document.getElementById("nextBtn");
@@ -58,10 +58,15 @@ const revealInput = document.getElementById("revealTime");
       const practiceTextColor = document.getElementById("practiceTextColor");
       const practicePreviousCard = document.getElementById("practicePreviousCard");
       const settingsOpen = document.getElementById("settingsOpen");
+      const creditsOpen = document.getElementById("creditsOpen");
       const statsOpen = document.getElementById("statsOpen");
       const achievementsOpen = document.getElementById("achievementsOpen");
       const settingsModal = document.getElementById("settingsModal");
       const settingsClose = document.getElementById("settingsClose");
+      const creditsModal = document.getElementById("creditsModal");
+      const creditsClose = document.getElementById("creditsClose");
+      const creditsList = document.getElementById("creditsList");
+      const creditsEmpty = document.getElementById("creditsEmpty");
       const statsModal = document.getElementById("statsModal");
       const statsClose = document.getElementById("statsClose");
       const achievementsModal = document.getElementById("achievementsModal");
@@ -905,38 +910,55 @@ const revealInput = document.getElementById("revealTime");
             .map((text, index) => ({ text, strong: index % 2 === 1 }))
             .filter((fragment) => fragment.text);
         };
-        const renderInstructionText = (targetEl, rawText, visibleChars = Number.POSITIVE_INFINITY) => {
-          if (!targetEl) return 0;
-          const fragments = buildInstructionFragments(rawText);
+        const createInstructionTextRenderer = (targetEl, rawText) => {
+          if (!targetEl) {
+            return { totalChars: 0, render: () => 0 };
+          }
           targetEl.replaceChildren();
-          let remaining = Number.isFinite(visibleChars) ? Math.max(0, visibleChars) : Number.POSITIVE_INFINITY;
-          let written = 0;
-          fragments.forEach((fragment) => {
-            if (remaining <= 0) return;
-            const fullText = String(fragment.text || "");
-            const nextText = Number.isFinite(remaining) ? fullText.slice(0, remaining) : fullText;
-            if (!nextText) return;
-            const node = fragment.strong ? document.createElement("strong") : document.createElement("span");
-            node.textContent = nextText;
-            targetEl.appendChild(node);
-            written += nextText.length;
-            if (Number.isFinite(remaining)) {
-              remaining -= nextText.length;
-            }
-          });
-          return written;
+          const nodes = buildInstructionFragments(rawText)
+            .map((fragment) => {
+              const text = String(fragment.text || "");
+              if (!text) return null;
+              const node = fragment.strong ? document.createElement("strong") : document.createElement("span");
+              const textNode = document.createTextNode("");
+              node.appendChild(textNode);
+              targetEl.appendChild(node);
+              return { text, textNode };
+            })
+            .filter(Boolean);
+          const totalChars = nodes.reduce((sum, fragment) => sum + fragment.text.length, 0);
+          const render = (visibleChars = Number.POSITIVE_INFINITY) => {
+            let remaining = Number.isFinite(visibleChars) ? Math.max(0, visibleChars) : Number.POSITIVE_INFINITY;
+            let written = 0;
+            nodes.forEach((fragment) => {
+              const nextText = remaining <= 0
+                ? ""
+                : (Number.isFinite(remaining) ? fragment.text.slice(0, remaining) : fragment.text);
+              if (fragment.textNode.nodeValue !== nextText) {
+                fragment.textNode.nodeValue = nextText;
+              }
+              written += nextText.length;
+              if (Number.isFinite(remaining)) {
+                remaining -= nextText.length;
+              }
+            });
+            return written;
+          };
+          return { totalChars, render };
         };
         const startInstructionTypewriter = (targetEl, rawText, box, entryDuration) => {
-          const totalChars = renderInstructionText(targetEl, rawText, Number.POSITIVE_INFINITY);
-          renderInstructionText(targetEl, rawText, 0);
+          const renderer = createInstructionTextRenderer(targetEl, rawText);
+          const totalChars = renderer.totalChars;
+          renderer.render(0);
           if (!totalChars) return 0;
           const availableDuration = Number.isFinite(Number(entryDuration)) ? Math.max(700, Number(entryDuration) - 500) : null;
           const typingDuration = availableDuration === null
-            ? clamp(totalChars * 56, 1400, 4400)
-            : clamp(Math.min(totalChars * 56, availableDuration), 1000, 4400);
+            ? clamp(totalChars * 34, 850, 2800)
+            : clamp(Math.min(totalChars * 34, availableDuration), 700, 2800);
           const msPerChar = Math.max(16, typingDuration / totalChars);
           box.classList.add("stage-instruction--typing");
           const startedAt = performance.now();
+          let lastVisibleChars = 0;
           const timerId = window.setInterval(() => {
             if (renderToken !== stageInstructionToken) {
               clearInterval(timerId);
@@ -944,7 +966,10 @@ const revealInput = document.getElementById("revealTime");
             }
             const elapsed = performance.now() - startedAt;
             const visibleChars = Math.min(totalChars, Math.max(1, Math.floor(elapsed / msPerChar) + 1));
-            renderInstructionText(targetEl, rawText, visibleChars);
+            if (visibleChars !== lastVisibleChars) {
+              lastVisibleChars = visibleChars;
+              renderer.render(visibleChars);
+            }
             if (visibleChars >= totalChars) {
               clearInterval(timerId);
               box.classList.remove("stage-instruction--typing");
@@ -973,8 +998,9 @@ const revealInput = document.getElementById("revealTime");
             box.classList.add("stage-instruction--turbo");
             box.innerHTML = `
               <div class="stage-instruction__turbo-layout">
-                <img class="stage-instruction__turbo-image" src="${TURBO_TUTORIAL_IMAGE_SRC}" alt="Turbo the Sloth" />
+                <img class="stage-instruction__turbo-image" src="${TURBO_TUTORIAL_IMAGE_SRC}" alt="Turbo the Sloth" decoding="async" fetchpriority="high" />
                 <div class="stage-instruction__bubble">
+                  <span class="stage-instruction__speaker">Turbo</span>
                   <span class="stage-instruction__text stage-instruction__text--turbo"></span>
                 </div>
               </div>
@@ -1012,7 +1038,7 @@ const revealInput = document.getElementById("revealTime");
           const duration = Number(entry.duration);
           const resolvedDuration =
             Number.isFinite(duration) && duration > 0
-              ? (isTurboTutorial ? Math.max(duration, Math.round(typedDuration + 650)) : duration)
+              ? (isTurboTutorial ? Math.max(Math.round(duration * 1.4), Math.round(typedDuration + 1700)) : duration)
               : 0;
           if (resolvedDuration > 0) {
             const hideId = window.setTimeout(() => {
@@ -1030,8 +1056,12 @@ const revealInput = document.getElementById("revealTime");
         };
         entries.forEach((entry) => {
           const delay = Number(entry && entry.at);
-          if (Number.isFinite(delay) && delay > 0) {
-            const timerId = window.setTimeout(() => showEntry(entry), delay);
+          const scheduledDelay =
+            Number.isFinite(delay) && delay > 0
+              ? (isTurboTutorial ? Math.round(delay * 1.35) : delay)
+              : delay;
+          if (Number.isFinite(scheduledDelay) && scheduledDelay > 0) {
+            const timerId = window.setTimeout(() => showEntry(entry), scheduledDelay);
             stageInstructionTimers.push(timerId);
           } else {
             showEntry(entry);

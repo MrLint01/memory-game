@@ -29,6 +29,7 @@
 
   const scriptList = [
     'settings-defaults.js',
+    'credits-data.js',
     'data.js',
     'sandbox-unlocks.js',
     'stages-instructions.js',

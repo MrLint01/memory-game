@@ -41,6 +41,10 @@
       const AUDIO_MIGRATION_KEY = "flashRecallAudioDefaults2026a";
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
       const SANDBOX_UNLOCK_CONFIRM_KEY = "flashRecallSandboxUnlockConfirm";
+      const TURBO_STORY_STATE_KEY = "flashRecallTurboStoryState";
+      const TURBO_STORY_STATE_ACTIVE = "active";
+      const TURBO_STORY_STATE_ASCENDED = "ascended";
+      const TURBO_STORY_STATE_RESTORED = "restored";
       const LEADERBOARDS_ENABLED_STORAGE_KEY = "flashRecallLeaderboardsEnabled";
       const SPLASH_SEEN_KEY = "flashRecallSplashSeen";
       const ADAPTIVE_PROFILE_KEY = "flashRecallAdaptiveProfile";
@@ -866,6 +870,7 @@
         const isStagePreviewOpen = Boolean(stageIntroModal && stageIntroModal.classList.contains("show"));
         const isStageLeaderboardOpen = Boolean(leaderboardModal && leaderboardModal.classList.contains("show"));
         const isSettingsOpen = Boolean(settingsModal && settingsModal.classList.contains("show"));
+        const isCreditsOpen = Boolean(creditsModal && creditsModal.classList.contains("show"));
         const isStatsOpen = Boolean(statsModal && statsModal.classList.contains("show"));
         const isAchievementsOpen = Boolean(achievementsModal && achievementsModal.classList.contains("show"));
         const isStatsLeaderboardOpen = Boolean(statsLeaderboardModal && statsLeaderboardModal.classList.contains("show"));
@@ -880,6 +885,8 @@
           quitBucket = "stage_leaderboard";
         } else if (isSettingsOpen) {
           quitBucket = "settings";
+        } else if (isCreditsOpen) {
+          quitBucket = "credits";
         } else if (isStatsLeaderboardOpen) {
           quitBucket = "stats_leaderboard";
         } else if (isStatsOpen) {
@@ -911,6 +918,7 @@
           stage_preview_open: isStagePreviewOpen,
           stage_leaderboard_open: isStageLeaderboardOpen,
           settings_modal_open: isSettingsOpen,
+          credits_modal_open: isCreditsOpen,
           stats_modal_open: isStatsOpen,
           achievements_modal_open: isAchievementsOpen,
           stats_leaderboard_modal_open: isStatsLeaderboardOpen,
@@ -1156,7 +1164,230 @@
           scaleMultiplier: 0.84
         }
       };
+      let turboStoryState = TURBO_STORY_STATE_ACTIVE;
+      let floatingAngelLayer = null;
+      let floatingAngelImage = null;
+      let floatingAngelTimer = null;
+
+      function normalizeTurboStoryState(value) {
+        const raw = String(value || "").trim().toLowerCase();
+        if (raw === TURBO_STORY_STATE_ASCENDED || raw === TURBO_STORY_STATE_RESTORED) {
+          return raw;
+        }
+        return TURBO_STORY_STATE_ACTIVE;
+      }
+
+      function loadTurboStoryState() {
+        try {
+          return normalizeTurboStoryState(window.localStorage.getItem(TURBO_STORY_STATE_KEY));
+        } catch {
+          return TURBO_STORY_STATE_ACTIVE;
+        }
+      }
+
+      function saveTurboStoryState(nextState) {
+        try {
+          window.localStorage.setItem(TURBO_STORY_STATE_KEY, normalizeTurboStoryState(nextState));
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      function hasTurboFarewellOccurred() {
+        return turboStoryState !== TURBO_STORY_STATE_ACTIVE;
+      }
+
+      function shouldShowTurboCompanions() {
+        return turboStoryState !== TURBO_STORY_STATE_ASCENDED;
+      }
+
+      function shouldShowSandboxAngelTurbo() {
+        return turboStoryState === TURBO_STORY_STATE_ASCENDED;
+      }
+
+      function shouldShowSandboxWavingTurbo() {
+        return turboStoryState === TURBO_STORY_STATE_RESTORED;
+      }
+
+      function shouldShowFloatingAngel() {
+        return Boolean(
+          turboStoryState === TURBO_STORY_STATE_RESTORED &&
+          document.body &&
+          document.body.dataset &&
+          document.body.dataset.state === "idle" &&
+          document.visibilityState === "visible" &&
+          !document.body.classList.contains("loading-overlay")
+        );
+      }
+
+      function clearFloatingAngelTimer() {
+        if (floatingAngelTimer) {
+          window.clearTimeout(floatingAngelTimer);
+          floatingAngelTimer = null;
+        }
+      }
+
+      function ensureFloatingAngelActor() {
+        if (floatingAngelLayer && document.body && floatingAngelLayer.parentNode !== document.body) {
+          document.body.appendChild(floatingAngelLayer);
+        }
+        if (!document.body || floatingAngelLayer) {
+          return;
+        }
+        floatingAngelLayer = document.createElement("div");
+        floatingAngelLayer.className = "floating-angel-layer";
+        floatingAngelLayer.setAttribute("aria-hidden", "true");
+        floatingAngelImage = document.createElement("img");
+        floatingAngelImage.className = "floating-angel";
+        floatingAngelImage.src = "imgs/Sloths/transparent/turbo_angel.png";
+        floatingAngelImage.alt = "";
+        floatingAngelImage.hidden = true;
+        floatingAngelImage.decoding = "async";
+        floatingAngelImage.addEventListener("animationend", () => {
+          if (!floatingAngelImage) return;
+          floatingAngelImage.classList.remove("is-active");
+          floatingAngelImage.hidden = true;
+          if (turboStoryState === TURBO_STORY_STATE_RESTORED) {
+            scheduleFloatingAngel();
+          }
+        });
+        floatingAngelLayer.appendChild(floatingAngelImage);
+        document.body.appendChild(floatingAngelLayer);
+      }
+
+      function hideFloatingAngel() {
+        if (!floatingAngelImage) return;
+        floatingAngelImage.classList.remove("is-active");
+        floatingAngelImage.hidden = true;
+      }
+
+      function showFloatingAngel() {
+        if (!shouldShowFloatingAngel()) {
+          scheduleFloatingAngel(8000);
+          return;
+        }
+        ensureFloatingAngelActor();
+        if (!floatingAngelImage) return;
+        const fromRight = Math.random() < 0.5;
+        const topPx = Math.round(window.innerHeight * (0.16 + Math.random() * 0.42));
+        const driftY = Math.round(-24 + Math.random() * 48);
+        const durationMs = 10500 + Math.round(Math.random() * 4500);
+        floatingAngelImage.style.top = `${topPx}px`;
+        floatingAngelImage.style.setProperty("--angel-opacity", (0.2 + Math.random() * 0.18).toFixed(2));
+        floatingAngelImage.style.setProperty("--angel-duration", `${durationMs}ms`);
+        floatingAngelImage.style.setProperty("--angel-y-drift", `${driftY}px`);
+        if (fromRight) {
+          floatingAngelImage.style.setProperty("--angel-x-start", "calc(100vw + 12rem)");
+          floatingAngelImage.style.setProperty("--angel-x-end", "-16rem");
+        } else {
+          floatingAngelImage.style.setProperty("--angel-x-start", "-16rem");
+          floatingAngelImage.style.setProperty("--angel-x-end", "calc(100vw + 12rem)");
+        }
+        floatingAngelImage.hidden = false;
+        floatingAngelImage.classList.remove("is-active");
+        void floatingAngelImage.offsetWidth;
+        floatingAngelImage.classList.add("is-active");
+      }
+
+      function scheduleFloatingAngel(delayMs = null) {
+        clearFloatingAngelTimer();
+        if (turboStoryState !== TURBO_STORY_STATE_RESTORED) {
+          hideFloatingAngel();
+          return;
+        }
+        const nextDelay = Number.isFinite(Number(delayMs))
+          ? Math.max(0, Number(delayMs))
+          : 18000 + Math.round(Math.random() * 18000);
+        floatingAngelTimer = window.setTimeout(() => {
+          floatingAngelTimer = null;
+          showFloatingAngel();
+        }, nextDelay);
+      }
+
+      function syncSandboxTurboStory() {
+        const storyEl = document.getElementById("sandboxTurboStory");
+        const buttonEl = document.getElementById("sandboxTurboStoryButton");
+        const imageEl = document.getElementById("sandboxTurboStoryImage");
+        if (!(storyEl && buttonEl && imageEl)) return;
+        const showAngel = shouldShowSandboxAngelTurbo();
+        const showWaving = shouldShowSandboxWavingTurbo();
+        if (!showAngel && !showWaving) {
+          storyEl.hidden = true;
+          storyEl.classList.remove("is-restoring", "is-restored");
+          buttonEl.disabled = true;
+          return;
+        }
+        storyEl.hidden = false;
+        storyEl.classList.toggle("is-restored", showWaving);
+        if (!storyEl.classList.contains("is-restoring")) {
+          storyEl.classList.toggle("is-restoring", false);
+        }
+        buttonEl.disabled = showWaving;
+        buttonEl.setAttribute("aria-label", showAngel ? "Angel Turbo" : "Turbo");
+        imageEl.src = showAngel
+          ? "imgs/Sloths/transparent/turbo_angel.png"
+          : "imgs/Sloths/transparent/turbo_waving.png";
+      }
+
+      function applyTurboStoryState(nextState, options = {}) {
+        turboStoryState = normalizeTurboStoryState(nextState);
+        if (document.body && document.body.dataset) {
+          document.body.dataset.turboStory = turboStoryState;
+        }
+        syncSandboxTurboStory();
+        if (turboStoryState === TURBO_STORY_STATE_ASCENDED) {
+          stopSplashTurboCycle();
+          hideFloatingAngel();
+          clearFloatingAngelTimer();
+        } else if (turboStoryState === TURBO_STORY_STATE_RESTORED) {
+          if (document.body && document.body.dataset && document.body.dataset.view === "splash") {
+            startSplashTurboCycle();
+          }
+          if (!options.skipFloatingAngelSchedule) {
+            scheduleFloatingAngel(9000);
+          }
+        } else {
+          hideFloatingAngel();
+          clearFloatingAngelTimer();
+          if (document.body && document.body.dataset && document.body.dataset.view === "splash") {
+            startSplashTurboCycle();
+          }
+        }
+      }
+
+      function setTurboStoryState(nextState, options = {}) {
+        const normalized = normalizeTurboStoryState(nextState);
+        saveTurboStoryState(normalized);
+        applyTurboStoryState(normalized, options);
+      }
+
+      function markTurboAscended() {
+        if (hasTurboFarewellOccurred()) return;
+        setTurboStoryState(TURBO_STORY_STATE_ASCENDED);
+      }
+
+      function restoreTurboFromSandbox() {
+        if (turboStoryState !== TURBO_STORY_STATE_ASCENDED) return;
+        setTurboStoryState(TURBO_STORY_STATE_RESTORED);
+      }
+
+      window.hasTurboFarewellOccurred = hasTurboFarewellOccurred;
+      window.shouldShowTurboCompanions = shouldShowTurboCompanions;
+      window.shouldShowSandboxAngelTurbo = shouldShowSandboxAngelTurbo;
+      window.shouldShowSandboxWavingTurbo = shouldShowSandboxWavingTurbo;
+      window.markTurboAscended = markTurboAscended;
+      window.restoreTurboFromSandbox = restoreTurboFromSandbox;
       const splashTurboPreloadImages = [];
+      const GAMEPLAY_TURBO_SPRITE_SOURCES = [
+        "imgs/Sloths/transparent/turbo_holding_branch.png",
+        "imgs/Sloths/transparent/turbo_angel.png",
+        "imgs/Sloths/transparent/turbo_flag_splash.png",
+        "imgs/Sloths/transparent/turbo_hanging_happy_splash.png",
+        "imgs/Sloths/transparent/turbo_painting.png",
+        "imgs/Sloths/transparent/turbo_catching_branch.png",
+        "imgs/Sloths/transparent/turbo_waving.png"
+      ];
+      const gameplayTurboPreloadImages = [];
       let splashTurboLayer = null;
       let splashTurboButton = null;
       let splashTurboImage = null;
@@ -1207,6 +1438,13 @@
         rows.push(row);
       }
 
+      function buildLeaderboardPlaceholderRow() {
+        const row = document.createElement("div");
+        row.className = "leaderboard-row leaderboard-row--context";
+        row.innerHTML = `<span>-</span><span class="leaderboard-name">-</span><span>-</span>`;
+        return row;
+      }
+
       function preloadSplashTurboSprites() {
         if (splashTurboPreloadImages.length) {
           return;
@@ -1220,6 +1458,22 @@
             image.decode().catch(() => {});
           }
           splashTurboPreloadImages.push(image);
+        });
+      }
+
+      function preloadGameplayTurboSprites() {
+        if (gameplayTurboPreloadImages.length) {
+          return;
+        }
+        GAMEPLAY_TURBO_SPRITE_SOURCES.forEach((src) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.fetchPriority = "high";
+          image.src = src;
+          if (typeof image.decode === "function") {
+            image.decode().catch(() => {});
+          }
+          gameplayTurboPreloadImages.push(image);
         });
       }
 
@@ -1280,6 +1534,7 @@
 
       function canShowSplashTurbo() {
         return Boolean(
+          shouldShowTurboCompanions() &&
           splashScreen &&
           document.body &&
           document.body.dataset.view === "splash" &&
@@ -1503,6 +1758,9 @@
       }
 
       preloadSplashTurboSprites();
+      preloadGameplayTurboSprites();
+      turboStoryState = loadTurboStoryState();
+      applyTurboStoryState(turboStoryState, { skipFloatingAngelSchedule: false });
 
       function updateSplashAutoStartLabel(remainingMs = SPLASH_AUTO_START_MS) {
         if (!splashAutoStartMessage) return;
@@ -1849,6 +2107,7 @@
         setModalState(practiceModal, true);
         updateSandboxStarsDisplay();
         updateCategoryControls();
+        syncSandboxTurboStory();
       }
 
       function closePracticeModal() {
@@ -1957,6 +2216,11 @@
       };
       let stageListAnimTimeout = null;
       let stageListStarTimeout = null;
+      let stageListBobTimeout = null;
+      let resultCompetitionMessageTimer = null;
+      let resultCompetitionFollowupTimer = null;
+      let resultFinalStageMessageTimer = null;
+      let resultFinalStageFlyTimer = null;
       let stageListAnimActive = false;
       let stageListMouseListenerAttached = false;
       let stageListSkipListener = null;
@@ -2739,6 +3003,13 @@ function runFlashCountdown(onComplete) {
           clearTimeout(stageListStarTimeout);
           stageListStarTimeout = null;
         }
+        if (stageListBobTimeout) {
+          clearTimeout(stageListBobTimeout);
+          stageListBobTimeout = null;
+        }
+        stageList.querySelectorAll(".stage-card--bob").forEach((card) => {
+          card.classList.remove("stage-card--bob");
+        });
         const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
         const pageSize = 20;
         const totalPages = Math.max(1, Math.ceil(stages.length / pageSize));
@@ -2772,6 +3043,9 @@ function runFlashCountdown(onComplete) {
         }
         const pageStart = stageState.page * pageSize;
         const pageStages = stages.slice(pageStart, pageStart + pageSize);
+        const latestUnlockedStageIndex = stages.reduce((latest, _stage, index) => {
+          return isStageUnlocked(index) ? index : latest;
+        }, -1);
         stageList.classList.add("stage-list--hidden");
         stageList.innerHTML = pageStages
           .map((stage, offset) => {
@@ -2812,8 +3086,10 @@ function runFlashCountdown(onComplete) {
 
             const name = stage && stage.id ? String(stage.id) : String(index + 1);
             const unlocked = isStageUnlocked(index);
+            const showTurboGuide = unlocked && index === latestUnlockedStageIndex;
             const lockedClass = unlocked ? "" : " stage-card--locked";
             const stageTypeClass = stageType ? ` stage-card--${stageType}` : "";
+            const currentClass = showTurboGuide ? " stage-card--current" : "";
             const lockedAttr = unlocked ? "" : " disabled";
             const lockIcon = unlocked
               ? ""
@@ -2840,7 +3116,7 @@ function runFlashCountdown(onComplete) {
             }
 
             return `
-              <button class="stage-card stage-card--clickable${stageTypeClass}${lockedClass}" type="button" data-stage-index="${index}" data-anim-index="${offset}" data-anim-state="pending" data-stage-type="${stageType}"${lockedAttr}>
+              <button class="stage-card stage-card--clickable${stageTypeClass}${lockedClass}${currentClass}" type="button" data-stage-index="${index}" data-anim-index="${offset}" data-anim-state="pending" data-stage-type="${stageType}"${lockedAttr}>
                 ${unlocked ? `<strong>${name}</strong>` : ""}
                 ${lockIcon}
                 ${lockedLabel}
@@ -2852,6 +3128,14 @@ function runFlashCountdown(onComplete) {
                       : placeholderStars
                 }
                 ${placeholderBest}
+                ${showTurboGuide ? `
+                  <img
+                    class="stage-card__turbo-guide"
+                    src="imgs/Sloths/transparent/turbo_hanging_happy_splash.png"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                ` : ""}
                 ${unlocked && stageTypeIcon ? `<img class="stage-type-icon" src="${stageTypeIcon.src}" alt="${stageTypeIcon.label}" />` : ""}
               </button>
             `;
@@ -2898,6 +3182,13 @@ function runFlashCountdown(onComplete) {
             });
             const pendingCount = pendingCards.length;
             const fadeDelay = 240;
+            stageListBobTimeout = window.setTimeout(() => {
+              stageListBobTimeout = null;
+              const currentCard = stageList.querySelector(".stage-card--current");
+              if (currentCard) {
+                currentCard.classList.add("stage-card--bob");
+              }
+            }, pendingCount ? fadeDelay + 220 : 0);
             stageListStarTimeout = window.setTimeout(() => {
               stageList
                 .querySelectorAll(".stage-stars")
@@ -2943,6 +3234,13 @@ function runFlashCountdown(onComplete) {
               const cards = stageList.querySelectorAll(".stage-card");
               const maxIndex = Math.max(0, cards.length - 1);
               const totalDelay = headerDelayMs + maxIndex * 100;
+              stageListBobTimeout = window.setTimeout(() => {
+                stageListBobTimeout = null;
+                const currentCard = stageList.querySelector(".stage-card--current");
+                if (currentCard) {
+                  currentCard.classList.add("stage-card--bob");
+                }
+              }, totalDelay + 420);
               stageListStarTimeout = window.setTimeout(() => {
                 stageListAnimActive = false;
                 stageList
@@ -2975,6 +3273,10 @@ function runFlashCountdown(onComplete) {
           stageList.querySelectorAll(".stage-stars").forEach((stars) => {
             stars.classList.remove("stage-stars--shine");
           });
+          const currentCard = stageList.querySelector(".stage-card--current");
+          if (currentCard) {
+            currentCard.classList.add("stage-card--bob");
+          }
         }
       }
 
@@ -3059,6 +3361,14 @@ function runFlashCountdown(onComplete) {
         setBackgroundMusicMode("menu");
       }
 
+      function randomizePlayButtonTurboSide() {
+        if (!playStart) return;
+        const nextSide = Math.random() < 0.5 ? "left" : "right";
+        playStart.classList.toggle("mode-card--turbo-left", nextSide === "left");
+        playStart.classList.toggle("mode-card--turbo-right", nextSide === "right");
+        playStart.dataset.turboSide = nextSide;
+      }
+
       function closeStagesScreen(animateHome = true) {
         if (stageStarShineInterval) {
           clearInterval(stageStarShineInterval);
@@ -3073,6 +3383,7 @@ function runFlashCountdown(onComplete) {
         setBackgroundMusicMode("menu");
         clearFirstLetterHint();
         clearFlashCountdown();
+        randomizePlayButtonTurboSide();
         if (animateHome) {
           document.body.classList.remove("home-anim");
           void document.body.offsetWidth;
@@ -3196,6 +3507,7 @@ function runFlashCountdown(onComplete) {
           deferStartRound = false,
           skipFlashWarningPrompt = false
         } = options;
+        preloadGameplayTurboSprites();
         tabTutorialShownRound = null;
         tabTutorialActive = false;
         firstLetterHintCooldown = 0;
@@ -3394,9 +3706,145 @@ function runFlashCountdown(onComplete) {
         return messageEl;
       }
 
-      function applyResultCompetitionMessage(stageId, stageVersion, result) {
+      function getResultCompetitionWrapElement(stageId, stageVersion) {
+        const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
+        return messageEl ? messageEl.closest(".stage-complete__competitive-wrap") : null;
+      }
+
+      function getResultCompetitionTurboElement(stageId, stageVersion) {
+        const wrapEl = getResultCompetitionWrapElement(stageId, stageVersion);
+        return wrapEl ? wrapEl.querySelector(".stage-complete__competitive-turbo") : null;
+      }
+
+      function clearResultCompetitionMessageTimer() {
+        if (resultCompetitionMessageTimer) {
+          window.clearTimeout(resultCompetitionMessageTimer);
+          resultCompetitionMessageTimer = null;
+        }
+        if (resultCompetitionFollowupTimer) {
+          window.clearTimeout(resultCompetitionFollowupTimer);
+          resultCompetitionFollowupTimer = null;
+        }
+      }
+
+      function clearFinalStageSpeakerTimers() {
+        if (resultFinalStageMessageTimer) {
+          window.clearTimeout(resultFinalStageMessageTimer);
+          resultFinalStageMessageTimer = null;
+        }
+        if (resultFinalStageFlyTimer) {
+          window.clearTimeout(resultFinalStageFlyTimer);
+          resultFinalStageFlyTimer = null;
+        }
+      }
+
+      function isTurboImposterPlayerName() {
+        const playerName = typeof window.getPlayerName === "function" ? window.getPlayerName() : "";
+        return String(playerName || "").trim().toLowerCase() === "turbo";
+      }
+
+      function maybeUnlockTurboImposterAchievement(stageId, stageVersion) {
+        const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
+        if (!messageEl || messageEl.dataset.imposterAchievementUnlocked === "1") {
+          return;
+        }
+        messageEl.dataset.imposterAchievementUnlocked = "1";
+        if (typeof window.syncAchievementsFromLocal === "function") {
+          Promise.resolve(window.syncAchievementsFromLocal({ turboImposterFound: true })).catch((error) => {
+            console.warn("Failed to unlock turbo imposter achievement", error);
+          });
+        }
+      }
+
+      function resetResultCompetitionSpeaker(stageId, stageVersion) {
+        const wrapEl = getResultCompetitionWrapElement(stageId, stageVersion);
+        const turboEl = getResultCompetitionTurboElement(stageId, stageVersion);
+        const bubbleEl = wrapEl ? wrapEl.querySelector(".stage-complete__competitive-bubble") : null;
+        if (wrapEl) {
+          wrapEl.hidden = false;
+          wrapEl.classList.remove("stage-complete__competitive-wrap--final-flyaway");
+        }
+        if (bubbleEl) {
+          bubbleEl.hidden = false;
+        }
+        if (turboEl) {
+          turboEl.classList.remove("is-angel");
+          const defaultSrc = String(turboEl.dataset.defaultSrc || "").trim();
+          if (defaultSrc && turboEl.getAttribute("src") !== defaultSrc) {
+            turboEl.setAttribute("src", defaultSrc);
+          }
+        }
+      }
+
+      function scheduleFinalStageSpeakerSequence(stageId, stageVersion, delayMs = 0) {
+        const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
+        if (!messageEl || messageEl.dataset.finalStage !== "1") return;
+        const finalMessage = String(messageEl.dataset.finalMessage || "").trim();
+        if (!finalMessage) return;
+        clearFinalStageSpeakerTimers();
+        resultFinalStageMessageTimer = window.setTimeout(() => {
+          resultFinalStageMessageTimer = null;
+          const turboEl = getResultCompetitionTurboElement(stageId, stageVersion);
+          if (turboEl) {
+            const angelSrc = String(turboEl.dataset.angelSrc || "").trim();
+            turboEl.classList.add("is-angel");
+            if (angelSrc && turboEl.getAttribute("src") !== angelSrc) {
+              turboEl.setAttribute("src", angelSrc);
+            }
+          }
+          setResultCompetitionMessage(stageId, stageVersion, finalMessage);
+          resultFinalStageFlyTimer = window.setTimeout(() => {
+            resultFinalStageFlyTimer = null;
+            const wrapEl = getResultCompetitionWrapElement(stageId, stageVersion);
+            const bubbleEl = wrapEl ? wrapEl.querySelector(".stage-complete__competitive-bubble") : null;
+            const liveMessageEl = getResultCompetitionMessageElement(stageId, stageVersion);
+            if (bubbleEl) {
+              bubbleEl.hidden = true;
+            }
+            if (liveMessageEl) {
+              liveMessageEl.hidden = true;
+            }
+            if (wrapEl) {
+              wrapEl.classList.add("stage-complete__competitive-wrap--final-flyaway");
+            }
+            window.setTimeout(() => {
+              markTurboAscended();
+            }, 1800);
+          }, 3000);
+        }, Math.max(0, Number(delayMs) || 0));
+      }
+
+      function setResultCompetitionMessage(stageId, stageVersion, message, messageColor = "") {
         const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
         if (!messageEl) return;
+        const wrapEl = messageEl.closest(".stage-complete__competitive-wrap");
+        const bubbleEl = wrapEl ? wrapEl.querySelector(".stage-complete__competitive-bubble") : null;
+        messageEl.textContent = message;
+        if (messageColor) {
+          messageEl.style.color = messageColor;
+        } else {
+          messageEl.style.removeProperty("color");
+        }
+        if (wrapEl) {
+          wrapEl.hidden = false;
+          wrapEl.classList.remove("stage-complete__competitive-wrap--final-flyaway");
+        }
+        if (bubbleEl) {
+          bubbleEl.hidden = false;
+        }
+        messageEl.hidden = false;
+      }
+
+      function applyResultCompetitionMessage(stageId, stageVersion, result, options = {}) {
+        const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
+        if (!messageEl) return;
+        const wrapEl = messageEl.closest(".stage-complete__competitive-wrap");
+        const initialMessage = String(messageEl.dataset.initialMessage || "").trim();
+        const initialShownAt = Number(messageEl.dataset.initialShownAt) || 0;
+        const initialHoldMs = Number(messageEl.dataset.initialHoldMs) || 3000;
+        const finalizeFinalStage = Boolean(options.finalizeFinalStage);
+        const imposterMessage = "I think I smell an imposter.";
+        const imposterHoldMs = 2500;
         const rank =
           result && Number.isFinite(Number(result.currentRunRank))
             ? Number(result.currentRunRank)
@@ -3414,7 +3862,17 @@ function runFlashCountdown(onComplete) {
             0,
             Math.min(100, Math.round(((totalPlayers - rank) / (totalPlayers - 1)) * 100))
           );
-          message = `You did better than ${percentBeaten}% of players.`;
+          if (percentBeaten < 25) {
+            message = `Uh oh, you only did better than ${percentBeaten}% of players.`;
+          } else if (percentBeaten < 50) {
+            message = `You did better than ${percentBeaten}% of players. Good effort.`;
+          } else if (percentBeaten < 75) {
+            message = `Nice job! You did better than ${percentBeaten}% of players.`;
+          } else if (percentBeaten < 100) {
+            message = `Congratulations! You did better than ${percentBeaten}% of players. You are really on a roll.`;
+          } else {
+            message = `Holy smokes! You did better than ${percentBeaten}% of players. One day you might even be faster than me!`;
+          }
           const ratio = percentBeaten / 100;
           const red = Math.round(220 * (1 - ratio) + 34 * ratio);
           const green = Math.round(38 * (1 - ratio) + 197 * ratio);
@@ -3426,17 +3884,65 @@ function runFlashCountdown(onComplete) {
           message = "";
         }
         if (message) {
-          messageEl.textContent = message;
-          if (messageColor) {
-            messageEl.style.color = messageColor;
+          clearResultCompetitionMessageTimer();
+          const delayMs = initialMessage && initialShownAt
+            ? Math.max(0, initialShownAt + initialHoldMs - Date.now())
+            : 0;
+          const shouldShowTurboImposter =
+            rank && totalPlayers > 1 && isTurboImposterPlayerName() && messageEl.dataset.imposterSequenceShown !== "1";
+          const applyMessage = () => {
+            resultCompetitionMessageTimer = null;
+            setResultCompetitionMessage(stageId, stageVersion, message, messageColor);
+            const liveMessageEl = getResultCompetitionMessageElement(stageId, stageVersion);
+            if (liveMessageEl) {
+              liveMessageEl.dataset.initialMessage = "";
+            }
+            if (finalizeFinalStage) {
+              scheduleFinalStageSpeakerSequence(stageId, stageVersion, 3000);
+            }
+          };
+          const showImposterThenMessage = () => {
+            resultCompetitionMessageTimer = null;
+            messageEl.dataset.imposterSequenceShown = "1";
+            maybeUnlockTurboImposterAchievement(stageId, stageVersion);
+            setResultCompetitionMessage(stageId, stageVersion, imposterMessage);
+            resultCompetitionFollowupTimer = window.setTimeout(() => {
+              resultCompetitionFollowupTimer = null;
+              applyMessage();
+            }, imposterHoldMs);
+          };
+          if (shouldShowTurboImposter) {
+            if (delayMs > 0) {
+              resultCompetitionMessageTimer = window.setTimeout(showImposterThenMessage, delayMs);
+            } else {
+              showImposterThenMessage();
+            }
+          } else if (delayMs > 0) {
+            resultCompetitionMessageTimer = window.setTimeout(applyMessage, delayMs);
           } else {
-            messageEl.style.removeProperty("color");
+            applyMessage();
           }
-          messageEl.hidden = false;
         } else {
-          messageEl.textContent = "";
-          messageEl.style.removeProperty("color");
-          messageEl.hidden = true;
+          clearResultCompetitionMessageTimer();
+          if (initialMessage) {
+            setResultCompetitionMessage(stageId, stageVersion, initialMessage);
+            if (finalizeFinalStage) {
+              const remainingInitialMs = initialShownAt
+                ? Math.max(0, initialShownAt + initialHoldMs - Date.now())
+                : 0;
+              scheduleFinalStageSpeakerSequence(stageId, stageVersion, remainingInitialMs);
+            }
+          } else {
+            messageEl.textContent = "";
+            messageEl.style.removeProperty("color");
+            messageEl.hidden = true;
+            if (wrapEl) {
+              wrapEl.hidden = true;
+            }
+            if (finalizeFinalStage) {
+              scheduleFinalStageSpeakerSequence(stageId, stageVersion, 0);
+            }
+          }
         }
       }
 
@@ -3467,8 +3973,12 @@ function runFlashCountdown(onComplete) {
         const comparisonTimeMs = competitionEl && Number.isFinite(Number(competitionEl.dataset.currentTimeMs))
           ? Number(competitionEl.dataset.currentTimeMs)
           : null;
+        clearResultCompetitionMessageTimer();
+        clearFinalStageSpeakerTimers();
+        resetResultCompetitionSpeaker(stageId, stageVersion);
         if (competitionEl) {
-          competitionEl.textContent = "Comparing your run...";
+          const initialMessage = String(competitionEl.dataset.initialMessage || "").trim();
+          competitionEl.textContent = initialMessage || competitionEl.textContent || "Good job completing the level!";
           competitionEl.hidden = false;
         }
         const leaderboardReady = typeof window.getLeaderboardReady === "function"
@@ -3483,21 +3993,26 @@ function runFlashCountdown(onComplete) {
           } else if (emptyEl) {
             loadingRow.textContent = "No data yet";
           }
-          applyResultCompetitionMessage(stageId, stageVersion, null);
+          applyResultCompetitionMessage(stageId, stageVersion, null, {
+            finalizeFinalStage: retryCount >= 5
+          });
           return;
         }
         listEl.dataset.lbRetryCount = "0";
         try {
           const result = await window.fetchStageLeaderboard(stageId, stageVersion, 5, comparisonTimeMs);
           const top = result && Array.isArray(result.top) ? result.top : [];
-          const context = result && Array.isArray(result.context) ? result.context : [];
           const me = result ? result.me : null;
           const fetchedMeRank = result ? result.meRank : null;
           const topRows = [];
-          const contextRows = [];
           const localName = getPreferredPlayerDisplayName();
           let meEntry = null;
           let meRank = Number.isFinite(fetchedMeRank) ? fetchedMeRank : null;
+          const bestKey = window.getStageBestTimeKey
+            ? window.getStageBestTimeKey(stage, index)
+            : stageId;
+          const localBestSeconds = Number(window.stageBestTimes && window.stageBestTimes[bestKey]);
+          const localBestMs = Number.isFinite(localBestSeconds) ? Math.round(localBestSeconds * 1000) : null;
           (Array.isArray(top) ? top : []).forEach((entry, idx) => {
             if (entry.player_id && window.getLeaderboardPlayerId && entry.player_id === window.getLeaderboardPlayerId()) {
               meEntry = entry;
@@ -3510,41 +4025,39 @@ function runFlashCountdown(onComplete) {
               return `<span>${rank}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
             });
           });
-          if (Array.isArray(context) && context.length) {
-            context.forEach((entry) => {
-              const rank = Number(entry && entry.rank) || 0;
-              const time = Number(entry && entry.best_time_ms);
-              const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "\u2014";
-              appendLeaderboardDataRow(contextRows, entry, rank, localName, (resolvedRank, rawName) => {
-                const name = truncateLeaderboardName(rawName);
-                return `<span>${resolvedRank}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
-              }, ["leaderboard-row--context"]);
-            });
-          } else if (meEntry || me) {
-            const source = meEntry || me;
-            const time = Number(source.best_time_ms);
+          const meIsInTop = Boolean(meEntry) || (Number.isFinite(meRank) && meRank > 0 && meRank <= top.length);
+          let playerRow = null;
+          if (meIsInTop) {
+            playerRow = buildLeaderboardPlaceholderRow();
+          } else if (me) {
+            const time = Number(me.best_time_ms);
             const timeText = Number.isFinite(time) ? `${(time / 1000).toFixed(2)}s` : "\u2014";
             const rankText = meRank ? String(meRank) : "\u2014";
-            appendLeaderboardDataRow(contextRows, source, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
+            const rows = [];
+            appendLeaderboardDataRow(rows, me, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
               const name = truncateLeaderboardName(rawName);
               return `<span>${resolvedRank || rankText}</span><span class="leaderboard-name" title="${rawName}">${name}</span><span>${timeText}</span>`;
             }, ["leaderboard-row--context"]);
+            playerRow = rows[0] || null;
           } else {
             const row = document.createElement("div");
             row.className = "leaderboard-row leaderboard-row--me leaderboard-row--context";
             row.dataset.playerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
-            const name = localName || "You";
-            row.innerHTML = `<span>-</span><span class="leaderboard-name">${name}</span><span>-</span>`;
-            contextRows.push(row);
+            const name = truncateLeaderboardName(localName || "You");
+            const timeText = Number.isFinite(localBestMs) ? `${(localBestMs / 1000).toFixed(2)}s` : "-";
+            row.innerHTML = `<span>${meRank || "-"}</span><span class="leaderboard-name" title="${localName || "You"}">${name}</span><span>${timeText}</span>`;
+            playerRow = row;
           }
           const rows = topRows.slice();
-          if (topRows.length && contextRows.length) {
+          if (topRows.length && playerRow) {
             const dividerRow = document.createElement("div");
             dividerRow.className = "leaderboard-divider";
             dividerRow.setAttribute("aria-hidden", "true");
             rows.push(dividerRow);
           }
-          rows.push(...contextRows);
+          if (playerRow) {
+            rows.push(playerRow);
+          }
           if (rows.length) {
             listEl.replaceChildren(headerRow, ...rows);
           } else {
@@ -3566,12 +4079,16 @@ function runFlashCountdown(onComplete) {
             }
             listEl.appendChild(statusRow);
           }
-          applyResultCompetitionMessage(stageId, stageVersion, result);
+          applyResultCompetitionMessage(stageId, stageVersion, result, {
+            finalizeFinalStage: true
+          });
         } catch (error) {
           console.warn("Failed to render leaderboard", error);
           loadingRow.textContent = "Leaderboard failed to load. Please try again later.";
           listEl.replaceChildren(headerRow, loadingRow);
-          applyResultCompetitionMessage(stageId, stageVersion, null);
+          applyResultCompetitionMessage(stageId, stageVersion, null, {
+            finalizeFinalStage: true
+          });
         }
       };
 
@@ -3609,6 +4126,230 @@ function runFlashCountdown(onComplete) {
           }
         });
       };
+
+      const CREDITS_LIKES_STORAGE_KEY = "flashRecallCreditsLikes";
+
+      function getStoredCreditsLikes() {
+        try {
+          const raw = window.localStorage.getItem(CREDITS_LIKES_STORAGE_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? parsed : {};
+        } catch {
+          return {};
+        }
+      }
+
+      function saveStoredCreditsLikes(likesByKey) {
+        try {
+          window.localStorage.setItem(CREDITS_LIKES_STORAGE_KEY, JSON.stringify(likesByKey || {}));
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      function buildCreditsEntryKey(section, entry, index) {
+        const directId = entry && entry.id ? String(entry.id) : "";
+        if (directId) return `${section}:${directId}`;
+        const fallback = entry && (entry.title || entry.name || entry.creator)
+          ? String(entry.title || entry.name || entry.creator)
+          : String(index);
+        return `${section}:${fallback.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+      }
+
+      function getCreditsLikeState(entryKey, baseLikes = 0) {
+        const stored = getStoredCreditsLikes();
+        const liked = stored[entryKey] === 1;
+        return {
+          liked,
+          count: Math.max(0, Number(baseLikes) || 0) + (liked ? 1 : 0)
+        };
+      }
+
+      function toggleCreditsLike(entryKey) {
+        const stored = getStoredCreditsLikes();
+        if (stored[entryKey] === 1) {
+          delete stored[entryKey];
+        } else {
+          stored[entryKey] = 1;
+        }
+        saveStoredCreditsLikes(stored);
+      }
+
+      function appendCreditsLikeRow(card, entryKey, baseLikes = 0) {
+        const likeState = getCreditsLikeState(entryKey, baseLikes);
+        const actions = document.createElement("div");
+        actions.className = "credits-entry__actions";
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "credits-like-button";
+        button.dataset.creditsLike = entryKey;
+        button.setAttribute("aria-pressed", likeState.liked ? "true" : "false");
+        button.setAttribute("aria-label", likeState.liked ? "Unlike this entry" : "Like this entry");
+        if (likeState.liked) {
+          button.classList.add("is-liked");
+        }
+        button.innerHTML = `<span class="credits-like-button__heart" aria-hidden="true">♥</span><span class="credits-like-button__count">${likeState.count}</span>`;
+        actions.appendChild(button);
+        card.appendChild(actions);
+      }
+
+      function renderCreditsSection(container, headingText, entries, sectionName, emptyText) {
+        const section = document.createElement("section");
+        section.className = "credits-section";
+
+        if (headingText) {
+          const heading = document.createElement("h4");
+          heading.className = "credits-section__title";
+          heading.textContent = headingText;
+          section.appendChild(heading);
+        }
+
+        const list = document.createElement("div");
+        list.className = "credits-section__list";
+        section.appendChild(list);
+
+        const safeEntries = Array.isArray(entries) ? entries : [];
+        safeEntries.forEach((entry, index) => {
+          if (!entry || typeof entry !== "object") return;
+          const card = document.createElement("article");
+          card.className = "credits-entry";
+
+          const title = document.createElement("h5");
+          title.className = "credits-entry__title";
+          title.textContent = sectionName === "contributors"
+            ? (entry.name ? String(entry.name) : "Unnamed contributor")
+            : (entry.title ? String(entry.title) : "Untitled");
+          card.appendChild(title);
+
+          if (sectionName === "contributors" && entry.role) {
+            const role = document.createElement("p");
+            role.className = "credits-entry__meta";
+            role.textContent = String(entry.role);
+            card.appendChild(role);
+          }
+
+          if (sectionName !== "contributors" && entry.creator) {
+            const creator = document.createElement("p");
+            creator.className = "credits-entry__meta";
+            creator.textContent = `By ${String(entry.creator)}`;
+            card.appendChild(creator);
+          }
+
+          const hasSourceLink = sectionName === "contributors"
+            ? (entry.linkLabel || entry.linkUrl)
+            : (entry.sourceName || entry.sourceUrl);
+          if (hasSourceLink) {
+            const source = document.createElement("p");
+            source.className = "credits-entry__meta";
+            const linkUrl = sectionName === "contributors" ? entry.linkUrl : entry.sourceUrl;
+            const linkLabel = sectionName === "contributors"
+              ? (entry.linkLabel || entry.linkUrl)
+              : (entry.sourceName || entry.sourceUrl);
+            if (linkUrl) {
+              const link = document.createElement("a");
+              link.href = String(linkUrl);
+              link.textContent = String(linkLabel);
+              link.target = "_blank";
+              link.rel = "noreferrer noopener";
+              source.appendChild(link);
+            } else {
+              source.textContent = String(linkLabel);
+            }
+            card.appendChild(source);
+          }
+
+          if (sectionName !== "contributors" && entry.license) {
+            const license = document.createElement("p");
+            license.className = "credits-entry__meta";
+            license.textContent = `License: ${String(entry.license)}`;
+            card.appendChild(license);
+          }
+
+          if (entry.notes) {
+            const notes = document.createElement("p");
+            notes.className = "credits-entry__notes";
+            notes.textContent = String(entry.notes);
+            card.appendChild(notes);
+          }
+
+          appendCreditsLikeRow(card, buildCreditsEntryKey(sectionName, entry, index), entry.likes);
+          list.appendChild(card);
+        });
+
+        if (!list.children.length) {
+          const empty = document.createElement("div");
+          empty.className = "leaderboard-row leaderboard-row--empty";
+          empty.textContent = emptyText;
+          list.appendChild(empty);
+        }
+
+        container.appendChild(section);
+      }
+
+      function renderCreditsModal() {
+        if (!creditsList || !creditsEmpty) return;
+        const attributions = Array.isArray(window.creditsAttributions) ? window.creditsAttributions : [];
+        const contributors = Array.isArray(window.creditsContributors) ? window.creditsContributors : [];
+        creditsList.replaceChildren();
+        if (!attributions.length && !contributors.length) {
+          creditsEmpty.hidden = false;
+          return;
+        }
+        creditsEmpty.hidden = true;
+        const intro = document.createElement("p");
+        intro.className = "modal-note credits-note";
+        intro.textContent = "Thank you for everyone who contributed to this project. It would not have been possible without you!";
+        creditsList.appendChild(intro);
+
+        renderCreditsSection(creditsList, "", attributions, "attributions", "No attributions added yet.");
+        renderCreditsSection(creditsList, "Contributors", contributors, "contributors", "No contributors added yet.");
+        if (!creditsList.children.length) {
+          creditsEmpty.hidden = false;
+        }
+      }
+
+      if (creditsOpen && creditsModal) {
+        creditsOpen.addEventListener("click", () => {
+          logUiInteraction("credits_open", {
+            area: "home_menu",
+            action: "open"
+          });
+          renderCreditsModal();
+          setModalState(creditsModal, true);
+        });
+      }
+
+      if (creditsClose && creditsModal) {
+        creditsClose.addEventListener("click", () => {
+          logUiInteraction("credits_close", {
+            area: "credits_modal",
+            action: "close",
+            close_source: "button"
+          });
+          setModalState(creditsModal, false);
+        });
+      }
+
+      if (creditsModal) {
+        creditsModal.addEventListener("click", (event) => {
+          const likeButton = event.target.closest("[data-credits-like]");
+          if (likeButton) {
+            toggleCreditsLike(String(likeButton.dataset.creditsLike || ""));
+            renderCreditsModal();
+            return;
+          }
+          if (event.target === creditsModal) {
+            logUiInteraction("credits_close", {
+              area: "credits_modal",
+              action: "close",
+              close_source: "backdrop"
+            });
+            setModalState(creditsModal, false);
+          }
+        });
+      }
       if (stageIntroStart && stageIntroModal) {
         stageIntroStart.addEventListener("click", async () => {
           const index = stageIntroPendingIndex;
@@ -3821,6 +4562,7 @@ function runFlashCountdown(onComplete) {
       }
 
       if (playStart) {
+        randomizePlayButtonTurboSide();
         playStart.addEventListener("click", () => {
           logUiInteraction("play_start", {
             area: "home_menu",
@@ -4503,12 +5245,10 @@ function runFlashCountdown(onComplete) {
             }
           } while (attempts <= 5);
           const top = result && Array.isArray(result.top) ? result.top : [];
-          const context = result && Array.isArray(result.context) ? result.context : [];
           const me = result ? result.me : null;
           const meRank = result && Number.isFinite(result.meRank) ? result.meRank : null;
           const localName = getPreferredPlayerDisplayName();
           const topRows = [];
-          const contextRows = [];
           const mePlayerId = window.getLeaderboardPlayerId ? window.getLeaderboardPlayerId() : "";
           let meInTop = false;
           top.forEach((entry, idx) => {
@@ -4519,38 +5259,36 @@ function runFlashCountdown(onComplete) {
               return `<span>${rank}</span><span class="leaderboard-name" title="${rawName}">${rawName}</span><span>${value}</span>`;
             });
           });
-          if (Array.isArray(context) && context.length) {
-            context.forEach((entry) => {
-              const rank = Number(entry && entry.rank) || 0;
-              const value = Number(entry && entry[metric]);
-              const safeValue = Number.isFinite(value) ? value : localValue;
-              appendLeaderboardDataRow(contextRows, entry, rank, localName, (resolvedRank, rawName) => {
-                return `<span>${resolvedRank}</span><span class="leaderboard-name" title="${rawName}">${rawName}</span><span>${safeValue}</span>`;
-              }, ["leaderboard-row--context"]);
-            });
-          } else if (me && !meInTop) {
+          let playerRow = null;
+          if (meInTop || (Number.isFinite(meRank) && meRank > 0 && meRank <= top.length)) {
+            playerRow = buildLeaderboardPlaceholderRow();
+          } else if (me) {
             const value = Number(me[metric]);
             const safeValue = Number.isFinite(value) ? value : localValue;
             const rankText = meRank ? String(meRank) : "\u2014";
-            appendLeaderboardDataRow(contextRows, me, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
+            const rows = [];
+            appendLeaderboardDataRow(rows, me, Number(rankText) || 0, localName, (resolvedRank, rawName) => {
               return `<span>${resolvedRank || rankText}</span><span class="leaderboard-name" title="${rawName}">${rawName}</span><span>${safeValue}</span>`;
             }, ["leaderboard-row--context"]);
-          } else if (!me) {
+            playerRow = rows[0] || null;
+          } else {
             const meRow = document.createElement("div");
             meRow.className = "leaderboard-row leaderboard-row--me leaderboard-row--context";
             meRow.dataset.playerId = mePlayerId;
             const name = localName || "You";
-            meRow.innerHTML = `<span>-</span><span class="leaderboard-name">${name}</span><span>${localValue}</span>`;
-            contextRows.push(meRow);
+            meRow.innerHTML = `<span>${meRank || "-"}</span><span class="leaderboard-name">${name}</span><span>${localValue}</span>`;
+            playerRow = meRow;
           }
           const rows = topRows.slice();
-          if (topRows.length && contextRows.length) {
+          if (topRows.length && playerRow) {
             const dividerRow = document.createElement("div");
             dividerRow.className = "leaderboard-divider";
             dividerRow.setAttribute("aria-hidden", "true");
             rows.push(dividerRow);
           }
-          rows.push(...contextRows);
+          if (playerRow) {
+            rows.push(playerRow);
+          }
           listEl.replaceChildren(headerRow, ...rows);
           if (result && result.errorCode) {
             const statusRow = document.createElement("div");
@@ -5334,6 +6072,29 @@ function runFlashCountdown(onComplete) {
         }
       });
 
+      const sandboxTurboStoryButton = document.getElementById("sandboxTurboStoryButton");
+      if (sandboxTurboStoryButton) {
+        sandboxTurboStoryButton.addEventListener("click", () => {
+          if (!shouldShowSandboxAngelTurbo()) return;
+          const storyEl = document.getElementById("sandboxTurboStory");
+          sandboxTurboStoryButton.disabled = true;
+          if (storyEl) {
+            storyEl.classList.add("is-restoring");
+          }
+          window.setTimeout(() => {
+            restoreTurboFromSandbox();
+            if (typeof window.syncAchievementsFromLocal === "function") {
+              Promise.resolve(window.syncAchievementsFromLocal({ turboFreed: true })).catch((error) => {
+                console.warn("Failed to unlock freeing turbo achievement", error);
+              });
+            }
+            if (storyEl) {
+              storyEl.classList.remove("is-restoring");
+            }
+          }, 520);
+        });
+      }
+
       function hidePracticeError(error, resetText = "") {
         if (!error) return;
         error.classList.remove("show");
@@ -5858,6 +6619,13 @@ function runFlashCountdown(onComplete) {
         if (!isTextEntryTarget(event.target) && keybindMatches(event, "fullscreen")) {
           event.preventDefault();
           toggleFullscreen();
+          return;
+        }
+        if (creditsModal && creditsModal.classList.contains("show")) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setModalState(creditsModal, false);
+          }
           return;
         }
         if (referenceModal && referenceModal.classList.contains("show")) {

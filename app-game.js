@@ -656,17 +656,27 @@
       }
 
       function saveStageStars(stage, stars, elapsedSeconds) {
-        if (!stage || !window.stageStars) return { hadBest: false };
+        if (!stage || !window.stageStars) {
+          return {
+            hadBest: false,
+            isFirstClear: false,
+            isNewBest: false,
+            isNewScore: false
+          };
+        }
         const key = window.getStageStarsKey
           ? window.getStageStarsKey(stage, stageState.index)
           : (stage.id ? String(stage.id) : String(stageState.index + 1));
         let hadBest = false;
+        let isNewScore = false;
+        const wasCompletedBefore = Boolean(window.stageCompleted && window.stageCompleted[key]);
         
         // Save stars (keep the highest)
         const hasEntry = Object.prototype.hasOwnProperty.call(window.stageStars, key);
         const current = hasEntry ? Number(window.stageStars[key]) : null;
         if (!hasEntry || stars > current) {
           window.stageStars[key] = stars;
+          isNewScore = true;
         }
         
         // Mark as completed (regardless of stars)
@@ -689,14 +699,84 @@
             : key;
           const currentBest = Number(window.stageBestTimes[bestKey]);
           hadBest = Number.isFinite(currentBest);
+          const isNewBest = !Number.isFinite(currentBest) || elapsedSeconds < currentBest;
           if (!Number.isFinite(currentBest) || elapsedSeconds < currentBest) {
             window.stageBestTimes[bestKey] = elapsedSeconds;
           }
           if (window.saveStageProgress) {
             window.saveStageProgress();
           }
+          return {
+            hadBest,
+            isFirstClear: !wasCompletedBefore,
+            isNewBest,
+            isNewScore
+          };
         }
-        return { hadBest };
+        return {
+          hadBest,
+          isFirstClear: !wasCompletedBefore,
+          isNewBest: false,
+          isNewScore
+        };
+      }
+
+      function buildResultConfettiMarkup(count = 42) {
+        const palette = ["#ef4444", "#f59e0b", "#facc15", "#22c55e", "#38bdf8", "#a78bfa", "#ec4899"];
+        const burstAnchors = [8, 20, 34, 50, 66, 80, 92];
+        const pieces = Array.from({ length: count }, (_, index) => {
+          const anchor = burstAnchors[index % burstAnchors.length];
+          const left = Math.max(-4, Math.min(104, anchor + (Math.random() * 12 - 6)));
+          const startY = Math.round(-24 + Math.random() * 40);
+          const vx = Math.round((Math.random() * 2 - 1) * (90 + Math.random() * 90));
+          const vy = Math.round(-(60 + Math.random() * 150));
+          const gravity = Math.round(220 + Math.random() * 190);
+          const delay = Math.round(Math.random() * 320);
+          const duration = 1900 + Math.round(Math.random() * 950);
+          const rotateStart = Math.round(Math.random() * 180 - 90);
+          const spin = Math.round((Math.random() < 0.5 ? -1 : 1) * (220 + Math.random() * 560));
+          const size = 6 + Math.floor(Math.random() * 8);
+          const opacity = (0.82 + Math.random() * 0.18).toFixed(2);
+          const color = palette[Math.floor(Math.random() * palette.length)];
+          const ballisticY = (t) => Math.round(startY + vy * t + gravity * t * t);
+          const ballisticX = (t) => Math.round(vx * t);
+          const spinAt = (t) => Math.round(rotateStart + spin * t);
+          return `<span class="stage-complete__confetti-piece" style="--confetti-left:${left}%;--confetti-delay:${delay}ms;--confetti-duration:${duration}ms;--confetti-width:${size}px;--confetti-height:${size}px;--confetti-opacity:${opacity};--confetti-color:${color};--confetti-x0:0px;--confetti-y0:${startY}px;--confetti-x25:${ballisticX(0.25)}px;--confetti-y25:${ballisticY(0.25)}px;--confetti-x50:${ballisticX(0.5)}px;--confetti-y50:${ballisticY(0.5)}px;--confetti-x75:${ballisticX(0.75)}px;--confetti-y75:${ballisticY(0.75)}px;--confetti-x100:${ballisticX(1)}px;--confetti-y100:${ballisticY(1)}px;--confetti-r0:${rotateStart}deg;--confetti-r25:${spinAt(0.25)}deg;--confetti-r50:${spinAt(0.5)}deg;--confetti-r75:${spinAt(0.75)}deg;--confetti-r100:${spinAt(1)}deg;"></span>`;
+        }).join("");
+        return `<div class="stage-complete__confetti" aria-hidden="true">${pieces}</div>`;
+      }
+
+      function buildResultCompetitionSpeakerMarkup(stageId, stageVersion, elapsedSeconds, initialMessage, isFinalStage = false) {
+        const safeInitialMessage = initialMessage || "Good job completing the level!";
+        const finalStageMessage = "You beat the final level, looks like you have nothing left to learn from me.";
+        return `
+          <div class="stage-complete__competitive-wrap" id="stageCompetitiveWrap">
+            <div class="stage-complete__competitive-bubble">
+              <div
+                class="stage-competitive-message"
+                id="stageCompetitiveMessage"
+                data-stage-id="${stageId}"
+                data-stage-version="${stageVersion}"
+                data-current-time-ms="${Math.round(elapsedSeconds * 1000)}"
+                data-initial-message="${safeInitialMessage}"
+                data-initial-shown-at="${Date.now()}"
+                data-initial-hold-ms="3000"
+                data-final-stage="${isFinalStage ? "1" : "0"}"
+                data-final-message="${isFinalStage ? finalStageMessage : ""}"
+              >
+                ${safeInitialMessage}
+              </div>
+            </div>
+            <img
+              class="stage-complete__competitive-turbo"
+              data-default-src="imgs/Sloths/transparent/turbo_holding_branch.png"
+              data-angel-src="imgs/Sloths/transparent/turbo_angel.png"
+              src="imgs/Sloths/transparent/turbo_holding_branch.png"
+              alt=""
+              aria-hidden="true"
+            />
+          </div>
+        `;
       }
 
       function showStageComplete(elapsedSeconds, stars, stage, options = {}) {
@@ -743,9 +823,24 @@
           typeof window.getActionKeyLabel === "function" ? window.getActionKeyLabel("stageNext") : "N";
         const retryKey = retryActionKey;
         const starGap = stars < 4 ? "1rem" : "0.65rem";
+        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        const hasNextStage = Boolean(stages[stageState.index + 1]);
+        const nextStage = hasNextStage && typeof window.getStageConfig === "function"
+          ? window.getStageConfig(stageState.index + 1)
+          : stages[stageState.index + 1] || null;
+        const isFinalStage = !hasNextStage;
+        const shouldRunFinalTurboFarewell = Boolean(
+          isFinalStage &&
+          !(typeof window.hasTurboFarewellOccurred === "function" && window.hasTurboFarewellOccurred())
+        );
+        const initialCompetitiveMessage = options.isNewBest && options.showBest
+          ? "New personal best!"
+          : "Good job completing the level!";
+        const showCelebration = true;
 
         resultsPanel.innerHTML = `
-          <div class="stage-complete">
+          <div class="stage-complete${showCelebration ? " stage-complete--celebration" : ""}${shouldRunFinalTurboFarewell ? " stage-complete--final" : ""}">
+            ${showCelebration ? buildResultConfettiMarkup() : ""}
             ${adaptiveMessage ? `
               <div class="adaptive-stage-message" id="adaptiveStageMessage" role="status" aria-live="polite">
                 <button
@@ -761,15 +856,6 @@
               <div class="stage-complete__header">
                 <strong>${stageName} complete!</strong>
                 <div class="stage-meta">Time: ${elapsedSeconds.toFixed(2)}s <span class="stage-meta--best" id="stageCompleteBestTime"></span></div>
-                <div
-                  class="stage-competitive-message"
-                  id="stageCompetitiveMessage"
-                  data-stage-id="${stageId}"
-                  data-stage-version="${stageVersion}"
-                  data-current-time-ms="${Math.round(elapsedSeconds * 1000)}"
-                >
-                  Comparing your run...
-                </div>
               </div>
               <div class="stage-complete__stars" aria-label="Stage stars" data-stars="${stars}" style="gap: ${starGap};">
                 <div class="star-column">
@@ -794,6 +880,7 @@
               <div class="stage-complete__bar-track">
                 <div class="stage-complete__bar-fill" data-stars="${stars}"></div>
               </div>
+              ${buildResultCompetitionSpeakerMarkup(stageId, stageVersion, elapsedSeconds, initialCompetitiveMessage, shouldRunFinalTurboFarewell)}
             </div>
             <div class="leaderboard-panel" id="stageClearLeaderboard" data-stage-index="${stageState.index}">
               <div class="leaderboard-panel__title">Leaderboard</div>
@@ -861,11 +948,6 @@
           clearTimeout(autoAdvanceNextTimerId);
           autoAdvanceNextTimerId = null;
         }
-        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
-        const hasNextStage = Boolean(stages[stageState.index + 1]);
-        const nextStage = hasNextStage && typeof window.getStageConfig === "function"
-          ? window.getStageConfig(stageState.index + 1)
-          : stages[stageState.index + 1] || null;
         const nextTimer = document.querySelector("#resultsPanel .stage-next-timer");
         const nextTimerFill = nextTimer
           ? nextTimer.querySelector(".stage-next-timer__fill")
@@ -1483,7 +1565,10 @@
               lockInputs(true);
               renderCards(true);
               showStageComplete(elapsedSeconds, stars, stage, {
-                showBest: Boolean(saveResult && saveResult.hadBest)
+                showBest: Boolean(saveResult && saveResult.hadBest),
+                isFirstClear: Boolean(saveResult && saveResult.isFirstClear),
+                isNewBest: Boolean(saveResult && saveResult.isNewBest),
+                isNewScore: Boolean(saveResult && saveResult.isNewScore)
               });
               if (submitBtn) {
                 submitBtn.disabled = true;

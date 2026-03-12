@@ -337,6 +337,8 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "secret_forget_me", title: "Forget About Me", description: "Encounter the sloth during a level.", iconSrc: "imgs/forget_me.png", secret: true },
   { id: "secret_join_the_resistance", title: "Join the Resistance", description: "Be assigned the rare Red Penguin name.", iconSrc: RED_PENGUIN_ICON_SRC, secret: true },
   { id: "secret_turbo_taps", title: "Turbo!", description: "Click Turbo 10 times in a row on the start screen.", iconSrc: "imgs/Sloths/transparent/turbo_waving.png", secret: true },
+  { id: "secret_turbo_imposter", title: "Imposter!", description: "Name yourself Turbo and make the real Turbo suspicious.", iconSrc: "imgs/Sloths/transparent/turbo_flag_splash.png", secret: true },
+  { id: "secret_freeing_turbo", title: "Freeing Turbo", description: "Free angel Turbo from Sandbox after beating the final level.", iconSrc: "imgs/Sloths/transparent/turbo_angel.png", secret: true },
   { id: "secret_world_class_climber", title: "World Class Climber", description: "Name yourself after a world-class climber.", iconSrc: ROCK_CLIMBER_ICON_SRC, secret: true },
   { id: "secret_prism_parade", title: "Prism Parade", description: "Find the hidden rainbow theme through Shuffle Theme.", iconSrc: RAINBOW_ICON_SRC, secret: true },
   { id: "secret_stars_level_4", title: "Hidden Mastery", description: "Collect 4 stars on a level.", iconText: "\u2605\u2605\u2605\u2605", secret: true },
@@ -700,6 +702,8 @@ function getDefaultAchievementProfile() {
     first_steps: false,
     any_key_secret: false,
     world_class_climber: false,
+    turbo_imposter_found: false,
+    turbo_freed: false,
     prism_parade_found: false,
     cat_found: false,
     sloth_found: false,
@@ -752,6 +756,8 @@ function normalizeAchievementProfile(raw) {
   base.first_steps = Boolean(source.first_steps);
   base.any_key_secret = Boolean(source.any_key_secret);
   base.world_class_climber = Boolean(source.world_class_climber);
+  base.turbo_imposter_found = Boolean(source.turbo_imposter_found);
+  base.turbo_freed = Boolean(source.turbo_freed);
   base.prism_parade_found = Boolean(source.prism_parade_found);
   base.cat_found = Boolean(source.cat_found);
   base.sloth_found = Boolean(source.sloth_found);
@@ -934,6 +940,8 @@ function normalizeAchievementUpdate(update = {}) {
     firstSteps: false,
     anyKeySecret: false,
     worldClassClimber: false,
+    turboImposterFound: false,
+    turboFreed: false,
     prismParadeFound: false,
     catFound: false,
     slothFound: false,
@@ -976,6 +984,8 @@ function normalizeAchievementUpdate(update = {}) {
   base.firstSteps = Boolean(update.firstSteps);
   base.anyKeySecret = Boolean(update.anyKeySecret);
   base.worldClassClimber = Boolean(update.worldClassClimber);
+  base.turboImposterFound = Boolean(update.turboImposterFound);
+  base.turboFreed = Boolean(update.turboFreed);
   base.prismParadeFound = Boolean(update.prismParadeFound);
   base.catFound = Boolean(update.catFound);
   base.slothFound = Boolean(update.slothFound);
@@ -1074,6 +1084,8 @@ function mergeAchievementUpdateInputs(...updates) {
     merged.firstSteps = merged.firstSteps || update.firstSteps;
     merged.anyKeySecret = merged.anyKeySecret || update.anyKeySecret;
     merged.worldClassClimber = merged.worldClassClimber || update.worldClassClimber;
+    merged.turboImposterFound = merged.turboImposterFound || update.turboImposterFound;
+    merged.turboFreed = merged.turboFreed || update.turboFreed;
     merged.prismParadeFound = merged.prismParadeFound || update.prismParadeFound;
     merged.catFound = merged.catFound || update.catFound;
     merged.slothFound = merged.slothFound || update.slothFound;
@@ -1173,6 +1185,8 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   next.world_class_climber = next.world_class_climber
     || normalized.worldClassClimber
     || isWorldClassClimberName(normalized.playerName || next.player_name);
+  next.turbo_imposter_found = next.turbo_imposter_found || normalized.turboImposterFound;
+  next.turbo_freed = next.turbo_freed || normalized.turboFreed;
   next.prism_parade_found = next.prism_parade_found || normalized.prismParadeFound;
   next.cat_found = next.cat_found || normalized.catFound;
   next.sloth_found = next.sloth_found || normalized.slothFound;
@@ -1258,6 +1272,8 @@ function getAchievementUnlockIds(profile) {
   if (profile.sandbox_completed_count >= 1000) unlocks.push("sandbox_complete_1000");
   if (profile.any_key_secret) unlocks.push("secret_any_key");
   if (profile.world_class_climber) unlocks.push("secret_world_class_climber");
+  if (profile.turbo_imposter_found) unlocks.push("secret_turbo_imposter");
+  if (profile.turbo_freed) unlocks.push("secret_freeing_turbo");
   if (profile.cat_found) unlocks.push("secret_cat");
   if (profile.sloth_found) unlocks.push("secret_forget_me");
   if (profile.red_penguin_found) unlocks.push("secret_join_the_resistance");
@@ -1394,6 +1410,8 @@ async function applyAchievementUpdate(update = {}, options = {}) {
         first_steps: nextProfile.first_steps,
         any_key_secret: nextProfile.any_key_secret,
         world_class_climber: nextProfile.world_class_climber,
+        turbo_imposter_found: nextProfile.turbo_imposter_found,
+        turbo_freed: nextProfile.turbo_freed,
         prism_parade_found: nextProfile.prism_parade_found,
         cat_found: nextProfile.cat_found,
         sloth_found: nextProfile.sloth_found,
