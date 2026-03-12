@@ -3,8 +3,8 @@
 Flash Recall is a browser-based memory game with progressive difficulty, gameplay modifiers, unlockable achievements, stage variants, and Firestore-backed telemetry.
 
 ## Live URLs
-- Firebase Hosting: <a href="https://flash-recall-df7d9.web.app" target="_blank">https://flash-recall-df7d9.web.app</a>
-- GitHub Pages: <a href="https://mrlint01.github.io/memory-game/" target="_blank">https://mrlint01.github.io/memory-game/</a>
+- Firebase Hosting: https://flash-recall-df7d9.web.app
+- GitHub Pages: https://mrlint01.github.io/memory-game/
 
 ## Current Release
 - App version: `2026.04.0`
