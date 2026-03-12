@@ -1106,9 +1106,11 @@ button.splash-turbo:focus-visible {
   opacity: 0;
   user-select: none;
   -webkit-user-drag: none;
+  pointer-events: auto;
+  cursor: pointer;
   filter: saturate(0.94) brightness(1.03) drop-shadow(0 12px 22px rgba(15, 23, 42, 0.08));
   will-change: transform, opacity;
-  transform: translate3d(var(--angel-x-start, -16rem), 0, 0) scale(0.9);
+  transform: translate3d(var(--angel-x-start, -16rem), 0, 0) scale(var(--angel-scale-start, 0.9));
 }
 .floating-angel.is-active {
   animation: floatingAngelDrift var(--angel-duration, 14000ms) linear forwards;
@@ -1121,8 +1123,8 @@ body.loading-overlay .floating-angel-layer {
 }
 @keyframes floatingAngelDrift {
   0% {
-    opacity: 0;
-    transform: translate3d(var(--angel-x-start, -16rem), 0, 0) scale(0.9);
+    opacity: var(--angel-start-opacity, 0);
+    transform: translate3d(var(--angel-x-start, -16rem), 0, 0) scale(var(--angel-scale-start, 0.9));
   }
   12% {
     opacity: var(--angel-opacity, 0.26);
@@ -1132,7 +1134,7 @@ body.loading-overlay .floating-angel-layer {
   }
   100% {
     opacity: 0;
-    transform: translate3d(var(--angel-x-end, calc(100vw + 12rem)), var(--angel-y-drift, 0px), 0) scale(1);
+    transform: translate3d(var(--angel-x-end, calc(100vw + 12rem)), var(--angel-y-drift, 0px), 0) scale(var(--angel-scale-end, 1));
   }
 }
 .splash-title::before,
@@ -3429,6 +3431,11 @@ body[data-theme="prism-parade"][data-view="home"].home-anim .mode-card.primary {
 .mode-card.primary {
   background: var(--panel-muted);
   animation: playPulse 2.2s ease-in-out infinite;
+}
+#playStart,
+#playStart .mode-card__label,
+#playStart strong {
+  color: #000000;
 }
 .mode-card--turbo {
   min-height: clamp(6.2rem, 12vw, 7.1rem);
@@ -5803,9 +5810,9 @@ body.stage-fail .rotation-icon {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  min-height: 9rem;
-  padding: 0.3rem 0 0.85rem;
-  margin-top: 0.55rem;
+  min-height: 11rem;
+  padding: 2.1rem 0 0.75rem;
+  margin-top: 1.45rem;
 }
 .sandbox-turbo-story[hidden] {
   display: none !important;
@@ -5834,11 +5841,16 @@ body.stage-fail .rotation-icon {
 }
 .sandbox-turbo-story__button:disabled {
   cursor: default;
+  opacity: 1 !important;
+  filter: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 .sandbox-turbo-story__image {
   display: block;
-  width: clamp(136px, 17vw, 204px);
+  width: clamp(82px, 10.5vw, 124px);
   height: auto;
+  opacity: var(--sandbox-turbo-opacity, 0.76);
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: none;
@@ -5850,7 +5862,15 @@ body.stage-fail .rotation-icon {
   filter: blur(1.2px);
 }
 .sandbox-turbo-story.is-restored .sandbox-turbo-story__image {
-  width: clamp(142px, 18vw, 212px);
+  width: clamp(82px, 10.5vw, 124px);
+  opacity: 1 !important;
+  filter: none;
+}
+.sandbox-turbo-story.is-restored .sandbox-turbo-story__button,
+.sandbox-turbo-story.is-restored .sandbox-turbo-story__button:disabled,
+.sandbox-turbo-story.is-restored .sandbox-turbo-story__button:disabled .sandbox-turbo-story__image {
+  opacity: 1 !important;
+  filter: none !important;
 }
 .player-name-note {
   margin-bottom: 0.85rem;
@@ -6207,11 +6227,12 @@ body[data-state="result"] #resultsPanel .stage-complete__actions {
   }
 
   .sandbox-turbo-story {
-    min-height: 7.4rem;
+    min-height: 9.2rem;
+    padding-top: 1.5rem;
     padding-bottom: 0.55rem;
   }
   .sandbox-turbo-story__image {
-    width: clamp(112px, 28vw, 156px);
+    width: clamp(66px, 17vw, 94px);
   }
 
   .stage-grid {

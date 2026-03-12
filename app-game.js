@@ -1985,6 +1985,9 @@
         if (typeof window.setBackgroundMusicMode === "function") {
           window.setBackgroundMusicMode("level");
         }
+        if (typeof window.beginRareEventGracePeriod === "function") {
+          window.beginRareEventGracePeriod();
+        }
         document.body.classList.remove("stage-fail");
         if (gameMode === "stages" && !options.__flashOverride) {
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;

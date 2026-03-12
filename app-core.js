@@ -191,6 +191,7 @@ const revealInput = document.getElementById("revealTime");
         }
       };
       const RARE_CAT_CARD_CHANCE = 1 / 5000;
+      const RARE_EVENT_GRACE_PERIOD_MS = 60 * 1000;
       const RARE_CAT_CARD_IMAGES = [
         "imgs/cats/Aidan_cat.jpg",
         "imgs/cats/Aidan_cat2.jpg",
@@ -434,6 +435,7 @@ const revealInput = document.getElementById("revealTime");
         page: 0
       };
       let sessionStartTime = performance.now();
+      let rareEventGraceStartedAt = null;
       let lastCompletedLevel = 0;
       let dragSelecting = false;
       let dragTargetState = null;
@@ -463,6 +465,32 @@ const revealInput = document.getElementById("revealTime");
         if (practiceAds && practiceAds.checked) active.push("ads");
         return active;
       }
+
+      function resetRareEventGracePeriod() {
+        rareEventGraceStartedAt = null;
+      }
+
+      function beginRareEventGracePeriod(force = false) {
+        if (force || !Number.isFinite(rareEventGraceStartedAt)) {
+          rareEventGraceStartedAt = performance.now();
+        }
+      }
+
+      function getRareEventGraceRemainingMs() {
+        if (!Number.isFinite(rareEventGraceStartedAt)) {
+          return RARE_EVENT_GRACE_PERIOD_MS;
+        }
+        return Math.max(0, RARE_EVENT_GRACE_PERIOD_MS - (performance.now() - rareEventGraceStartedAt));
+      }
+
+      function hasRareEventGracePeriodElapsed() {
+        return getRareEventGraceRemainingMs() <= 0;
+      }
+
+      window.beginRareEventGracePeriod = beginRareEventGracePeriod;
+      window.resetRareEventGracePeriod = resetRareEventGracePeriod;
+      window.getRareEventGraceRemainingMs = getRareEventGraceRemainingMs;
+      window.hasRareEventGracePeriodElapsed = hasRareEventGracePeriodElapsed;
 
       function incrementAchievementCounter(map, key, amount = 1) {
         if (!map || !key || !Number.isFinite(amount) || amount <= 0) return;
@@ -1261,7 +1289,9 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function maybeConvertToCatCard(item) {
-        if (!item || item.specialType === "cat" || Math.random() >= RARE_CAT_CARD_CHANCE) {
+        const canShowRareCat =
+          typeof window.hasRareEventGracePeriodElapsed !== "function" || window.hasRareEventGracePeriodElapsed();
+        if (!item || item.specialType === "cat" || !canShowRareCat || Math.random() >= RARE_CAT_CARD_CHANCE) {
           return item;
         }
         return {

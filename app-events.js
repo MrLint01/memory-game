@@ -1168,6 +1168,7 @@
       let floatingAngelLayer = null;
       let floatingAngelImage = null;
       let floatingAngelTimer = null;
+      let floatingAngelDirection = 1;
 
       function normalizeTurboStoryState(value) {
         const raw = String(value || "").trim().toLowerCase();
@@ -1227,6 +1228,117 @@
         }
       }
 
+      function getFloatingAngelCurrentScale() {
+        if (!floatingAngelImage) return 1;
+        const computed = window.getComputedStyle(floatingAngelImage);
+        const transform = String(computed.transform || "").trim();
+        if (!transform || transform === "none") {
+          return 1;
+        }
+        const match2d = transform.match(/^matrix\(([^)]+)\)$/);
+        if (match2d) {
+          const parts = match2d[1].split(",").map((value) => Number.parseFloat(value.trim()));
+          if (parts.length >= 4 && parts.every((value) => Number.isFinite(value))) {
+            return Math.max(0.01, Math.hypot(parts[0], parts[1]));
+          }
+        }
+        const match3d = transform.match(/^matrix3d\(([^)]+)\)$/);
+        if (match3d) {
+          const parts = match3d[1].split(",").map((value) => Number.parseFloat(value.trim()));
+          if (parts.length >= 16 && parts.every((value) => Number.isFinite(value))) {
+            return Math.max(0.01, Math.hypot(parts[0], parts[1], parts[2]));
+          }
+        }
+        return 1;
+      }
+
+      function getFloatingAngelLayoutAnchorFromRect(rect, scale) {
+        const safeRect = rect && typeof rect === "object" ? rect : null;
+        const safeScale = Number.isFinite(Number(scale)) ? Math.max(0.01, Number(scale)) : 1;
+        const width = safeRect && Number.isFinite(Number(safeRect.width)) ? Number(safeRect.width) : 0;
+        const height = safeRect && Number.isFinite(Number(safeRect.height)) ? Number(safeRect.height) : 0;
+        const left = safeRect && Number.isFinite(Number(safeRect.left)) ? Number(safeRect.left) : 0;
+        const top = safeRect && Number.isFinite(Number(safeRect.top)) ? Number(safeRect.top) : 0;
+        const offsetX = width ? (width * (safeScale - 1)) / (2 * safeScale) : 0;
+        const offsetY = height ? (height * (safeScale - 1)) / (2 * safeScale) : 0;
+        return {
+          x: left + offsetX,
+          y: top + offsetY
+        };
+      }
+
+      function startFloatingAngelFlight(startX = null, startY = null, options = {}) {
+        if (!floatingAngelImage) return;
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const requestedDirection = Number(options.direction);
+        const direction = requestedDirection === -1 || requestedDirection === 1
+          ? requestedDirection
+          : (Math.random() < 0.5 ? -1 : 1);
+        const safeStartX = Number.isFinite(Number(startX))
+          ? Number(startX)
+          : (direction > 0 ? -192 : viewportWidth + 192);
+        const safeStartY = Number.isFinite(Number(startY))
+          ? Number(startY)
+          : Math.round(viewportHeight * (0.16 + Math.random() * 0.42));
+        const endX = direction > 0 ? viewportWidth + 192 : -192;
+        const yDrift = Number.isFinite(Number(options.yDrift))
+          ? Number(options.yDrift)
+          : Math.round(-72 + Math.random() * 144);
+        const distance = Math.max(240, Math.abs(endX - safeStartX));
+        const durationMs = Number.isFinite(Number(options.durationMs))
+          ? Math.max(3200, Number(options.durationMs))
+          : Math.round(Math.max(6500, Math.min(15000, distance * (11 + Math.random() * 4))));
+        const startOpacity = Number.isFinite(Number(options.startOpacity))
+          ? Math.max(0, Math.min(1, Number(options.startOpacity)))
+          : 0;
+        const peakOpacity = Number.isFinite(Number(options.peakOpacity))
+          ? Math.max(0.08, Math.min(0.6, Number(options.peakOpacity)))
+          : (0.2 + Math.random() * 0.18);
+        const scaleStart = Number.isFinite(Number(options.scaleStart))
+          ? Math.max(0.01, Number(options.scaleStart))
+          : 0.9;
+        const scaleEnd = Number.isFinite(Number(options.scaleEnd))
+          ? Math.max(0.01, Number(options.scaleEnd))
+          : 1;
+        floatingAngelDirection = direction;
+        floatingAngelImage.style.top = `${Math.round(safeStartY)}px`;
+        floatingAngelImage.style.setProperty("--angel-start-opacity", startOpacity.toFixed(2));
+        floatingAngelImage.style.setProperty("--angel-opacity", peakOpacity.toFixed(2));
+        floatingAngelImage.style.setProperty("--angel-duration", `${durationMs}ms`);
+        floatingAngelImage.style.setProperty("--angel-y-drift", `${Math.round(yDrift)}px`);
+        floatingAngelImage.style.setProperty("--angel-x-start", `${Math.round(safeStartX)}px`);
+        floatingAngelImage.style.setProperty("--angel-x-end", `${Math.round(endX)}px`);
+        floatingAngelImage.style.setProperty("--angel-scale-start", scaleStart.toFixed(3));
+        floatingAngelImage.style.setProperty("--angel-scale-end", scaleEnd.toFixed(3));
+        floatingAngelImage.hidden = false;
+        floatingAngelImage.classList.remove("is-active");
+        void floatingAngelImage.offsetWidth;
+        floatingAngelImage.classList.add("is-active");
+      }
+
+      function redirectFloatingAngelFlight() {
+        if (!floatingAngelImage || floatingAngelImage.hidden || !floatingAngelImage.classList.contains("is-active")) {
+          return;
+        }
+        const rect = floatingAngelImage.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        let nextDirection = Math.random() < 0.5 ? -1 : 1;
+        if (nextDirection === floatingAngelDirection) {
+          nextDirection *= -1;
+        }
+        const currentOpacity = parseFloat(window.getComputedStyle(floatingAngelImage).opacity);
+        const currentScale = getFloatingAngelCurrentScale();
+        const anchor = getFloatingAngelLayoutAnchorFromRect(rect, currentScale);
+        startFloatingAngelFlight(anchor.x, anchor.y, {
+          direction: nextDirection,
+          startOpacity: Number.isFinite(currentOpacity) ? currentOpacity : 0.2,
+          peakOpacity: Number.isFinite(currentOpacity) ? Math.max(currentOpacity, 0.18) : 0.24,
+          scaleStart: currentScale,
+          scaleEnd: currentScale
+        });
+      }
+
       function ensureFloatingAngelActor() {
         if (floatingAngelLayer && document.body && floatingAngelLayer.parentNode !== document.body) {
           document.body.appendChild(floatingAngelLayer);
@@ -1243,6 +1355,11 @@
         floatingAngelImage.alt = "";
         floatingAngelImage.hidden = true;
         floatingAngelImage.decoding = "async";
+        floatingAngelImage.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          redirectFloatingAngelFlight();
+        });
         floatingAngelImage.addEventListener("animationend", () => {
           if (!floatingAngelImage) return;
           floatingAngelImage.classList.remove("is-active");
@@ -1268,25 +1385,7 @@
         }
         ensureFloatingAngelActor();
         if (!floatingAngelImage) return;
-        const fromRight = Math.random() < 0.5;
-        const topPx = Math.round(window.innerHeight * (0.16 + Math.random() * 0.42));
-        const driftY = Math.round(-24 + Math.random() * 48);
-        const durationMs = 10500 + Math.round(Math.random() * 4500);
-        floatingAngelImage.style.top = `${topPx}px`;
-        floatingAngelImage.style.setProperty("--angel-opacity", (0.2 + Math.random() * 0.18).toFixed(2));
-        floatingAngelImage.style.setProperty("--angel-duration", `${durationMs}ms`);
-        floatingAngelImage.style.setProperty("--angel-y-drift", `${driftY}px`);
-        if (fromRight) {
-          floatingAngelImage.style.setProperty("--angel-x-start", "calc(100vw + 12rem)");
-          floatingAngelImage.style.setProperty("--angel-x-end", "-16rem");
-        } else {
-          floatingAngelImage.style.setProperty("--angel-x-start", "-16rem");
-          floatingAngelImage.style.setProperty("--angel-x-end", "calc(100vw + 12rem)");
-        }
-        floatingAngelImage.hidden = false;
-        floatingAngelImage.classList.remove("is-active");
-        void floatingAngelImage.offsetWidth;
-        floatingAngelImage.classList.add("is-active");
+        startFloatingAngelFlight();
       }
 
       function scheduleFloatingAngel(delayMs = null) {
@@ -1300,7 +1399,11 @@
           : 18000 + Math.round(Math.random() * 18000);
         floatingAngelTimer = window.setTimeout(() => {
           floatingAngelTimer = null;
-          showFloatingAngel();
+          if (Math.random() < 0.1) {
+            showFloatingAngel();
+            return;
+          }
+          scheduleFloatingAngel();
         }, nextDelay);
       }
 
@@ -1313,11 +1416,13 @@
         const showWaving = shouldShowSandboxWavingTurbo();
         if (!showAngel && !showWaving) {
           storyEl.hidden = true;
+          storyEl.style.removeProperty("--sandbox-turbo-opacity");
           storyEl.classList.remove("is-restoring", "is-restored");
           buttonEl.disabled = true;
           return;
         }
         storyEl.hidden = false;
+        storyEl.style.setProperty("--sandbox-turbo-opacity", showAngel ? "0.76" : "1");
         storyEl.classList.toggle("is-restored", showWaving);
         if (!storyEl.classList.contains("is-restoring")) {
           storyEl.classList.toggle("is-restoring", false);
@@ -2004,6 +2109,9 @@
       };
 
       function resetGame() {
+        if (typeof window.resetRareEventGracePeriod === "function") {
+          window.resetRareEventGracePeriod();
+        }
         bumpRoundFlowToken();
         clearScheduledSlothJumpscare();
         hideSlothJumpscare();
@@ -2063,6 +2171,9 @@
       }
 
       function resetForRetryRound() {
+        if (typeof window.resetRareEventGracePeriod === "function") {
+          window.resetRareEventGracePeriod();
+        }
         bumpRoundFlowToken();
         if (successAnimationActive) {
           cancelSuccessAnimation();
@@ -2352,7 +2463,12 @@
         const scheduledStageIndex = stageState.index;
         const scheduledAttempt = Number(stageState.attempts) || 0;
         const delayRange = Math.max(0, JUMPSCARE_DELAY_MAX_MS - JUMPSCARE_DELAY_MIN_MS);
-        const delayMs = JUMPSCARE_DELAY_MIN_MS + Math.round(Math.random() * delayRange);
+        const randomDelayMs = JUMPSCARE_DELAY_MIN_MS + Math.round(Math.random() * delayRange);
+        const rareEventGraceRemainingMs =
+          typeof window.getRareEventGraceRemainingMs === "function"
+            ? Math.max(0, Number(window.getRareEventGraceRemainingMs()) || 0)
+            : 0;
+        const delayMs = rareEventGraceRemainingMs + randomDelayMs;
         jumpscareScheduleTimeout = window.setTimeout(() => {
           jumpscareScheduleTimeout = null;
           if (
@@ -2360,7 +2476,8 @@
             !stageState.active ||
             phase === "result" ||
             stageState.index !== scheduledStageIndex ||
-            (Number(stageState.attempts) || 0) !== scheduledAttempt
+            (Number(stageState.attempts) || 0) !== scheduledAttempt ||
+            (typeof window.hasRareEventGracePeriodElapsed === "function" && !window.hasRareEventGracePeriodElapsed())
           ) {
             return;
           }
@@ -5039,11 +5156,14 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallAutoRetry");
           window.localStorage.removeItem("flashRecallEnterToNext");
           window.localStorage.removeItem("flashRecallStage1RecallLockUsed");
+          window.localStorage.removeItem(TURBO_STORY_STATE_KEY);
           window.localStorage.removeItem(LEADERBOARDS_ENABLED_STORAGE_KEY);
           window.localStorage.removeItem(ADAPTIVE_PROFILE_KEY);
           window.localStorage.removeItem(AUDIO_MASTER_KEY);
           window.localStorage.removeItem(AUDIO_MUSIC_KEY);
           window.localStorage.removeItem(AUDIO_EFFECTS_KEY);
+          turboStoryState = TURBO_STORY_STATE_ACTIVE;
+          applyTurboStoryState(turboStoryState, { skipFloatingAngelSchedule: false });
           const resetTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
             ? defaultAppearance.theme
             : appearanceOptions.themes[0];
