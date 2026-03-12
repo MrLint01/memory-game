@@ -435,7 +435,8 @@ const revealInput = document.getElementById("revealTime");
         page: 0
       };
       let sessionStartTime = performance.now();
-      let rareEventGraceStartedAt = null;
+      let rareEventGraceAccumulatedMs = 0;
+      let rareEventGraceActiveStartedAt = null;
       let lastCompletedLevel = 0;
       let dragSelecting = false;
       let dragTargetState = null;
@@ -466,21 +467,40 @@ const revealInput = document.getElementById("revealTime");
         return active;
       }
 
+      function pauseRareEventGracePeriod() {
+        if (!Number.isFinite(rareEventGraceActiveStartedAt)) {
+          return;
+        }
+        rareEventGraceAccumulatedMs += Math.max(0, performance.now() - rareEventGraceActiveStartedAt);
+        rareEventGraceActiveStartedAt = null;
+      }
+
       function resetRareEventGracePeriod() {
-        rareEventGraceStartedAt = null;
+        rareEventGraceAccumulatedMs = 0;
+        rareEventGraceActiveStartedAt = null;
       }
 
       function beginRareEventGracePeriod(force = false) {
-        if (force || !Number.isFinite(rareEventGraceStartedAt)) {
-          rareEventGraceStartedAt = performance.now();
+        if (force) {
+          rareEventGraceAccumulatedMs = 0;
+          rareEventGraceActiveStartedAt = performance.now();
+          return;
+        }
+        if (!Number.isFinite(rareEventGraceActiveStartedAt)) {
+          rareEventGraceActiveStartedAt = performance.now();
         }
       }
 
+      function getRareEventGraceElapsedMs() {
+        return rareEventGraceAccumulatedMs + (
+          Number.isFinite(rareEventGraceActiveStartedAt)
+            ? Math.max(0, performance.now() - rareEventGraceActiveStartedAt)
+            : 0
+        );
+      }
+
       function getRareEventGraceRemainingMs() {
-        if (!Number.isFinite(rareEventGraceStartedAt)) {
-          return RARE_EVENT_GRACE_PERIOD_MS;
-        }
-        return Math.max(0, RARE_EVENT_GRACE_PERIOD_MS - (performance.now() - rareEventGraceStartedAt));
+        return Math.max(0, RARE_EVENT_GRACE_PERIOD_MS - getRareEventGraceElapsedMs());
       }
 
       function hasRareEventGracePeriodElapsed() {
@@ -488,6 +508,7 @@ const revealInput = document.getElementById("revealTime");
       }
 
       window.beginRareEventGracePeriod = beginRareEventGracePeriod;
+      window.pauseRareEventGracePeriod = pauseRareEventGracePeriod;
       window.resetRareEventGracePeriod = resetRareEventGracePeriod;
       window.getRareEventGraceRemainingMs = getRareEventGraceRemainingMs;
       window.hasRareEventGracePeriodElapsed = hasRareEventGracePeriodElapsed;
@@ -828,6 +849,9 @@ const revealInput = document.getElementById("revealTime");
         if (nextState) {
           phase = nextState;
           page.dataset.state = nextState;
+          if ((nextState === "result" || nextState === "idle") && typeof pauseRareEventGracePeriod === "function") {
+            pauseRareEventGracePeriod();
+          }
         }
         updateRoundVisibility();
         updateStreakVisibility();

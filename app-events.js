@@ -2113,8 +2113,8 @@
       };
 
       function resetGame() {
-        if (typeof window.resetRareEventGracePeriod === "function") {
-          window.resetRareEventGracePeriod();
+        if (typeof window.pauseRareEventGracePeriod === "function") {
+          window.pauseRareEventGracePeriod();
         }
         bumpRoundFlowToken();
         clearScheduledSlothJumpscare();
@@ -2175,8 +2175,8 @@
       }
 
       function resetForRetryRound() {
-        if (typeof window.resetRareEventGracePeriod === "function") {
-          window.resetRareEventGracePeriod();
+        if (typeof window.pauseRareEventGracePeriod === "function") {
+          window.pauseRareEventGracePeriod();
         }
         bumpRoundFlowToken();
         if (successAnimationActive) {
@@ -2349,7 +2349,7 @@
       const JUMPSCARE_LEVEL_CHANCE = 1 / 500;
       const JUMPSCARE_DURATION_MS = 2000;
       const JUMPSCARE_DELAY_MIN_MS = 1000;
-      const JUMPSCARE_DELAY_MAX_MS = 4000;
+      const JUMPSCARE_DELAY_MAX_MS = 3000;
       const JUMPSCARE_ZOOM_DURATION_MS = 1000;
       const JUMPSCARE_FADE_DURATION_MS = 260;
       const JUMPSCARE_START_SCALE = 1;
@@ -2461,6 +2461,12 @@
         ) {
           return;
         }
+        if (
+          typeof window.hasRareEventGracePeriodElapsed === "function" &&
+          !window.hasRareEventGracePeriodElapsed()
+        ) {
+          return;
+        }
         if (Math.random() >= JUMPSCARE_LEVEL_CHANCE) {
           return;
         }
@@ -2468,11 +2474,6 @@
         const scheduledAttempt = Number(stageState.attempts) || 0;
         const delayRange = Math.max(0, JUMPSCARE_DELAY_MAX_MS - JUMPSCARE_DELAY_MIN_MS);
         const randomDelayMs = JUMPSCARE_DELAY_MIN_MS + Math.round(Math.random() * delayRange);
-        const rareEventGraceRemainingMs =
-          typeof window.getRareEventGraceRemainingMs === "function"
-            ? Math.max(0, Number(window.getRareEventGraceRemainingMs()) || 0)
-            : 0;
-        const delayMs = rareEventGraceRemainingMs + randomDelayMs;
         jumpscareScheduleTimeout = window.setTimeout(() => {
           jumpscareScheduleTimeout = null;
           if (
@@ -2480,13 +2481,12 @@
             !stageState.active ||
             phase === "result" ||
             stageState.index !== scheduledStageIndex ||
-            (Number(stageState.attempts) || 0) !== scheduledAttempt ||
-            (typeof window.hasRareEventGracePeriodElapsed === "function" && !window.hasRareEventGracePeriodElapsed())
+            (Number(stageState.attempts) || 0) !== scheduledAttempt
           ) {
             return;
           }
           showSlothJumpscare().catch(() => {});
-        }, delayMs);
+        }, randomDelayMs);
       }
       window.scheduleSlothJumpscareForStage = scheduleSlothJumpscareForStage;
 
