@@ -3881,12 +3881,17 @@ function runFlashCountdown(onComplete) {
         const wrapEl = getResultCompetitionWrapElement(stageId, stageVersion);
         const turboEl = getResultCompetitionTurboElement(stageId, stageVersion);
         const bubbleEl = wrapEl ? wrapEl.querySelector(".stage-complete__competitive-bubble") : null;
+        const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
         if (wrapEl) {
           wrapEl.hidden = false;
           wrapEl.classList.remove("stage-complete__competitive-wrap--final-flyaway");
         }
         if (bubbleEl) {
           bubbleEl.hidden = false;
+          bubbleEl.classList.remove("is-fading-in", "is-fading-out");
+        }
+        if (messageEl) {
+          messageEl.dataset.currentMessage = messageEl.textContent || "";
         }
         if (turboEl) {
           turboEl.classList.remove("is-angel");
@@ -3935,16 +3940,50 @@ function runFlashCountdown(onComplete) {
         }, Math.max(0, Number(delayMs) || 0));
       }
 
+      const RESULT_COMPETITIVE_FADE_MS = 260;
+      let resultCompetitionFadeToken = 0;
       function setResultCompetitionMessage(stageId, stageVersion, message, messageColor = "") {
         const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
         if (!messageEl) return;
         const wrapEl = messageEl.closest(".stage-complete__competitive-wrap");
         const bubbleEl = wrapEl ? wrapEl.querySelector(".stage-complete__competitive-bubble") : null;
-        messageEl.textContent = message;
-        if (messageColor) {
-          messageEl.style.color = messageColor;
+        const nextMessage = String(message || "");
+        const previousMessage = String(messageEl.dataset.currentMessage || messageEl.textContent || "");
+        const shouldAnimate = previousMessage && previousMessage !== nextMessage;
+        const applyMessage = () => {
+          messageEl.textContent = nextMessage;
+          messageEl.dataset.currentMessage = nextMessage;
+          if (messageColor) {
+            messageEl.style.color = messageColor;
+          } else {
+            messageEl.style.removeProperty("color");
+          }
+        };
+        if (shouldAnimate) {
+          resultCompetitionFadeToken += 1;
+          const fadeToken = resultCompetitionFadeToken;
+          if (bubbleEl) {
+            bubbleEl.classList.add("is-fading-out");
+            bubbleEl.classList.remove("is-fading-in");
+          }
+          window.setTimeout(() => {
+            if (fadeToken !== resultCompetitionFadeToken) return;
+            applyMessage();
+            if (bubbleEl) {
+              bubbleEl.classList.remove("is-fading-out");
+              bubbleEl.classList.add("is-fading-in");
+              requestAnimationFrame(() => {
+                if (fadeToken !== resultCompetitionFadeToken) return;
+                bubbleEl.classList.remove("is-fading-in");
+              });
+            }
+          }, RESULT_COMPETITIVE_FADE_MS);
         } else {
-          messageEl.style.removeProperty("color");
+          applyMessage();
+          if (bubbleEl) {
+            bubbleEl.classList.remove("is-fading-out");
+            bubbleEl.classList.remove("is-fading-in");
+          }
         }
         if (wrapEl) {
           wrapEl.hidden = false;
@@ -4099,7 +4138,9 @@ function runFlashCountdown(onComplete) {
         resetResultCompetitionSpeaker(stageId, stageVersion);
         if (competitionEl) {
           const initialMessage = String(competitionEl.dataset.initialMessage || "").trim();
-          competitionEl.textContent = initialMessage || competitionEl.textContent || "Good job completing the level!";
+          const resolvedMessage = initialMessage || competitionEl.textContent || "Good job completing the level!";
+          competitionEl.textContent = resolvedMessage;
+          competitionEl.dataset.currentMessage = resolvedMessage;
           competitionEl.hidden = false;
         }
         const leaderboardReady = typeof window.getLeaderboardReady === "function"
