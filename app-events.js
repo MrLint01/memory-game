@@ -120,6 +120,11 @@
       let audioSettings = { ...defaultAudioSettings };
       let keybinds = { ...defaultKeybinds };
       let activeRebindAction = null;
+      let stageIntroPendingIndex = null;
+      let flashWarningEnabled = true;
+      let flashCountdownEnabled = true;
+      let enterToNextEnabled = true;
+      let leaderboardsEnabled = true;
       const keybindButtons = {
         retry: keybindRetry,
         stageNext: keybindStageNext,
@@ -437,17 +442,32 @@
           effects: audioSettings.effects / 100
         };
       };
-      const menuMusic = createMusicAudio("audio/stage-background-music.mp3");
-      const levelMusic = createMusicAudio("audio/regular-groovy-background.wav");
+      const menuMusic = createMusicAudio("audio/stage-background-music.mp3", { loop: false });
+      const levelMusic = createMusicAudio("audio/regular-groovy-background.wav", { loop: true });
+      const MENU_MUSIC_START_DELAY_MS = 3000;
+      const MENU_MUSIC_FADE_IN_MS = 5000;
       let activeMusicMode = null;
-      let pendingMusicAudio = null;
+      let pendingMusicRequest = null;
       let pendingMusicListenerAttached = false;
+      let scheduledMenuMusicTimer = null;
 
-      function createMusicAudio(src) {
+      function createMusicAudio(src, options = {}) {
         if (typeof Audio === "undefined") return null;
         const audio = new Audio(src);
         audio.preload = "auto";
-        audio.loop = true;
+        audio.loop = options.loop !== false;
+        audio.__fadeFrameId = 0;
+        audio.__fadeFactor = 1;
+        audio.addEventListener("error", () => {
+          window.__lastAudioError = audio.error || new Error(`Failed to load ${audio.src}`);
+        });
+        return audio;
+      }
+
+      function createTurboClickAudio(src) {
+        if (typeof Audio === "undefined") return null;
+        const audio = new Audio(src);
+        audio.preload = "auto";
         audio.addEventListener("error", () => {
           window.__lastAudioError = audio.error || new Error(`Failed to load ${audio.src}`);
         });
@@ -464,72 +484,169 @@
         return 1;
       }
 
-      function applyMusicVolume() {
+      function clampMusicVolume(value) {
+        return Math.max(0, Math.min(1, value));
+      }
+
+      function cancelMusicFade(audio) {
+        if (!audio || !audio.__fadeFrameId) return;
+        window.cancelAnimationFrame(audio.__fadeFrameId);
+        audio.__fadeFrameId = 0;
+      }
+
+      function applySingleMusicVolume(audio) {
+        if (!audio) return;
         const volume = getMusicMixVolume();
-        [menuMusic, levelMusic].forEach((audio) => {
-          if (!audio) return;
-          audio.volume = Math.max(0, Math.min(1, volume));
-          audio.muted = volume <= 0;
-          if (volume <= 0 && !audio.paused) {
-            audio.pause();
+        const factor = Number.isFinite(audio.__fadeFactor) ? audio.__fadeFactor : 1;
+        audio.volume = clampMusicVolume(volume * factor);
+        audio.muted = volume <= 0;
+        if (volume <= 0 && !audio.paused) {
+          audio.pause();
+        }
+      }
+
+      function startMusicFadeIn(audio, durationMs = MENU_MUSIC_FADE_IN_MS) {
+        if (!audio) return;
+        cancelMusicFade(audio);
+        audio.__fadeFactor = 0;
+        applySingleMusicVolume(audio);
+        const startTime = performance.now();
+        const step = (now) => {
+          if (!audio || audio.paused) {
+            if (audio) audio.__fadeFrameId = 0;
+            return;
           }
+          const progress = durationMs <= 0
+            ? 1
+            : Math.min(1, (now - startTime) / durationMs);
+          audio.__fadeFactor = progress;
+          applySingleMusicVolume(audio);
+          if (progress >= 1) {
+            audio.__fadeFactor = 1;
+            audio.__fadeFrameId = 0;
+            return;
+          }
+          audio.__fadeFrameId = window.requestAnimationFrame(step);
+        };
+        audio.__fadeFrameId = window.requestAnimationFrame(step);
+      }
+
+      function getEffectsMixVolume() {
+        if (typeof window.getAudioMix === "function") {
+          const mix = window.getAudioMix() || {};
+          const master = Number.isFinite(mix.master) ? mix.master : 1;
+          const effects = Number.isFinite(mix.effects) ? mix.effects : 1;
+          return Math.max(0, Math.min(1, master)) * Math.max(0, Math.min(1, effects));
+        }
+        return 1;
+      }
+
+      function applyMusicVolume() {
+        [menuMusic, levelMusic].forEach((audio) => {
+          applySingleMusicVolume(audio);
         });
-        if (volume > 0 && activeMusicMode) {
+        if (getMusicMixVolume() > 0 && activeMusicMode) {
           setBackgroundMusicMode(activeMusicMode);
         }
       }
 
       function stopMusic(audio) {
         if (!audio) return;
+        cancelMusicFade(audio);
+        audio.__fadeFactor = 1;
         audio.pause();
         audio.currentTime = 0;
       }
 
-      function queuePendingMusic(audio) {
+      function queuePendingMusic(audio, options = {}) {
+        pendingMusicRequest = { audio, options };
         if (pendingMusicListenerAttached) return;
         pendingMusicListenerAttached = true;
-        pendingMusicAudio = audio;
         const handler = () => {
           pendingMusicListenerAttached = false;
-          const nextAudio = pendingMusicAudio;
-          pendingMusicAudio = null;
-          if (!nextAudio) return;
-          playMusic(nextAudio);
+          const nextRequest = pendingMusicRequest;
+          pendingMusicRequest = null;
+          if (!(nextRequest && nextRequest.audio)) return;
+          playMusic(nextRequest.audio, nextRequest.options);
         };
         document.addEventListener("pointerdown", handler, { capture: true, once: true });
         document.addEventListener("keydown", handler, { capture: true, once: true });
       }
 
-      function playMusic(audio) {
+      function clearScheduledMenuMusicFadeIn() {
+        if (!scheduledMenuMusicTimer) return;
+        window.clearTimeout(scheduledMenuMusicTimer);
+        scheduledMenuMusicTimer = null;
+      }
+
+      function scheduleMenuMusicFadeIn(delayMs = 0) {
+        const delay = Math.max(0, Number(delayMs) || 0);
+        clearScheduledMenuMusicFadeIn();
+        if (delay <= 0) {
+          setBackgroundMusicMode("menu");
+          return;
+        }
+        scheduledMenuMusicTimer = window.setTimeout(() => {
+          scheduledMenuMusicTimer = null;
+          setBackgroundMusicMode("menu");
+        }, delay);
+      }
+
+      function playMusic(audio, options = {}) {
         if (!audio) return;
         const volume = getMusicMixVolume();
         if (volume <= 0) return;
+        const fadeIn = Boolean(options.fadeIn);
+        const shouldRestartFade = fadeIn && audio.paused;
+        if (!audio.paused) {
+          if (!fadeIn) {
+            cancelMusicFade(audio);
+            audio.__fadeFactor = 1;
+            applySingleMusicVolume(audio);
+          }
+          return;
+        }
         audio.muted = false;
-        audio.volume = Math.max(0, Math.min(1, volume));
+        cancelMusicFade(audio);
+        audio.__fadeFactor = shouldRestartFade ? 0 : 1;
+        applySingleMusicVolume(audio);
         try {
           const playResult = audio.play();
           if (playResult && typeof playResult.catch === "function") {
+            if (shouldRestartFade && typeof playResult.then === "function") {
+              playResult.then(() => {
+                startMusicFadeIn(audio);
+              }).catch((error) => {
+                window.__lastAudioError = error;
+                queuePendingMusic(audio, options);
+              });
+              return;
+            }
             playResult.catch((error) => {
               window.__lastAudioError = error;
-              queuePendingMusic(audio);
+              queuePendingMusic(audio, options);
             });
+          }
+          if (shouldRestartFade) {
+            startMusicFadeIn(audio);
           }
         } catch (error) {
           window.__lastAudioError = error;
-          queuePendingMusic(audio);
+          queuePendingMusic(audio, options);
         }
       }
 
       function setBackgroundMusicMode(mode) {
+        clearScheduledMenuMusicFadeIn();
         if (mode === activeMusicMode) {
-          if (mode === "menu") playMusic(menuMusic);
+          if (mode === "menu") playMusic(menuMusic, { fadeIn: true });
           if (mode === "level") playMusic(levelMusic);
           return;
         }
         activeMusicMode = mode;
         if (mode === "menu") {
           stopMusic(levelMusic);
-          playMusic(menuMusic);
+          playMusic(menuMusic, { fadeIn: true });
           return;
         }
         if (mode === "level") {
@@ -542,6 +659,14 @@
       }
 
       window.setBackgroundMusicMode = setBackgroundMusicMode;
+      window.scheduleMenuMusicFadeIn = scheduleMenuMusicFadeIn;
+      window.clearScheduledMenuMusicFadeIn = clearScheduledMenuMusicFadeIn;
+      if (menuMusic) {
+        menuMusic.addEventListener("ended", () => {
+          if (activeMusicMode !== "menu") return;
+          scheduleMenuMusicFadeIn(MENU_MUSIC_START_DELAY_MS);
+        });
+      }
       let splashReturnToHome = false;
       let pendingSplashReveal = false;
       let resetLoadingActive = false;
@@ -1431,11 +1556,25 @@
         if (!storyEl.classList.contains("is-restoring")) {
           storyEl.classList.toggle("is-restoring", false);
         }
-        buttonEl.disabled = showWaving;
+        buttonEl.disabled = false;
         buttonEl.setAttribute("aria-label", showAngel ? "Angel Turbo" : "Turbo");
         imageEl.src = showAngel
           ? "imgs/Sloths/transparent/turbo_angel.png"
           : "imgs/Sloths/transparent/turbo_waving.png";
+      }
+
+      function syncStageIntroPreviewTurbo(stageIndex = stageIntroPendingIndex) {
+        const turboEl = document.getElementById("stageIntroStartTurbo");
+        const startButton = stageIntroStart;
+        const startWrap = startButton && startButton.parentElement;
+        if (!(turboEl && startButton && startWrap)) return;
+        const latestUnlockedStageIndex = getLatestUnlockedStageIndex();
+        const showTurbo = Number.isFinite(stageIndex) &&
+          stageIndex === latestUnlockedStageIndex &&
+          shouldShowTurboCompanions();
+        turboEl.hidden = !showTurbo;
+        startButton.classList.toggle("stage-intro-start--with-turbo", showTurbo);
+        startWrap.classList.toggle("stage-intro-start-wrap--turbo", showTurbo);
       }
 
       function applyTurboStoryState(nextState, options = {}) {
@@ -1444,6 +1583,7 @@
           document.body.dataset.turboStory = turboStoryState;
         }
         syncSandboxTurboStory();
+        syncStageIntroPreviewTurbo();
         if (turboStoryState === TURBO_STORY_STATE_ASCENDED) {
           stopSplashTurboCycle();
           hideFloatingAngel();
@@ -1492,11 +1632,25 @@
         "imgs/Sloths/transparent/turbo_angel.png",
         "imgs/Sloths/transparent/turbo_flag_splash.png",
         "imgs/Sloths/transparent/turbo_hanging_happy_splash.png",
+        "imgs/Sloths/transparent/turbo_napping_on_log_splash.png",
         "imgs/Sloths/transparent/turbo_painting.png",
         "imgs/Sloths/transparent/turbo_catching_branch.png",
         "imgs/Sloths/transparent/turbo_waving.png"
       ];
+      const TURBO_CLICK_SOUND_SOURCES = [
+        "audio/sloth_sounds/roaming_sloth-sloth-inspired-imaginary-sound-no6-124170.mp3",
+        "audio/sloth_sounds/roaming_sloth-sloth-inspired-imaginary-sound-no5-124169.mp3",
+        "audio/sloth_sounds/roaming_sloth-sloth-inspired-imaginary-sound-no15-151509.mp3",
+        "audio/sloth_sounds/roaming_sloth-sloth-inspired-imaginary-sound-no14-124916.mp3",
+        "audio/sloth_sounds/roaming_sloth-sloth-inspired-imaginary-sound-no13-124915.mp3",
+        "audio/sloth_sounds/roaming_sloth-sloth-inspired-imaginary-sound-no10-124912.mp3"
+      ];
+      const TURBO_CLICK_AUDIO_POOL_SIZE = 2;
+      const TURBO_CLICK_SOUND_COOLDOWN_MS = 2000;
+      const TURBO_CLICK_SOUND_START_OFFSET_SECONDS = 0.12;
       const gameplayTurboPreloadImages = [];
+      const turboClickAudioPools = [];
+      const turboSoundCooldownByTarget = new WeakMap();
       let splashTurboLayer = null;
       let splashTurboButton = null;
       let splashTurboImage = null;
@@ -1506,6 +1660,7 @@
       let splashTurboLastKey = "";
       let splashTurboTapStreak = 0;
       let splashTurboBestStreak = 0;
+      let lastTurboClickSoundIndex = -1;
 
       function saveSplashTurboBestStreak(value) {
         splashTurboBestStreak = Math.max(0, Math.floor(Number(value) || 0));
@@ -1524,6 +1679,119 @@
         if (typeof window.syncAchievementsFromLocal === "function") {
           window.syncAchievementsFromLocal({ turboBestStreak: splashTurboBestStreak });
         }
+      }
+
+      function preloadTurboClickSounds() {
+        if (turboClickAudioPools.length) {
+          return;
+        }
+        TURBO_CLICK_SOUND_SOURCES.forEach((src) => {
+          const pool = [];
+          for (let index = 0; index < TURBO_CLICK_AUDIO_POOL_SIZE; index += 1) {
+            const audio = createTurboClickAudio(src);
+            if (!audio) continue;
+            try {
+              audio.load();
+            } catch (error) {
+              // ignore preload errors
+            }
+            pool.push(audio);
+          }
+          turboClickAudioPools.push(pool);
+        });
+      }
+
+      function pickTurboClickSoundIndex() {
+        if (!turboClickAudioPools.length) {
+          return -1;
+        }
+        if (turboClickAudioPools.length === 1) {
+          return 0;
+        }
+        let nextIndex = Math.floor(Math.random() * turboClickAudioPools.length);
+        if (nextIndex === lastTurboClickSoundIndex) {
+          nextIndex = (nextIndex + 1 + Math.floor(Math.random() * (turboClickAudioPools.length - 1))) % turboClickAudioPools.length;
+        }
+        lastTurboClickSoundIndex = nextIndex;
+        return nextIndex;
+      }
+
+      function playRandomTurboClickSound() {
+        preloadTurboClickSounds();
+        if (!turboClickAudioPools.length) return;
+        const volume = getEffectsMixVolume();
+        if (volume <= 0) return;
+        const soundIndex = pickTurboClickSoundIndex();
+        if (soundIndex < 0) return;
+        const pool = turboClickAudioPools[soundIndex] || [];
+        if (!pool.length) return;
+        let audio = pool.find((candidate) => candidate && (candidate.paused || candidate.ended));
+        if (!audio) {
+          audio = pool[0];
+          if (audio) {
+            audio.pause();
+          }
+        }
+        if (!audio) return;
+        try {
+          const startOffset = TURBO_CLICK_SOUND_START_OFFSET_SECONDS;
+          if (audio.readyState >= 1 && Number.isFinite(audio.duration) && audio.duration > startOffset + 0.05) {
+            audio.currentTime = startOffset;
+          } else {
+            audio.currentTime = 0;
+          }
+          audio.muted = false;
+          audio.volume = volume;
+          const playResult = audio.play();
+          if (playResult && typeof playResult.catch === "function") {
+            playResult.catch((error) => {
+              window.__lastAudioError = error;
+            });
+          }
+        } catch (error) {
+          window.__lastAudioError = error;
+        }
+      }
+
+      function isTurboSoundSource(src) {
+        return String(src || "").toLowerCase().includes("turbo_");
+      }
+
+      function resolveTurboSoundTarget(target) {
+        if (!(target instanceof Element)) return null;
+        const directMatch = target.closest([
+          "[data-splash-turbo]",
+          "#sandboxTurboStoryButton",
+          ".mode-card__turbo",
+          ".modal-card__turbo-art",
+          ".stage-card__turbo-guide",
+          ".stage-intro-start__turbo",
+          ".stage-instruction__turbo-image",
+          ".stage-complete__competitive-turbo",
+          ".floating-angel"
+        ].join(", "));
+        if (directMatch) {
+          return directMatch;
+        }
+        const achievementIcon = target.closest(".achievement-tile__icon, .achievement-icon, .achievement-toast__icon");
+        if (!achievementIcon) return null;
+        const turboIcon = achievementIcon.querySelector("img");
+        if (!turboIcon) return null;
+        const src = turboIcon.getAttribute("src") || turboIcon.currentSrc || "";
+        return isTurboSoundSource(src) ? turboIcon : null;
+      }
+
+      function handleTurboSoundInteraction(event) {
+        if (event && "button" in event && Number(event.button) !== 0) return;
+        const turboTarget = resolveTurboSoundTarget(event.target);
+        if (!turboTarget) return;
+        const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+        const lastPlayedAt = Number(turboSoundCooldownByTarget.get(turboTarget)) || 0;
+        if (now - lastPlayedAt < TURBO_CLICK_SOUND_COOLDOWN_MS) {
+          return;
+        }
+        turboSoundCooldownByTarget.set(turboTarget, now);
+        playRandomTurboClickSound();
       }
 
       function appendLeaderboardDataRow(rows, entry, rank, localName, formatter, rowClassNames = []) {
@@ -1868,8 +2136,10 @@
 
       preloadSplashTurboSprites();
       preloadGameplayTurboSprites();
+      preloadTurboClickSounds();
       turboStoryState = loadTurboStoryState();
       applyTurboStoryState(turboStoryState, { skipFloatingAngelSchedule: false });
+      document.addEventListener("pointerdown", handleTurboSoundInteraction, { capture: true });
 
       function updateSplashAutoStartLabel(remainingMs = SPLASH_AUTO_START_MS) {
         if (!splashAutoStartMessage) return;
@@ -2292,7 +2562,7 @@
         return enabled.length ? enabled.join(", ") : "None";
       }
 
-      let stageIntroPendingIndex = null;
+      stageIntroPendingIndex = null;
       let stageIntroOriginEl = null;
       let stageIntroAnimationMode = null;
       let stageIntroOpenSource = "stage_card";
@@ -2306,7 +2576,7 @@
       let flashStagePendingIndex = null;
       let flashCountdownTimers = [];
       let flashCountdownActive = false;
-      let flashWarningEnabled = true;
+      flashWarningEnabled = true;
       let tabTutorialShownRound = null;
       window.tabTutorialActive = false;
       let tabTutorialDisabledInputs = [];
@@ -2339,9 +2609,9 @@
       let stageListAnimActive = false;
       let stageListMouseListenerAttached = false;
       let stageListSkipListener = null;
-      let flashCountdownEnabled = true;
-      let enterToNextEnabled = true;
-      let leaderboardsEnabled = true;
+      flashCountdownEnabled = true;
+      enterToNextEnabled = true;
+      leaderboardsEnabled = true;
       let stageStarShineInterval = null;
       let resultAutoActionTimers = [];
       const RESULT_AUTO_ACTION_SECONDS = 3;
@@ -2602,6 +2872,7 @@
           stageIntroCard.style.removeProperty("--intro-from-y");
           stageIntroCard.style.removeProperty("--intro-from-scale");
         }
+        syncStageIntroPreviewNavigation(null);
         clearStageIntroAutoStart();
         setModalState(stageIntroModal, false);
       }
@@ -2995,6 +3266,8 @@ function runFlashCountdown(onComplete) {
           renderIconSection("Modifiers", modifierItems);
         }
         stageIntroPendingIndex = index;
+        syncStageIntroPreviewTurbo(index);
+        syncStageIntroPreviewNavigation(index);
         if (leaderboardOpen) {
           leaderboardOpen.dataset.stageIndex = String(index);
         }
@@ -3104,6 +3377,61 @@ function runFlashCountdown(onComplete) {
         return false;
       }
 
+      function getLatestUnlockedStageIndex() {
+        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        return stages.reduce((latest, _stage, index) => {
+          return isStageUnlocked(index) ? index : latest;
+        }, -1);
+      }
+
+      function getAdjacentUnlockedStageIndex(currentIndex, direction) {
+        if (!Number.isFinite(currentIndex)) return null;
+        const step = Number(direction) < 0 ? -1 : 1;
+        const stages = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+        for (let nextIndex = currentIndex + step; nextIndex >= 0 && nextIndex < stages.length; nextIndex += step) {
+          if (isStageUnlocked(nextIndex)) {
+            return nextIndex;
+          }
+        }
+        return null;
+      }
+
+      function syncStageIntroPreviewNavigation(stageIndex = stageIntroPendingIndex) {
+        const prevButton = document.getElementById("stageIntroPrev");
+        const nextButton = document.getElementById("stageIntroNext");
+        if (!(prevButton && nextButton)) return;
+        const prevIndex = Number.isFinite(stageIndex) ? getAdjacentUnlockedStageIndex(stageIndex, -1) : null;
+        const nextIndex = Number.isFinite(stageIndex) ? getAdjacentUnlockedStageIndex(stageIndex, 1) : null;
+        prevButton.disabled = !Number.isFinite(prevIndex);
+        nextButton.disabled = !Number.isFinite(nextIndex);
+        prevButton.dataset.stageIndex = Number.isFinite(prevIndex) ? String(prevIndex) : "";
+        nextButton.dataset.stageIndex = Number.isFinite(nextIndex) ? String(nextIndex) : "";
+      }
+
+      function navigateStageIntroPreview(direction, source = "button") {
+        if (!(stageIntroModal && stageIntroModal.classList.contains("show"))) return false;
+        if (leaderboardModal && leaderboardModal.classList.contains("show")) return false;
+        const nextIndex = getAdjacentUnlockedStageIndex(stageIntroPendingIndex, direction);
+        if (!Number.isFinite(nextIndex)) return false;
+        if (stageIntroCard && stageIntroCard.classList.contains("intro-auto")) {
+          cancelStageIntroAutoStartBar(source === "keyboard" ? "stage_preview_arrow_key" : "stage_preview_arrow_button");
+        }
+        if (typeof window.setStageIntroOpenSource === "function") {
+          window.setStageIntroOpenSource(source === "keyboard" ? "preview_arrow_key" : "preview_arrow_button");
+        }
+        if (typeof window.setStageIntroAnimationMode === "function") {
+          window.setStageIntroAnimationMode("soft");
+        }
+        logUiInteraction("stage_preview_navigate", {
+          area: "stage_preview",
+          action: "navigate",
+          navigation_source: source,
+          level_number: nextIndex + 1
+        });
+        openStageIntro(nextIndex, null);
+        return true;
+      }
+
       function renderStageList(animate = false) {
         if (!stageList) return;
         syncPrismParadeStageListPhase();
@@ -3164,9 +3492,7 @@ function runFlashCountdown(onComplete) {
         }
         const pageStart = stageState.page * pageSize;
         const pageStages = stages.slice(pageStart, pageStart + pageSize);
-        const latestUnlockedStageIndex = stages.reduce((latest, _stage, index) => {
-          return isStageUnlocked(index) ? index : latest;
-        }, -1);
+        const latestUnlockedStageIndex = getLatestUnlockedStageIndex();
         stageList.classList.add("stage-list--hidden");
         stageList.innerHTML = pageStages
           .map((stage, offset) => {
@@ -3479,7 +3805,7 @@ function runFlashCountdown(onComplete) {
         document.body.dataset.view = "stages";
         syncPrismParadePhase();
         startStarShineLoop();
-        setBackgroundMusicMode("menu");
+        scheduleMenuMusicFadeIn();
       }
 
       function randomizePlayButtonTurboSide() {
@@ -3501,7 +3827,7 @@ function runFlashCountdown(onComplete) {
         }
         document.body.dataset.view = "home";
         syncPrismParadePhase();
-        setBackgroundMusicMode("menu");
+        scheduleMenuMusicFadeIn();
         clearFirstLetterHint();
         clearFlashCountdown();
         randomizePlayButtonTurboSide();
@@ -3519,6 +3845,8 @@ function runFlashCountdown(onComplete) {
         clearSplashAutoStart();
         resetSplashAnyKeySequence();
         splashAutoStartDismissed = false;
+        clearScheduledMenuMusicFadeIn();
+        setBackgroundMusicMode("off");
         if (splashScreen) {
           if (document.body.classList.contains("loading-overlay")) {
             pendingSplashReveal = true;
@@ -3533,7 +3861,6 @@ function runFlashCountdown(onComplete) {
           mainHeader.style.display = "none";
         }
         document.body.dataset.view = "splash";
-        setBackgroundMusicMode("menu");
         startSplashTurboCycle();
         scheduleSplashAutoStart();
       }
@@ -3553,7 +3880,7 @@ function runFlashCountdown(onComplete) {
         if (document.body.dataset.view === "splash") {
           document.body.dataset.view = "home";
         }
-        setBackgroundMusicMode("menu");
+        scheduleMenuMusicFadeIn();
       }
 
       function openSplashLoading(message = null) {
@@ -3770,6 +4097,18 @@ function runFlashCountdown(onComplete) {
             level_number: Number.isFinite(stageIntroPendingIndex) ? stageIntroPendingIndex + 1 : null
           });
           closeStageIntro();
+        });
+      }
+      const stageIntroPrev = document.getElementById("stageIntroPrev");
+      const stageIntroNext = document.getElementById("stageIntroNext");
+      if (stageIntroPrev) {
+        stageIntroPrev.addEventListener("click", () => {
+          navigateStageIntroPreview(-1, "button");
+        });
+      }
+      if (stageIntroNext) {
+        stageIntroNext.addEventListener("click", () => {
+          navigateStageIntroPreview(1, "button");
         });
       }
       if (leaderboardOpen && leaderboardModal) {
@@ -4578,6 +4917,23 @@ function runFlashCountdown(onComplete) {
               level_number: Number.isFinite(stageIntroPendingIndex) ? stageIntroPendingIndex + 1 : null
             });
             closeStageIntro();
+          }
+        });
+      }
+      if (!window.__stageIntroArrowKeyListener) {
+        window.__stageIntroArrowKeyListener = true;
+        document.addEventListener("keydown", (event) => {
+          if (!(stageIntroModal && stageIntroModal.classList.contains("show"))) return;
+          if (leaderboardModal && leaderboardModal.classList.contains("show")) return;
+          if (isTextEntryTarget(event.target)) return;
+          if (event.key === "ArrowLeft") {
+            if (navigateStageIntroPreview(-1, "keyboard")) {
+              event.preventDefault();
+            }
+          } else if (event.key === "ArrowRight") {
+            if (navigateStageIntroPreview(1, "keyboard")) {
+              event.preventDefault();
+            }
           }
         });
       }
@@ -6629,7 +6985,7 @@ function runFlashCountdown(onComplete) {
           resetGame();
           setPhase("Waiting to start", "idle");
           document.body.dataset.view = "home";
-          setBackgroundMusicMode("menu");
+          scheduleMenuMusicFadeIn();
           document.body.classList.remove("home-anim");
           void document.body.offsetWidth;
           document.body.classList.add("home-anim");
@@ -6666,7 +7022,7 @@ function runFlashCountdown(onComplete) {
           modeSelect.value = "practice";
           updateModeUI();
           document.body.dataset.view = "home";
-          setBackgroundMusicMode("menu");
+          scheduleMenuMusicFadeIn();
           document.body.classList.remove("home-anim");
           void document.body.offsetWidth;
           document.body.classList.add("home-anim");

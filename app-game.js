@@ -195,6 +195,25 @@
       function shouldPlayButtonClick(event) {
         if (!event) return false;
         if (event.pointerType && event.pointerType !== "mouse") return false;
+        const rawTarget = event.target instanceof Element ? event.target : null;
+        if (
+          rawTarget &&
+          (
+            rawTarget.matches('img[src*="turbo_"]') ||
+            rawTarget.closest([
+              "[data-splash-turbo]",
+              "#sandboxTurboStoryButton",
+              ".mode-card__turbo",
+              ".modal-card__turbo-art",
+              ".stage-card__turbo-guide",
+              ".stage-instruction__turbo-image",
+              ".stage-complete__competitive-turbo",
+              ".floating-angel"
+            ].join(", "))
+          )
+        ) {
+          return false;
+        }
         const target = event.target && event.target.closest
           ? event.target.closest("button, [role=\"button\"]")
           : null;
@@ -1562,6 +1581,9 @@
               playLevelCompletedSound();
               if (typeof window.setBackgroundMusicMode === "function") {
                 window.setBackgroundMusicMode("off");
+              }
+              if (typeof window.scheduleMenuMusicFadeIn === "function") {
+                window.scheduleMenuMusicFadeIn(3000);
               }
               lastCompletedLevel = stageState.index + 1;
               lockInputs(true);
