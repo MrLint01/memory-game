@@ -401,7 +401,17 @@ body[data-theme="prism-parade"]::before {
     );
   opacity: 0.55;
 }
-
+body:not([data-theme]),
+body[data-theme="studio-light"],
+body[data-theme="pastel-red"],
+body[data-theme="pastel-orange"],
+body[data-theme="pastel-yellow"],
+body[data-theme="pastel-green"],
+body[data-theme="pastel-blue"],
+body[data-theme="pastel-purple"],
+body[data-theme="pastel-pink"] {
+  --font-display: "Anton", "Chakra Petch", sans-serif;
+}
 @keyframes prismRainbowShift {
   0% {
     background-position: 0% 50%;
@@ -1001,6 +1011,18 @@ h1 {
   animation: none;
   text-shadow: 1px 1px 0 var(--border);
 }
+body:not([data-theme]) .title,
+body[data-theme="studio-light"] .title,
+body[data-theme="pastel-red"] .title,
+body[data-theme="pastel-orange"] .title,
+body[data-theme="pastel-yellow"] .title,
+body[data-theme="pastel-green"] .title,
+body[data-theme="pastel-blue"] .title,
+body[data-theme="pastel-purple"] .title,
+body[data-theme="pastel-pink"] .title {
+  color: color-mix(in srgb, var(--border) 70%, #ffffff);
+  text-shadow: 2px 2px 0 var(--border);
+}
 .title::before,
 .title::after {
   content: attr(data-text);
@@ -1119,6 +1141,18 @@ h1 {
   position: relative;
   text-shadow: 3px 3px 0 var(--border);
   display: inline-block;
+}
+body:not([data-theme]) .splash-title,
+body[data-theme="studio-light"] .splash-title,
+body[data-theme="pastel-red"] .splash-title,
+body[data-theme="pastel-orange"] .splash-title,
+body[data-theme="pastel-yellow"] .splash-title,
+body[data-theme="pastel-green"] .splash-title,
+body[data-theme="pastel-blue"] .splash-title,
+body[data-theme="pastel-purple"] .splash-title,
+body[data-theme="pastel-pink"] .splash-title {
+  color: color-mix(in srgb, var(--border) 70%, #ffffff);
+  text-shadow: 3px 3px 0 var(--border);
 }
 .splash-title,
 .splash-message,
@@ -1254,6 +1288,29 @@ body.loading-overlay .floating-angel-layer {
   mix-blend-mode: screen;
   animation: splashShine 2.8s ease-in-out 0.8s infinite;
   pointer-events: none;
+}
+body:not([data-theme]) :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="studio-light"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="pastel-red"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="pastel-orange"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="pastel-yellow"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="pastel-green"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="pastel-blue"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="pastel-purple"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after),
+body[data-theme="pastel-pink"] :is(.title::before, .title::after, .splash-title::before, .splash-title::after) {
+  animation: none;
+  opacity: 0;
+}
+body:not([data-theme]) :is(.title__shine, .splash-title__shine),
+body[data-theme="studio-light"] :is(.title__shine, .splash-title__shine),
+body[data-theme="pastel-red"] :is(.title__shine, .splash-title__shine),
+body[data-theme="pastel-orange"] :is(.title__shine, .splash-title__shine),
+body[data-theme="pastel-yellow"] :is(.title__shine, .splash-title__shine),
+body[data-theme="pastel-green"] :is(.title__shine, .splash-title__shine),
+body[data-theme="pastel-blue"] :is(.title__shine, .splash-title__shine),
+body[data-theme="pastel-purple"] :is(.title__shine, .splash-title__shine),
+body[data-theme="pastel-pink"] :is(.title__shine, .splash-title__shine) {
+  display: none;
 }
 .splash-message {
   font-size: 1.05rem;
