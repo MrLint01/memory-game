@@ -14,6 +14,18 @@ old_median_highest_level: 1.0
 new_median_highest_level: 1.0
 old_median_levels_completed_count: 1.0
 new_median_levels_completed_count: 1.0
+
+Level 1 feature bar chart definitions:
+- started_level_1 = player has a level_start event for level 1
+- started_level_1_then_clicked_button = player started level 1, then later had a level-1 ui_interaction click event
+- autoplayed_into_level_1 = player has a level-1 autoplay event with auto preview start
+level_1_feature_bar_chart: level_1_feature_bar_comparison.png
+old_started_level_1_pct: 65.12
+new_started_level_1_pct: 89.19
+old_started_level_1_then_clicked_button_pct: 0.00
+new_started_level_1_then_clicked_button_pct: 0.00
+old_autoplayed_into_level_1_pct: 0.00
+new_autoplayed_into_level_1_pct: 0.00
 old_adaptive_unassigned_players: 0
 old_adaptive_b_players: 0
 old_adaptive_a_players: 0

@@ -179,6 +179,37 @@ def load_version_tables_from_dir(version_dir: Path) -> tuple[pd.DataFrame, pd.Da
     return s, a, e
 
 
+def filter_table_for_version(df: pd.DataFrame, version: str) -> pd.DataFrame:
+    if df.empty or "game_version" not in df.columns:
+        return pd.DataFrame()
+    return df[df["game_version"].astype(str) == str(version)].copy()
+
+
+def get_all_players_from_tables(s: pd.DataFrame, a: pd.DataFrame, e: pd.DataFrame) -> list[str]:
+    all_players: set[str] = set()
+    for df in [s, a, e]:
+        player_col = pick_player_column(df)
+        if player_col is None or df.empty:
+            continue
+        all_players.update(df[player_col].dropna().astype(str).tolist())
+    return sorted(all_players)
+
+
+def coerce_datetime_series(df: pd.DataFrame) -> pd.Series:
+    for col in ["event_timestamp", "created_at", "client_iso"]:
+        if col not in df.columns:
+            continue
+        ts = pd.to_datetime(df[col], errors="coerce", utc=True)
+        if ts.notna().any():
+            return ts
+    if "client_timestamp_ms" in df.columns:
+        ms = pd.to_numeric(df["client_timestamp_ms"], errors="coerce")
+        ts = pd.to_datetime(ms, unit="ms", errors="coerce", utc=True)
+        if ts.notna().any():
+            return ts
+    return pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+
+
 def retention_curve(series: pd.Series) -> pd.Series:
     if series is None or series.empty:
         return pd.Series(dtype=float)
@@ -211,6 +242,338 @@ def plot_two_lines(out_png: Path, title: str, xlabel: str, old_label: str, new_l
     plt.tight_layout()
     plt.savefig(out_png, dpi=130)
     plt.close()
+
+
+def compute_level_one_feature_rates(s: pd.DataFrame, a: pd.DataFrame, e: pd.DataFrame) -> pd.DataFrame:
+    features = [
+        ("started_level_1", "Started level 1"),
+        ("interacted_level_1", "Interacted"),
+    ]
+    all_players = get_all_players_from_tables(s, a, e)
+    total_players = len(all_players)
+    empty = pd.DataFrame(
+        {
+            "feature_key": [key for key, _ in features],
+            "feature_label": [label for _, label in features],
+            "players": [0] * len(features),
+            "total_players": [total_players] * len(features),
+            "percent": [0.0] * len(features),
+        }
+    )
+    if total_players == 0 or e.empty:
+        return empty
+
+    player_col = pick_player_column(e)
+    if player_col is None:
+        return empty
+
+    events = e[e[player_col].notna()].copy()
+    if events.empty:
+        # We can still compute level-1 starts from attempts if event telemetry is absent.
+        if not a.empty:
+            a_player_col = pick_player_column(a)
+            if a_player_col is not None:
+                attempts = a[a[a_player_col].notna()].copy()
+                attempts["_player"] = attempts[a_player_col].astype(str)
+                attempts["_level_number"] = pd.to_numeric(attempts["level_number"], errors="coerce") if "level_number" in attempts.columns else pd.Series(np.nan, index=attempts.index)
+                started_level_1_players = set(attempts[attempts["_level_number"] == 1]["_player"].tolist())
+                rows = []
+                for feature_key, feature_label in features:
+                    players = len(started_level_1_players) if feature_key == "started_level_1" else 0
+                    percent = (players / total_players * 100.0) if total_players else 0.0
+                    rows.append(
+                        {
+                            "feature_key": feature_key,
+                            "feature_label": feature_label,
+                            "players": players,
+                            "total_players": total_players,
+                            "percent": percent,
+                        }
+                    )
+                return pd.DataFrame(rows)
+        return empty
+
+    events["_player"] = events[player_col].astype(str)
+    events["_event_type"] = events["event_type"].astype(str).str.strip().str.lower() if "event_type" in events.columns else ""
+    events["_level_number"] = (
+        pd.to_numeric(events["level_number"], errors="coerce")
+        if "level_number" in events.columns
+        else pd.Series(np.nan, index=events.index)
+    )
+    events["_action"] = events["action"].astype(str).str.strip().str.lower() if "action" in events.columns else ""
+    events["_autoplay_mode"] = (
+        events["autoplay_mode"].astype(str).str.strip().str.lower()
+        if "autoplay_mode" in events.columns
+        else ""
+    )
+    events["_target"] = events["target"].astype(str).str.strip().str.lower() if "target" in events.columns else ""
+    events["_preview_start_source"] = (
+        events["preview_start_source"].astype(str).str.strip().str.lower()
+        if "preview_start_source" in events.columns
+        else ""
+    )
+    events["_current_level_number"] = (
+        pd.to_numeric(events["current_level_number"], errors="coerce")
+        if "current_level_number" in events.columns
+        else pd.Series(np.nan, index=events.index)
+    )
+    events["_timestamp"] = coerce_datetime_series(events)
+
+    started_level_1_players: set[str] = set()
+    start_time_frames: list[pd.DataFrame] = []
+
+    if not a.empty:
+        a_player_col = pick_player_column(a)
+        if a_player_col is not None:
+            attempts = a[a[a_player_col].notna()].copy()
+            attempts["_player"] = attempts[a_player_col].astype(str)
+            attempts["_level_number"] = (
+                pd.to_numeric(attempts["level_number"], errors="coerce")
+                if "level_number" in attempts.columns
+                else pd.Series(np.nan, index=attempts.index)
+            )
+            attempts_started_level_1 = attempts[attempts["_level_number"] == 1].copy()
+            started_level_1_players.update(attempts_started_level_1["_player"].tolist())
+            attempts_started_level_1["_timestamp"] = coerce_datetime_series(attempts_started_level_1)
+            start_time_frames.append(attempts_started_level_1[["_player", "_timestamp"]])
+
+    started_level_1_events = events[
+        (
+            ((events["_event_type"] == "level_start") & (events["_level_number"] == 1)) |
+            ((events["_event_type"] == "round_complete") & (events["_level_number"] == 1)) |
+            ((events["_event_type"] == "level_end") & (events["_level_number"] == 1)) |
+            (
+                (events["_event_type"] == "autoplay_event") &
+                (events["_current_level_number"] == 1) &
+                (events["_target"].isin(["splash_start", "first_level_countdown", "stage_preview_start"]))
+            )
+        )
+    ].copy()
+    started_level_1_players.update(started_level_1_events["_player"].tolist())
+    start_time_frames.append(started_level_1_events[["_player", "_timestamp"]])
+
+    if start_time_frames:
+        level_1_starts = pd.concat(start_time_frames, ignore_index=True)
+        first_level_start_by_player = (
+            level_1_starts[level_1_starts["_timestamp"].notna()]
+            .sort_values("_timestamp")
+            .groupby("_player")["_timestamp"]
+            .first()
+        )
+    else:
+        first_level_start_by_player = pd.Series(dtype="datetime64[ns, UTC]")
+
+    interacted_level_1 = events[
+        (events["_event_type"] == "round_complete") &
+        (events["_level_number"] == 1)
+    ].copy()
+    interacted_level_1["_first_start_at"] = interacted_level_1["_player"].map(first_level_start_by_player)
+    interacted_level_1_players = set(
+        interacted_level_1[
+            interacted_level_1["_timestamp"].notna() &
+            interacted_level_1["_first_start_at"].notna() &
+            (interacted_level_1["_timestamp"] >= interacted_level_1["_first_start_at"])
+        ]["_player"].tolist()
+    )
+
+    player_sets = {
+        "started_level_1": started_level_1_players,
+        "interacted_level_1": interacted_level_1_players,
+    }
+
+    rows = []
+    for feature_key, feature_label in features:
+        players = len(player_sets.get(feature_key, set()))
+        percent = (players / total_players * 100.0) if total_players else 0.0
+        rows.append(
+            {
+                "feature_key": feature_key,
+                "feature_label": feature_label,
+                "players": players,
+                "total_players": total_players,
+                "percent": percent,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def plot_grouped_feature_bars(
+    out_png: Path,
+    title: str,
+    old_label: str,
+    new_label: str,
+    old_df: pd.DataFrame,
+    new_df: pd.DataFrame,
+    feature_order: list[str] | None = None,
+) -> None:
+    if old_df.empty and new_df.empty:
+        return
+
+    old_plot = old_df[["feature_key", "feature_label", "percent"]].copy()
+    new_plot = new_df[["feature_key", "feature_label", "percent"]].copy()
+    merged = old_plot.merge(
+        new_plot,
+        on=["feature_key", "feature_label"],
+        how="outer",
+        suffixes=("_old", "_new"),
+    ).fillna(0.0)
+    if feature_order is None:
+        feature_order = old_plot["feature_key"].tolist() or new_plot["feature_key"].tolist()
+    merged["_order"] = merged["feature_key"].map({key: idx for idx, key in enumerate(feature_order)})
+    merged = merged.sort_values("_order")
+
+    labels = merged["feature_label"].tolist()
+    old_vals = merged["percent_old"].astype(float).tolist()
+    new_vals = merged["percent_new"].astype(float).tolist()
+
+    x = np.arange(len(labels), dtype=float) * 1.75
+    width = 0.34
+
+    fig, ax = plt.subplots(figsize=(9.5, 5.2))
+    old_bars = ax.bar(x - width / 2, old_vals, width=width, color="#5b8ff9", label=old_label)
+    new_bars = ax.bar(x + width / 2, new_vals, width=width, color="#5ad8a6", label=new_label)
+    ax.set_xticks(x, labels)
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("Percent of players")
+    ax.set_xlabel("Features")
+    ax.set_title(title)
+    ax.grid(True, axis="y", alpha=0.25)
+    ax.legend()
+
+    for bars in [old_bars, new_bars]:
+        for bar in bars:
+            height = float(bar.get_height())
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                height + 1.5,
+                f"{height:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=120)
+    plt.close(fig)
+
+
+def compute_level_one_onboarding_metrics(s: pd.DataFrame, a: pd.DataFrame, e: pd.DataFrame) -> pd.DataFrame:
+    feature_rates = compute_level_one_feature_rates(s, a, e)
+    all_players = get_all_players_from_tables(s, a, e)
+    total_players = len(all_players)
+    features = [
+        ("started_level_1", "Started L1"),
+        ("interacted_level_1", "Reached round 1\nend"),
+        ("completed_level_1", "Completed L1"),
+        ("attempted_level_2", "Attempted L2"),
+    ]
+
+    players_by_key = {
+        row["feature_key"]: int(row["players"])
+        for _, row in feature_rates.iterrows()
+    }
+
+    if not a.empty:
+        player_col = pick_player_column(a)
+        if player_col is not None:
+            attempts = a[a[player_col].notna()].copy()
+            attempts["_player"] = attempts[player_col].astype(str)
+            attempts["_level_number"] = (
+                pd.to_numeric(attempts["level_number"], errors="coerce")
+                if "level_number" in attempts.columns
+                else pd.Series(np.nan, index=attempts.index)
+            )
+            attempts["_passed"] = bool_series(attempts["passed"]) if "passed" in attempts.columns else False
+            players_by_key["completed_level_1"] = len(
+                set(attempts[(attempts["_level_number"] == 1) & attempts["_passed"]]["_player"].tolist())
+            )
+            players_by_key["attempted_level_2"] = len(
+                set(attempts[attempts["_level_number"] == 2]["_player"].tolist())
+            )
+        else:
+            players_by_key["completed_level_1"] = 0
+            players_by_key["attempted_level_2"] = 0
+    else:
+        players_by_key["completed_level_1"] = 0
+        players_by_key["attempted_level_2"] = 0
+
+    rows = []
+    for feature_key, feature_label in features:
+        players = int(players_by_key.get(feature_key, 0))
+        percent = (players / total_players * 100.0) if total_players else 0.0
+        rows.append(
+            {
+                "feature_key": feature_key,
+                "feature_label": feature_label,
+                "players": players,
+                "total_players": total_players,
+                "percent": percent,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def compute_early_level_completion_metrics(stats: pd.DataFrame, max_level: int = 5) -> pd.DataFrame:
+    rows = []
+    total_players = len(stats)
+    highest = stats["highest_level_completed"] if not stats.empty and "highest_level_completed" in stats.columns else pd.Series(dtype=float)
+    for level in range(1, max_level + 1):
+        percent = float((highest >= level).mean() * 100.0) if total_players else 0.0
+        rows.append(
+            {
+                "feature_key": f"completed_level_{level}",
+                "feature_label": f"Completed L{level}",
+                "players": int(round(percent * total_players / 100.0)) if total_players else 0,
+                "total_players": total_players,
+                "percent": percent,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def load_level_one_player_flow_metrics(version_dir: Path) -> pd.DataFrame:
+    path = version_dir / "level_dropoff_analysis" / "level1_player_flow_percent.csv"
+    features = [
+        ("quit_before_l1", "Quit Before L1", "Quit Before L1"),
+        ("started_l1_quit_before_finish", "Started L1,\nQuit Before Finish", "Started L1, Quit Before Finish"),
+        ("completed_l1_quit_immediately", "Completed L1,\nQuit Immediately", "Completed L1, Quit Immediately"),
+        ("completed_l1_attempted_l2", "Completed L1,\nAttempted L2", "Completed L1, Attempted L2"),
+    ]
+    empty = pd.DataFrame(
+        {
+            "feature_key": [key for key, _, _ in features],
+            "feature_label": [label for _, label, _ in features],
+            "players": [0] * len(features),
+            "total_players": [0] * len(features),
+            "percent": [0.0] * len(features),
+        }
+    )
+    if not path.exists():
+        return empty
+
+    df = normalize_columns(pd.read_csv(path))
+    if df.empty:
+        return empty
+
+    name_col = df.columns[0]
+    percent_col = "percent_of_players" if "percent_of_players" in df.columns else "percent"
+    if percent_col not in df.columns:
+        return empty
+
+    rows = []
+    for feature_key, feature_label, source_name in features:
+        match = df[df[name_col].astype(str).str.strip() == source_name]
+        percent = float(pd.to_numeric(match[percent_col], errors="coerce").iloc[0]) if not match.empty else 0.0
+        rows.append(
+            {
+                "feature_key": feature_key,
+                "feature_label": feature_label,
+                "players": 0,
+                "total_players": 0,
+                "percent": percent,
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def load_adaptive_retention_csv(version_dir: Path, filename: str, value_col: str) -> pd.DataFrame:
@@ -386,12 +749,25 @@ def main() -> None:
     if old_dir.exists() and new_dir.exists():
         old_s, old_a, old_e = load_version_tables_from_dir(old_dir)
         new_s, new_a, new_e = load_version_tables_from_dir(new_dir)
-        old_stats = get_player_metrics_from_tables(old_s, old_a, old_e)
-        new_stats = get_player_metrics_from_tables(new_s, new_a, new_e)
     else:
         sessions, attempts, events = load_tables(args)
-        old_stats = get_player_metrics_for_version(sessions, attempts, events, args.old_version)
-        new_stats = get_player_metrics_for_version(sessions, attempts, events, args.new_version)
+        old_s = filter_table_for_version(sessions, args.old_version)
+        old_a = filter_table_for_version(attempts, args.old_version)
+        old_e = filter_table_for_version(events, args.old_version)
+        new_s = filter_table_for_version(sessions, args.new_version)
+        new_a = filter_table_for_version(attempts, args.new_version)
+        new_e = filter_table_for_version(events, args.new_version)
+
+    old_stats = get_player_metrics_from_tables(old_s, old_a, old_e)
+    new_stats = get_player_metrics_from_tables(new_s, new_a, new_e)
+    old_level1_features = compute_level_one_feature_rates(old_s, old_a, old_e)
+    new_level1_features = compute_level_one_feature_rates(new_s, new_a, new_e)
+    old_level1_onboarding = compute_level_one_onboarding_metrics(old_s, old_a, old_e)
+    new_level1_onboarding = compute_level_one_onboarding_metrics(new_s, new_a, new_e)
+    old_early_completion = compute_early_level_completion_metrics(old_stats, max_level=5)
+    new_early_completion = compute_early_level_completion_metrics(new_stats, max_level=5)
+    old_level1_flow = load_level_one_player_flow_metrics(old_dir)
+    new_level1_flow = load_level_one_player_flow_metrics(new_dir)
 
     # Keep only superimposed retention curve visuals.
     for old_png in outdir.glob("*.png"):
@@ -423,6 +799,57 @@ def main() -> None:
         args.new_version,
         retention_curve_time(old_stats["total_playtime_seconds"]),
         retention_curve_time(new_stats["total_playtime_seconds"]),
+    )
+    plot_grouped_feature_bars(
+        outdir / "level_1_feature_bar_comparison.png",
+        "Level 1 Feature Comparison",
+        args.old_version,
+        args.new_version,
+        old_level1_features,
+        new_level1_features,
+    )
+    plot_grouped_feature_bars(
+        outdir / "level_1_onboarding_funnel_comparison.png",
+        "Level 1 Onboarding Funnel Comparison",
+        args.old_version,
+        args.new_version,
+        old_level1_onboarding,
+        new_level1_onboarding,
+        feature_order=[
+            "started_level_1",
+            "interacted_level_1",
+            "completed_level_1",
+            "attempted_level_2",
+        ],
+    )
+    plot_grouped_feature_bars(
+        outdir / "early_level_completion_comparison.png",
+        "Early Level Completion Comparison",
+        args.old_version,
+        args.new_version,
+        old_early_completion,
+        new_early_completion,
+        feature_order=[
+            "completed_level_1",
+            "completed_level_2",
+            "completed_level_3",
+            "completed_level_4",
+            "completed_level_5",
+        ],
+    )
+    plot_grouped_feature_bars(
+        outdir / "level_1_player_flow_comparison.png",
+        "Level 1 Player Flow Comparison",
+        args.old_version,
+        args.new_version,
+        old_level1_flow,
+        new_level1_flow,
+        feature_order=[
+            "quit_before_l1",
+            "started_l1_quit_before_finish",
+            "completed_l1_quit_immediately",
+            "completed_l1_attempted_l2",
+        ],
     )
 
     old_adaptive_retention = load_adaptive_retention_csv(
@@ -505,7 +932,7 @@ def main() -> None:
         f"old_version: {args.old_version}",
         f"new_version: {args.new_version}",
         "",
-        "Comparison output: superimposed retention curves (highest level, levels completed count, time played)",
+        "Comparison output: superimposed retention curves plus level-1 onboarding/flow and early-completion grouped bars",
         f"old_players: {len(old_stats)}",
         f"new_players: {len(new_stats)}",
         f"old_retention_levels_completed_2plus_pct: {retention_pct(old_stats, 2):.2f}",
@@ -516,6 +943,28 @@ def main() -> None:
         f"new_median_highest_level: {new_stats['highest_level_completed'].median() if len(new_stats) else 0}",
         f"old_median_levels_completed_count: {old_stats['levels_completed_count'].median() if len(old_stats) else 0}",
         f"new_median_levels_completed_count: {new_stats['levels_completed_count'].median() if len(new_stats) else 0}",
+        "",
+        "Level 1 feature bar chart definitions:",
+        "- started_level_1 = player has any evidence of entering level 1 (attempt row, level_start, level_end, round_complete, or first-level autoplay entry)",
+        "- interacted_level_1 = player started level 1 and then reached a level-1 round_complete event, whether that round ended in success or failure",
+        f"level_1_feature_bar_chart: {(outdir / 'level_1_feature_bar_comparison.png').name}",
+        f"old_started_level_1_pct: {old_level1_features.loc[old_level1_features['feature_key'] == 'started_level_1', 'percent'].iloc[0]:.2f}",
+        f"new_started_level_1_pct: {new_level1_features.loc[new_level1_features['feature_key'] == 'started_level_1', 'percent'].iloc[0]:.2f}",
+        f"old_interacted_level_1_pct: {old_level1_features.loc[old_level1_features['feature_key'] == 'interacted_level_1', 'percent'].iloc[0]:.2f}",
+        f"new_interacted_level_1_pct: {new_level1_features.loc[new_level1_features['feature_key'] == 'interacted_level_1', 'percent'].iloc[0]:.2f}",
+        f"level_1_onboarding_funnel_chart: {(outdir / 'level_1_onboarding_funnel_comparison.png').name}",
+        f"old_completed_level_1_pct: {old_level1_onboarding.loc[old_level1_onboarding['feature_key'] == 'completed_level_1', 'percent'].iloc[0]:.2f}",
+        f"new_completed_level_1_pct: {new_level1_onboarding.loc[new_level1_onboarding['feature_key'] == 'completed_level_1', 'percent'].iloc[0]:.2f}",
+        f"old_attempted_level_2_pct: {old_level1_onboarding.loc[old_level1_onboarding['feature_key'] == 'attempted_level_2', 'percent'].iloc[0]:.2f}",
+        f"new_attempted_level_2_pct: {new_level1_onboarding.loc[new_level1_onboarding['feature_key'] == 'attempted_level_2', 'percent'].iloc[0]:.2f}",
+        f"early_level_completion_chart: {(outdir / 'early_level_completion_comparison.png').name}",
+        f"old_completed_level_3_pct: {old_early_completion.loc[old_early_completion['feature_key'] == 'completed_level_3', 'percent'].iloc[0]:.2f}",
+        f"new_completed_level_3_pct: {new_early_completion.loc[new_early_completion['feature_key'] == 'completed_level_3', 'percent'].iloc[0]:.2f}",
+        f"level_1_player_flow_chart: {(outdir / 'level_1_player_flow_comparison.png').name}",
+        f"old_quit_before_l1_pct: {old_level1_flow.loc[old_level1_flow['feature_key'] == 'quit_before_l1', 'percent'].iloc[0]:.2f}",
+        f"new_quit_before_l1_pct: {new_level1_flow.loc[new_level1_flow['feature_key'] == 'quit_before_l1', 'percent'].iloc[0]:.2f}",
+        f"old_started_l1_quit_before_finish_pct: {old_level1_flow.loc[old_level1_flow['feature_key'] == 'started_l1_quit_before_finish', 'percent'].iloc[0]:.2f}",
+        f"new_started_l1_quit_before_finish_pct: {new_level1_flow.loc[new_level1_flow['feature_key'] == 'started_l1_quit_before_finish', 'percent'].iloc[0]:.2f}",
         f"old_adaptive_unassigned_players: {old_adaptive_counts['unassigned']}",
         f"old_adaptive_b_players: {old_adaptive_counts['B']}",
         f"old_adaptive_a_players: {old_adaptive_counts['A']}",
@@ -530,6 +979,14 @@ def main() -> None:
     (outdir / "summary.txt").write_text("\n".join(map(str, summary)) + "\n", encoding="utf-8")
     old_stats.to_csv(outdir / "old_version_player_stats.csv", index=False)
     new_stats.to_csv(outdir / "new_version_player_stats.csv", index=False)
+    old_level1_features.assign(version=args.old_version).to_csv(outdir / "old_version_level_1_feature_rates.csv", index=False)
+    new_level1_features.assign(version=args.new_version).to_csv(outdir / "new_version_level_1_feature_rates.csv", index=False)
+    old_level1_onboarding.assign(version=args.old_version).to_csv(outdir / "old_version_level_1_onboarding_rates.csv", index=False)
+    new_level1_onboarding.assign(version=args.new_version).to_csv(outdir / "new_version_level_1_onboarding_rates.csv", index=False)
+    old_early_completion.assign(version=args.old_version).to_csv(outdir / "old_version_early_level_completion_rates.csv", index=False)
+    new_early_completion.assign(version=args.new_version).to_csv(outdir / "new_version_early_level_completion_rates.csv", index=False)
+    old_level1_flow.assign(version=args.old_version).to_csv(outdir / "old_version_level_1_player_flow_rates.csv", index=False)
+    new_level1_flow.assign(version=args.new_version).to_csv(outdir / "new_version_level_1_player_flow_rates.csv", index=False)
 
     print(f"Comparison complete. Outputs written to: {outdir}")
 
