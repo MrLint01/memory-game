@@ -442,7 +442,7 @@
           effects: audioSettings.effects / 100
         };
       };
-      const menuMusic = createMusicAudio("audio/stage-background-music.mp3", { loop: false });
+      const menuMusic = createMusicAudio("audio/stage-background-music.mp3", { loop: true });
       const levelMusic = createMusicAudio("audio/regular-groovy-background.wav", { loop: true });
       const MENU_MUSIC_START_DELAY_MS = 3000;
       const MENU_MUSIC_FADE_IN_MS = 5000;
