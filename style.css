@@ -2037,7 +2037,7 @@ body.stage-fail #resultsPanel {
   background: var(--panel-muted);
   box-shadow: none;
   padding: 1.2rem 1.4rem;
-  animation: panelFailIn 680ms ease-out both;
+  animation: panelClearIn 880ms ease-out both;
 }
 body.stage-fail #resultsPanel .stage-fail-bar {
   display: grid;
