@@ -442,10 +442,12 @@
           effects: audioSettings.effects / 100
         };
       };
-      const menuMusic = createMusicAudio("audio/stage-background-music.mp3", { loop: true });
+      const menuMusic = createMusicAudio("audio/stage-background-music.mp3", { loop: false });
       const levelMusic = createMusicAudio("audio/regular-groovy-background.wav", { loop: true });
       const MENU_MUSIC_START_DELAY_MS = 3000;
       const MENU_MUSIC_FADE_IN_MS = 5000;
+      const MENU_MUSIC_LOOP_FADE_OUT_MS = 2600;
+      const MENU_MUSIC_LOOP_FADE_IN_MS = 5200;
       let activeMusicMode = null;
       let pendingMusicRequest = null;
       let pendingMusicListenerAttached = false;
@@ -498,7 +500,8 @@
         if (!audio) return;
         const volume = getMusicMixVolume();
         const factor = Number.isFinite(audio.__fadeFactor) ? audio.__fadeFactor : 1;
-        audio.volume = clampMusicVolume(volume * factor);
+        const loopFactor = Number.isFinite(audio.__loopFadeFactor) ? audio.__loopFadeFactor : 1;
+        audio.volume = clampMusicVolume(volume * factor * loopFactor);
         audio.muted = volume <= 0;
         if (volume <= 0 && !audio.paused) {
           audio.pause();
@@ -531,6 +534,86 @@
         audio.__fadeFrameId = window.requestAnimationFrame(step);
       }
 
+      function resetMenuLoopFadeState(audio) {
+        if (!audio) return;
+        audio.__loopFadeFactor = 1;
+        audio.__loopLastTime = 0;
+        audio.__loopFadeInId = 0;
+        audio.__loopFadeInActive = false;
+        audio.__loopFadeInStart = 0;
+      }
+
+      function stopMenuMusicLoopMonitor(audio) {
+        if (!audio || !audio.__loopMonitorId) return;
+        window.cancelAnimationFrame(audio.__loopMonitorId);
+        audio.__loopMonitorId = 0;
+      }
+
+      function updateMenuMusicLoopFade(audio, now) {
+        if (!audio || audio.paused) return;
+        const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+        if (!(duration > 0)) return;
+        const fadeOutSec = Math.max(0.1, MENU_MUSIC_LOOP_FADE_OUT_MS / 1000);
+        const fadeInMs = Math.max(100, MENU_MUSIC_LOOP_FADE_IN_MS);
+        const current = audio.currentTime;
+        const remaining = duration - current;
+        if (audio.__loopFadeInActive) {
+          const elapsed = Math.max(0, now - (audio.__loopFadeInStart || now));
+          const progress = fadeInMs <= 0 ? 1 : Math.min(1, elapsed / fadeInMs);
+          const eased = Math.pow(progress, 1.6);
+          audio.__loopFadeFactor = eased;
+          applySingleMusicVolume(audio);
+          if (progress >= 1) {
+            audio.__loopFadeFactor = 1;
+            audio.__loopFadeInActive = false;
+          }
+          return;
+        }
+        if (remaining <= fadeOutSec) {
+          const nextFactor = Math.max(0, Math.min(1, Math.pow(remaining / fadeOutSec, 1.15)));
+          audio.__loopFadeFactor = nextFactor;
+          applySingleMusicVolume(audio);
+        } else if (audio.__loopFadeFactor !== 1) {
+          audio.__loopFadeFactor = 1;
+          applySingleMusicVolume(audio);
+        }
+      }
+
+      function startMenuMusicLoopMonitor(audio) {
+        if (!audio || audio.__loopMonitorId) return;
+        const step = (now) => {
+          if (!audio || audio.paused) {
+            audio.__loopMonitorId = 0;
+            return;
+          }
+          updateMenuMusicLoopFade(audio, now);
+          audio.__loopMonitorId = window.requestAnimationFrame(step);
+        };
+        audio.__loopMonitorId = window.requestAnimationFrame(step);
+      }
+
+      function restartMenuMusicLoop() {
+        if (!menuMusic || activeMusicMode !== "menu") return;
+        menuMusic.__loopFadeFactor = 0;
+        applySingleMusicVolume(menuMusic);
+        menuMusic.currentTime = 0;
+        try {
+          const playResult = menuMusic.play();
+          if (playResult && typeof playResult.catch === "function") {
+            playResult.catch((error) => {
+              window.__lastAudioError = error;
+              queuePendingMusic(menuMusic, { fadeIn: true });
+            });
+          }
+        } catch (error) {
+          window.__lastAudioError = error;
+          queuePendingMusic(menuMusic, { fadeIn: true });
+          return;
+        }
+        menuMusic.__loopFadeInStart = performance.now();
+        menuMusic.__loopFadeInActive = true;
+      }
+
       function getEffectsMixVolume() {
         if (typeof window.getAudioMix === "function") {
           const mix = window.getAudioMix() || {};
@@ -554,6 +637,9 @@
         if (!audio) return;
         cancelMusicFade(audio);
         audio.__fadeFactor = 1;
+        if (audio === menuMusic) {
+          stopMenuMusicLoopMonitor(audio);
+        }
         audio.pause();
         audio.currentTime = 0;
       }
@@ -630,6 +716,9 @@
           if (shouldRestartFade) {
             startMusicFadeIn(audio);
           }
+          if (audio === menuMusic) {
+            startMenuMusicLoopMonitor(audio);
+          }
         } catch (error) {
           window.__lastAudioError = error;
           queuePendingMusic(audio, options);
@@ -661,10 +750,34 @@
       window.setBackgroundMusicMode = setBackgroundMusicMode;
       window.scheduleMenuMusicFadeIn = scheduleMenuMusicFadeIn;
       window.clearScheduledMenuMusicFadeIn = clearScheduledMenuMusicFadeIn;
+      window.__menuMusic = menuMusic;
+      window.getMenuMusicState = () => {
+        if (!menuMusic) return { available: false };
+        return {
+          available: true,
+          src: menuMusic.currentSrc || menuMusic.src,
+          paused: menuMusic.paused,
+          loop: menuMusic.loop,
+          currentTime: menuMusic.currentTime,
+          duration: menuMusic.duration,
+          volume: menuMusic.volume,
+          fadeFactor: menuMusic.__fadeFactor,
+          loopFadeFactor: menuMusic.__loopFadeFactor,
+          loopFadeInActive: Boolean(menuMusic.__loopFadeInActive),
+          loopMonitorActive: Boolean(menuMusic.__loopMonitorId)
+        };
+      };
+      window.jumpMenuMusicToEnd = (seconds = 2) => {
+        if (!menuMusic || !Number.isFinite(menuMusic.duration)) return false;
+        const offset = Math.max(0.2, Number(seconds) || 2);
+        menuMusic.currentTime = Math.max(0, menuMusic.duration - offset);
+        return true;
+      };
+      resetMenuLoopFadeState(menuMusic);
       if (menuMusic) {
         menuMusic.addEventListener("ended", () => {
           if (activeMusicMode !== "menu") return;
-          scheduleMenuMusicFadeIn(MENU_MUSIC_START_DELAY_MS);
+          restartMenuMusicLoop();
         });
       }
       let splashReturnToHome = false;

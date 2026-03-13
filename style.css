@@ -3611,7 +3611,7 @@ body[data-theme="prism-parade"][data-view="home"].home-anim .mode-card.primary {
 #playStart,
 #playStart .mode-card__label,
 #playStart strong {
-  color: #000000;
+  color: var(--ink);
 }
 .mode-card--turbo {
   min-height: clamp(6.2rem, 12vw, 7.1rem);
