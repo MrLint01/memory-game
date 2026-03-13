@@ -37,11 +37,14 @@ player_id_norm,retention_seconds,l1_attempts_before_first_completion,l1_failed_f
 7fd064f6-8900-4f27-948b-f08e9ea412cb,28.28,2.0,True,False,15.73,0.0,,,,0.0,,,
 8185cb13-fc23-4d12-a05b-0e1738a3052f,150.68,0.0,False,True,21.95,0.0,False,True,9.59,0.0,False,True,17.55
 832bf59e-5979-4694-886e-4774aac96f66,35.0,1.0,True,False,35.0,0.0,,,,0.0,,,
+83ab28df-6ec3-4b44-a370-7c64503b438e,23.73,0.0,False,True,23.73,0.0,,,,0.0,,,
 8d0708ab-5820-4fa8-b7a1-8234014ae672,41.86,0.0,False,True,16.34,0.0,False,True,8.18,0.0,False,True,10.59
 905cfd91-aca1-4150-8646-13f102a3eb5e,84.31,0.0,False,True,32.13,0.0,False,True,21.25,0.0,False,True,22.0
+9063bee5-dc83-472a-9fcd-af464d8e558e,0.0,0.0,,,,0.0,,,,0.0,,,
 929c931a-a5bd-4726-a6fb-fe48aabbe555,0.0,0.0,,,,0.0,,,,0.0,,,
 92ea7745-0461-4a3c-8a8a-14b7f8173389,36.0,1.0,True,False,36.0,0.0,,,,0.0,,,
 93b9a76c-166b-4d8d-95d8-77b69861cf45,7.42,0.0,False,True,4.05,0.0,,,,0.0,,,
+964598fc-9f1a-4811-bd53-902acc102de9,239.5,0.0,False,True,19.94,0.0,False,True,12.93,1.0,True,False,20.13
 993375df-ad41-40c5-b454-967d437c1fe8,101.48,0.0,False,True,10.45,0.0,False,True,7.88,0.0,False,True,6.89
 9a9be149-d07a-4cb1-af2c-d4615f62fe08,3.36,1.0,True,False,3.36,0.0,,,,0.0,,,
 a64ee7b8-3db1-4788-8bc8-ff43fd4d0f9f,35.93,1.0,True,False,35.93,0.0,,,,0.0,,,
@@ -60,7 +63,7 @@ d81125c8-890c-41c6-96de-73498ca1c66e,50.11,3.0,True,False,1.49,0.0,,,,0.0,,,
 dfe20491-7f2d-49b0-b6ce-06ea8f905622,56.25,1.0,True,False,2.15,0.0,False,True,4.27,3.0,True,False,1.75
 e0fc445c-421f-436d-9c30-101e55886380,97.85,1.0,True,False,17.05,0.0,False,True,10.23,2.0,True,False,7.9
 e27d8a1e-c9ee-430e-ad60-cef27708103b,0.0,0.0,,,,0.0,,,,0.0,,,
-e3b59f68-6252-4fa9-b38c-e095b0839eb7,1936.85,0.0,False,True,6.41,1.0,True,False,3.57,4.0,True,False,35.0
+e3b59f68-6252-4fa9-b38c-e095b0839eb7,1938.3,0.0,False,True,6.41,1.0,True,False,3.57,4.0,True,False,35.0
 e493e865-ed84-412b-ab4a-8aa9917906e0,79.5,1.0,True,False,19.1,0.0,False,True,6.91,0.0,,,
 e6e644a5-1c04-4386-9147-6ba9a9015c06,0.0,0.0,,,,0.0,,,,0.0,,,
 e9430dbd-a0ca-415a-8750-b50246be8fa4,69.14,1.0,True,False,11.4,0.0,False,True,24.27,1.0,True,False,8.65
@@ -72,5 +75,6 @@ ee687cbc-a399-4fc9-afc9-1a362231b562,187.12,0.0,False,True,6.06,1.0,True,False,2
 efc50570-43e0-4eb4-a1b6-a1e620ddf81e,0.0,0.0,,,,0.0,,,,0.0,,,
 f0a8c189-0c4e-455c-acd3-f3d05700cc10,0.0,0.0,,,,0.0,,,,0.0,,,
 f0ae6c6f-e6dc-467f-bb45-4c85e470f528,96.02,0.0,False,True,16.17,1.0,True,False,6.53,4.0,True,False,5.35
+f51ab81a-c80d-4a60-b657-69a63135456d,0.0,0.0,,,,0.0,,,,0.0,,,
 f583c242-7379-425d-a687-bafaeae57288,77.99,0.0,False,True,16.06,0.0,False,True,13.08,3.0,True,False,1.8
 id-1773100917089-9d9303ebd7e868,35.0,1.0,True,False,35.0,0.0,,,,0.0,,,

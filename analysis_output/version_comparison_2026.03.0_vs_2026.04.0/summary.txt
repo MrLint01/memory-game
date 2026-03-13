@@ -5,11 +5,11 @@ new_version: 2026.04.0
 
 Comparison output: superimposed retention curves plus level-1 onboarding/flow and early-completion grouped bars
 old_players: 37
-new_players: 75
+new_players: 79
 old_retention_levels_completed_2plus_pct: 48.65
-new_retention_levels_completed_2plus_pct: 44.00
+new_retention_levels_completed_2plus_pct: 43.04
 old_avg_playtime_minutes: 3.71
-new_avg_playtime_minutes: 1.87
+new_avg_playtime_minutes: 1.83
 old_median_highest_level: 1.0
 new_median_highest_level: 1.0
 old_median_levels_completed_count: 1.0
@@ -39,9 +39,9 @@ new_started_l1_quit_before_finish_pct: 22.67
 old_adaptive_unassigned_players: 4
 old_adaptive_b_players: 19
 old_adaptive_a_players: 4
-new_adaptive_unassigned_players: 5
+new_adaptive_unassigned_players: 6
 new_adaptive_b_players: 39
-new_adaptive_a_players: 13
+new_adaptive_a_players: 14
 adaptive_time_comparison_graph: adaptive_group_retention_by_time_comparison.png
 adaptive_time_comparison_by_group_graph: adaptive_group_retention_by_time_comparison_by_group.png
 adaptive_time_all_players_comparison_graph: adaptive_group_retention_by_time_all_players_comparison.png

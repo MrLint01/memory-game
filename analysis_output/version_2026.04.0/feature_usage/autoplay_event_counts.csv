@@ -1,13 +1,13 @@
-label,event_count
-stage_preview_open | manual,639
-result_auto_advance_scheduled | auto,444
-stage_preview_start | manual,441
-result_auto_advance_cancelled | manual,233
-result_auto_advance_triggered | auto,112
-stage_preview_open | auto,112
-splash_start | manual,76
+,event_count
+stage_preview_open | manual,641
+result_auto_advance_scheduled | auto,458
+stage_preview_start | manual,443
+result_auto_advance_cancelled | manual,236
+result_auto_advance_triggered | auto,124
+stage_preview_open | auto,124
+splash_start | manual,81
 stage_preview_autostart_cancelled | manual,73
-first_level_countdown | auto,33
-splash_start | auto,33
-first_level_countdown | manual,31
-stage_preview_start | auto,26
+stage_preview_start | auto,37
+first_level_countdown | auto,34
+splash_start | auto,34
+first_level_countdown | manual,33
