@@ -442,10 +442,12 @@
           effects: audioSettings.effects / 100
         };
       };
-      const menuMusic = createMusicAudio("audio/stage-background-music.mp3", { loop: false });
+      const menuMusic = createMusicAudio("audio/stage-background-music.mp3", { loop: true });
       const levelMusic = createMusicAudio("audio/regular-groovy-background.wav", { loop: true });
       const MENU_MUSIC_START_DELAY_MS = 3000;
       const MENU_MUSIC_FADE_IN_MS = 5000;
+      const MENU_MUSIC_LOOP_FADE_OUT_MS = 2600;
+      const MENU_MUSIC_LOOP_FADE_IN_MS = 5200;
       let activeMusicMode = null;
       let pendingMusicRequest = null;
       let pendingMusicListenerAttached = false;
@@ -496,11 +498,12 @@
 
       function applySingleMusicVolume(audio) {
         if (!audio) return;
-        const volume = getMusicMixVolume();
+        const mixVolume = getMusicMixVolume();
         const factor = Number.isFinite(audio.__fadeFactor) ? audio.__fadeFactor : 1;
-        audio.volume = clampMusicVolume(volume * factor);
-        audio.muted = volume <= 0;
-        if (volume <= 0 && !audio.paused) {
+        const loopFactor = Number.isFinite(audio.__loopFadeFactor) ? audio.__loopFadeFactor : 1;
+        audio.volume = clampMusicVolume(mixVolume * factor * loopFactor);
+        audio.muted = mixVolume <= 0;
+        if (mixVolume <= 0 && !audio.paused) {
           audio.pause();
         }
       }
@@ -531,6 +534,74 @@
         audio.__fadeFrameId = window.requestAnimationFrame(step);
       }
 
+      function resetMenuLoopFadeState(audio) {
+        if (!audio) return;
+        audio.__loopFadeFactor = 1;
+        audio.__loopLastTime = 0;
+        audio.__loopFadeInId = 0;
+        audio.__loopFadeInActive = false;
+        audio.__loopFadeInStart = 0;
+      }
+
+      function stopMenuMusicLoopMonitor(audio) {
+        if (!audio || !audio.__loopMonitorId) return;
+        window.cancelAnimationFrame(audio.__loopMonitorId);
+        audio.__loopMonitorId = 0;
+      }
+
+      function updateMenuMusicLoopFade(audio, now) {
+        if (!audio || audio.paused) return;
+        const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+        if (!(duration > 0)) return;
+        const fadeOutSec = Math.max(0.1, MENU_MUSIC_LOOP_FADE_OUT_MS / 1000);
+        const fadeInMs = Math.max(100, MENU_MUSIC_LOOP_FADE_IN_MS);
+        const current = audio.currentTime;
+        const last = Number.isFinite(audio.__loopLastTime) ? audio.__loopLastTime : 0;
+        audio.__loopLastTime = current;
+        const loopWrap = (last > Math.max(0, duration - 0.35) && current < 0.35)
+          || (current + 0.25 < last);
+        if (loopWrap) {
+          audio.__loopFadeInStart = now;
+          audio.__loopFadeInActive = true;
+          audio.__loopFadeFactor = 0;
+          applySingleMusicVolume(audio);
+        }
+        const remaining = duration - current;
+        if (audio.__loopFadeInActive) {
+          const elapsed = Math.max(0, now - (audio.__loopFadeInStart || now));
+          const progress = fadeInMs <= 0 ? 1 : Math.min(1, elapsed / fadeInMs);
+          const eased = Math.pow(progress, 1.6);
+          audio.__loopFadeFactor = eased;
+          applySingleMusicVolume(audio);
+          if (progress >= 1) {
+            audio.__loopFadeFactor = 1;
+            audio.__loopFadeInActive = false;
+          }
+          return;
+        }
+        if (remaining <= fadeOutSec) {
+          const nextFactor = Math.max(0, Math.min(1, Math.pow(remaining / fadeOutSec, 1.15)));
+          audio.__loopFadeFactor = nextFactor;
+          applySingleMusicVolume(audio);
+        } else if (audio.__loopFadeFactor !== 1) {
+          audio.__loopFadeFactor = 1;
+          applySingleMusicVolume(audio);
+        }
+      }
+
+      function startMenuMusicLoopMonitor(audio) {
+        if (!audio || audio.__loopMonitorId) return;
+        const step = (now) => {
+          if (!audio || audio.paused) {
+            audio.__loopMonitorId = 0;
+            return;
+          }
+          updateMenuMusicLoopFade(audio, now);
+          audio.__loopMonitorId = window.requestAnimationFrame(step);
+        };
+        audio.__loopMonitorId = window.requestAnimationFrame(step);
+      }
+
       function getEffectsMixVolume() {
         if (typeof window.getAudioMix === "function") {
           const mix = window.getAudioMix() || {};
@@ -554,6 +625,9 @@
         if (!audio) return;
         cancelMusicFade(audio);
         audio.__fadeFactor = 1;
+        if (audio === menuMusic) {
+          stopMenuMusicLoopMonitor(audio);
+        }
         audio.pause();
         audio.currentTime = 0;
       }
@@ -604,6 +678,9 @@
             audio.__fadeFactor = 1;
             applySingleMusicVolume(audio);
           }
+          if (audio === menuMusic) {
+            startMenuMusicLoopMonitor(audio);
+          }
           return;
         }
         audio.muted = false;
@@ -629,6 +706,9 @@
           }
           if (shouldRestartFade) {
             startMusicFadeIn(audio);
+          }
+          if (audio === menuMusic) {
+            startMenuMusicLoopMonitor(audio);
           }
         } catch (error) {
           window.__lastAudioError = error;
@@ -661,7 +741,34 @@
       window.setBackgroundMusicMode = setBackgroundMusicMode;
       window.scheduleMenuMusicFadeIn = scheduleMenuMusicFadeIn;
       window.clearScheduledMenuMusicFadeIn = clearScheduledMenuMusicFadeIn;
+      window.__menuMusic = menuMusic;
+      window.getMenuMusicState = () => {
+        if (!menuMusic) return { available: false };
+        return {
+          available: true,
+          src: menuMusic.currentSrc || menuMusic.src,
+          paused: menuMusic.paused,
+          loop: menuMusic.loop,
+          currentTime: menuMusic.currentTime,
+          duration: menuMusic.duration,
+          volume: menuMusic.volume,
+          fadeFactor: menuMusic.__fadeFactor,
+          loopFadeFactor: menuMusic.__loopFadeFactor,
+          loopFadeInActive: Boolean(menuMusic.__loopFadeInActive),
+          loopMonitorActive: Boolean(menuMusic.__loopMonitorId)
+        };
+      };
+      window.jumpMenuMusicToEnd = (seconds = 2) => {
+        if (!menuMusic || !Number.isFinite(menuMusic.duration)) return false;
+        const offset = Math.max(0.2, Number(seconds) || 2);
+        menuMusic.currentTime = Math.max(0, menuMusic.duration - offset);
+        return true;
+      };
+      resetMenuLoopFadeState(menuMusic);
       if (menuMusic) {
+        menuMusic.addEventListener("play", () => {
+          startMenuMusicLoopMonitor(menuMusic);
+        });
         menuMusic.addEventListener("ended", () => {
           if (activeMusicMode !== "menu") return;
           scheduleMenuMusicFadeIn(MENU_MUSIC_START_DELAY_MS);
@@ -1264,6 +1371,27 @@
       const SPLASH_TURBO_ENTER_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
       const SPLASH_TURBO_EXIT_EASING = "cubic-bezier(0.4, 0, 1, 1)";
       const SPLASH_TURBO_ACHIEVEMENT_THRESHOLD = 10;
+      const SPLASH_ICON_SWAP_PERIOD_MS = 8400;
+      const SPLASH_ICON_SWAP_OFFSETS_MS = [
+        Math.round(SPLASH_ICON_SWAP_PERIOD_MS * 0.58),
+        Math.round(SPLASH_ICON_SWAP_PERIOD_MS * 0.6),
+        Math.round(SPLASH_ICON_SWAP_PERIOD_MS * 0.67)
+      ];
+      const SPLASH_ICON_SWAP_ICONS = [
+        "imgs/icons/card-numbers.svg",
+        "imgs/icons/card-letters.svg",
+        "imgs/icons/card-shapes.svg",
+        "imgs/icons/card-directions.svg",
+        "imgs/icons/card-colors.svg",
+        "imgs/icons/card-diagonal.svg",
+        "imgs/icons/card-greekletters.svg",
+        "imgs/icons/mod-mathops.svg",
+        "imgs/icons/mod-mathopsplus.svg",
+        "imgs/icons/mod-rotate.svg",
+        "imgs/icons/mod-rotateplus.svg",
+        "imgs/icons/mod-swapcards.svg",
+        "imgs/icons/mod-backgroundcolor.svg"
+      ];
       const SPLASH_TURBO_VARIANTS = {
         climbing: {
           src: "imgs/Sloths/transparent/turbo_climbing_splash.png",
@@ -1298,6 +1426,9 @@
       let floatingAngelImage = null;
       let floatingAngelTimer = null;
       let floatingAngelDirection = 1;
+      let splashIconSwapInterval = null;
+      let splashIconSwapTimers = [];
+      let splashIconSwapLast = null;
 
       function normalizeTurboStoryState(value) {
         const raw = String(value || "").trim().toLowerCase();
@@ -1354,6 +1485,68 @@
         if (floatingAngelTimer) {
           window.clearTimeout(floatingAngelTimer);
           floatingAngelTimer = null;
+        }
+      }
+
+      function clearSplashIconSwapTimers() {
+        if (splashIconSwapTimers.length) {
+          splashIconSwapTimers.forEach((timerId) => window.clearTimeout(timerId));
+          splashIconSwapTimers = [];
+        }
+      }
+
+      function pickRandomSplashIcon() {
+        if (!SPLASH_ICON_SWAP_ICONS.length) return null;
+        if (SPLASH_ICON_SWAP_ICONS.length === 1) return SPLASH_ICON_SWAP_ICONS[0];
+        let next = null;
+        let guard = 0;
+        while (guard < 10) {
+          next = SPLASH_ICON_SWAP_ICONS[Math.floor(Math.random() * SPLASH_ICON_SWAP_ICONS.length)];
+          if (next && next !== splashIconSwapLast) break;
+          guard += 1;
+        }
+        splashIconSwapLast = next || SPLASH_ICON_SWAP_ICONS[0];
+        return splashIconSwapLast;
+      }
+
+      function applySplashIcon(icon) {
+        if (!icon || !document.body) return;
+        document.body.style.setProperty("--splash-icon-1", `url("${icon}")`);
+      }
+
+      function scheduleSplashIconSwaps() {
+        clearSplashIconSwapTimers();
+        if (!document.body || document.body.dataset.view !== "splash") return;
+        SPLASH_ICON_SWAP_OFFSETS_MS.forEach((offsetMs) => {
+          const timerId = window.setTimeout(() => {
+            if (!document.body || document.body.dataset.view !== "splash") return;
+            const nextIcon = pickRandomSplashIcon();
+            if (nextIcon) {
+              applySplashIcon(nextIcon);
+            }
+          }, offsetMs);
+          splashIconSwapTimers.push(timerId);
+        });
+      }
+
+      function startSplashIconSwap() {
+        if (splashIconSwapInterval) return;
+        const initial = pickRandomSplashIcon();
+        if (initial) {
+          applySplashIcon(initial);
+        }
+        scheduleSplashIconSwaps();
+        splashIconSwapInterval = window.setInterval(scheduleSplashIconSwaps, SPLASH_ICON_SWAP_PERIOD_MS);
+      }
+
+      function stopSplashIconSwap() {
+        if (splashIconSwapInterval) {
+          window.clearInterval(splashIconSwapInterval);
+          splashIconSwapInterval = null;
+        }
+        clearSplashIconSwapTimers();
+        if (document.body) {
+          document.body.style.removeProperty("--splash-icon-1");
         }
       }
 
@@ -3862,6 +4055,7 @@ function runFlashCountdown(onComplete) {
         }
         document.body.dataset.view = "splash";
         startSplashTurboCycle();
+        startSplashIconSwap();
         scheduleSplashAutoStart();
       }
 
@@ -3869,6 +4063,7 @@ function runFlashCountdown(onComplete) {
         clearSplashAutoStart();
         resetSplashAnyKeySequence();
         stopSplashTurboCycle();
+        stopSplashIconSwap();
         if (splashScreen) {
           splashScreen.setAttribute("aria-hidden", "true");
           splashScreen.setAttribute("hidden", "");
@@ -3885,6 +4080,7 @@ function runFlashCountdown(onComplete) {
 
       function openSplashLoading(message = null) {
         stopSplashTurboCycle();
+        stopSplashIconSwap();
         document.body.classList.add("loading-overlay");
         document.body.classList.remove("home-anim");
         if (splashLoading) {
@@ -3917,6 +4113,7 @@ function runFlashCountdown(onComplete) {
         }
         if (document.body.dataset.view === "splash") {
           startSplashTurboCycle();
+          startSplashIconSwap();
         }
         scheduleSplashAutoStart();
         if (!keepHeaderHidden && mainHeader) {
