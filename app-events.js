@@ -1264,6 +1264,27 @@
       const SPLASH_TURBO_ENTER_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
       const SPLASH_TURBO_EXIT_EASING = "cubic-bezier(0.4, 0, 1, 1)";
       const SPLASH_TURBO_ACHIEVEMENT_THRESHOLD = 10;
+      const SPLASH_ICON_SWAP_PERIOD_MS = 8400;
+      const SPLASH_ICON_SWAP_OFFSETS_MS = [
+        Math.round(SPLASH_ICON_SWAP_PERIOD_MS * 0.58),
+        Math.round(SPLASH_ICON_SWAP_PERIOD_MS * 0.6),
+        Math.round(SPLASH_ICON_SWAP_PERIOD_MS * 0.67)
+      ];
+      const SPLASH_ICON_SWAP_ICONS = [
+        "imgs/icons/card-numbers.svg",
+        "imgs/icons/card-letters.svg",
+        "imgs/icons/card-shapes.svg",
+        "imgs/icons/card-directions.svg",
+        "imgs/icons/card-colors.svg",
+        "imgs/icons/card-diagonal.svg",
+        "imgs/icons/card-greekletters.svg",
+        "imgs/icons/mod-mathops.svg",
+        "imgs/icons/mod-mathopsplus.svg",
+        "imgs/icons/mod-rotate.svg",
+        "imgs/icons/mod-rotateplus.svg",
+        "imgs/icons/mod-swapcards.svg",
+        "imgs/icons/mod-backgroundcolor.svg"
+      ];
       const SPLASH_TURBO_VARIANTS = {
         climbing: {
           src: "imgs/Sloths/transparent/turbo_climbing_splash.png",
@@ -1298,6 +1319,9 @@
       let floatingAngelImage = null;
       let floatingAngelTimer = null;
       let floatingAngelDirection = 1;
+      let splashIconSwapInterval = null;
+      let splashIconSwapTimers = [];
+      let splashIconSwapLast = null;
 
       function normalizeTurboStoryState(value) {
         const raw = String(value || "").trim().toLowerCase();
@@ -1354,6 +1378,68 @@
         if (floatingAngelTimer) {
           window.clearTimeout(floatingAngelTimer);
           floatingAngelTimer = null;
+        }
+      }
+
+      function clearSplashIconSwapTimers() {
+        if (splashIconSwapTimers.length) {
+          splashIconSwapTimers.forEach((timerId) => window.clearTimeout(timerId));
+          splashIconSwapTimers = [];
+        }
+      }
+
+      function pickRandomSplashIcon() {
+        if (!SPLASH_ICON_SWAP_ICONS.length) return null;
+        if (SPLASH_ICON_SWAP_ICONS.length === 1) return SPLASH_ICON_SWAP_ICONS[0];
+        let next = null;
+        let guard = 0;
+        while (guard < 10) {
+          next = SPLASH_ICON_SWAP_ICONS[Math.floor(Math.random() * SPLASH_ICON_SWAP_ICONS.length)];
+          if (next && next !== splashIconSwapLast) break;
+          guard += 1;
+        }
+        splashIconSwapLast = next || SPLASH_ICON_SWAP_ICONS[0];
+        return splashIconSwapLast;
+      }
+
+      function applySplashIcon(icon) {
+        if (!icon || !document.body) return;
+        document.body.style.setProperty("--splash-icon-1", `url("${icon}")`);
+      }
+
+      function scheduleSplashIconSwaps() {
+        clearSplashIconSwapTimers();
+        if (!document.body || document.body.dataset.view !== "splash") return;
+        SPLASH_ICON_SWAP_OFFSETS_MS.forEach((offsetMs) => {
+          const timerId = window.setTimeout(() => {
+            if (!document.body || document.body.dataset.view !== "splash") return;
+            const nextIcon = pickRandomSplashIcon();
+            if (nextIcon) {
+              applySplashIcon(nextIcon);
+            }
+          }, offsetMs);
+          splashIconSwapTimers.push(timerId);
+        });
+      }
+
+      function startSplashIconSwap() {
+        if (splashIconSwapInterval) return;
+        const initial = pickRandomSplashIcon();
+        if (initial) {
+          applySplashIcon(initial);
+        }
+        scheduleSplashIconSwaps();
+        splashIconSwapInterval = window.setInterval(scheduleSplashIconSwaps, SPLASH_ICON_SWAP_PERIOD_MS);
+      }
+
+      function stopSplashIconSwap() {
+        if (splashIconSwapInterval) {
+          window.clearInterval(splashIconSwapInterval);
+          splashIconSwapInterval = null;
+        }
+        clearSplashIconSwapTimers();
+        if (document.body) {
+          document.body.style.removeProperty("--splash-icon-1");
         }
       }
 
@@ -3862,6 +3948,7 @@ function runFlashCountdown(onComplete) {
         }
         document.body.dataset.view = "splash";
         startSplashTurboCycle();
+        startSplashIconSwap();
         scheduleSplashAutoStart();
       }
 
@@ -3869,6 +3956,7 @@ function runFlashCountdown(onComplete) {
         clearSplashAutoStart();
         resetSplashAnyKeySequence();
         stopSplashTurboCycle();
+        stopSplashIconSwap();
         if (splashScreen) {
           splashScreen.setAttribute("aria-hidden", "true");
           splashScreen.setAttribute("hidden", "");
@@ -3885,6 +3973,7 @@ function runFlashCountdown(onComplete) {
 
       function openSplashLoading(message = null) {
         stopSplashTurboCycle();
+        stopSplashIconSwap();
         document.body.classList.add("loading-overlay");
         document.body.classList.remove("home-anim");
         if (splashLoading) {
@@ -3917,6 +4006,7 @@ function runFlashCountdown(onComplete) {
         }
         if (document.body.dataset.view === "splash") {
           startSplashTurboCycle();
+          startSplashIconSwap();
         }
         scheduleSplashAutoStart();
         if (!keepHeaderHidden && mainHeader) {

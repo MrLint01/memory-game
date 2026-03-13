@@ -809,6 +809,53 @@ body[data-view="stages"][data-state="idle"] main {
 body[data-view="home"][data-state="idle"] main {
   background: var(--main-bg);
 }
+body[data-view="splash"]::before {
+  content: "";
+  display: block;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.28;
+  mix-blend-mode: normal;
+  filter: none;
+  background-repeat: repeat;
+  background-image:
+    var(--splash-icon-1, url("imgs/icons/card-numbers.svg")),
+    url("imgs/icons/card-letters.svg"),
+    url("imgs/icons/card-shapes.svg"),
+    url("imgs/icons/card-directions.svg"),
+    url("imgs/icons/card-colors.svg"),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0 6px, transparent 6px 42px),
+    linear-gradient(225deg, rgba(120, 160, 255, 0.18) 0 4px, transparent 4px 36px);
+  background-size:
+    140px 140px,
+    140px 140px,
+    140px 140px,
+    140px 140px,
+    140px 140px,
+    200px 200px,
+    240px 240px;
+  background-position:
+    0 0,
+    40px 60px,
+    80px 20px,
+    20px 100px,
+    100px 40px,
+    0 0,
+    60px 80px;
+  animation:
+    homeAtmoDrift 36s linear infinite,
+    homeFlashFlicker 8.4s ease-in-out infinite;
+}
+body[data-view="splash"] main {
+  position: relative;
+  z-index: 2;
+}
+body[data-view="splash"] main > * {
+  position: relative;
+  z-index: 3;
+}
 body[data-view="home"].home-anim {
   perspective: 1200px;
 }
@@ -840,6 +887,44 @@ body[data-view="home"].home-anim main > * {
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes homeAtmoDrift {
+  0% {
+    background-position:
+      0 0,
+      60px 80px,
+      0 0,
+      40px 60px,
+      80px 20px,
+      20px 100px,
+      100px 40px;
+  }
+  100% {
+    background-position:
+      -220px 240px,
+      260px -180px,
+      -360px 420px,
+      320px -280px,
+      -300px 220px,
+      240px -340px,
+      -260px 260px;
+  }
+}
+@keyframes homeFlashFlicker {
+  0%,
+  55%,
+  100% {
+    opacity: 0.12;
+  }
+  58% {
+    opacity: 0.28;
+  }
+  60% {
+    opacity: 0.08;
+  }
+  67% {
+    opacity: 0.22;
   }
 }
 @keyframes panelFadeIn {
