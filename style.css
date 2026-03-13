@@ -3466,11 +3466,7 @@ body[data-theme="prism-parade"][data-view="home"].home-anim .mode-card.primary {
   background: var(--panel-muted);
   animation: playPulse 2.2s ease-in-out infinite;
 }
-#playStart,
-#playStart .mode-card__label,
-#playStart strong {
-  color: #000000;
-}
+
 .mode-card--turbo {
   min-height: clamp(6.2rem, 12vw, 7.1rem);
   padding-left: clamp(6.2rem, 16vw, 8.2rem);
@@ -3508,7 +3504,6 @@ body[data-turbo-story="ascended"] .splash-turbo-layer {
       }
       .mode-card span {
         font-size: 0.92rem;
-        color: var(--muted);
       }
       .mode-card span.mode-card__lock {
         font-size: 0.7rem !important;
