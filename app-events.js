@@ -1429,6 +1429,7 @@
       let splashIconSwapInterval = null;
       let splashIconSwapTimers = [];
       let splashIconSwapLast = null;
+      const SPLASH_ICON_SWAP_VIEWS = new Set(["splash", "home"]);
 
       function normalizeTurboStoryState(value) {
         const raw = String(value || "").trim().toLowerCase();
@@ -1516,10 +1517,18 @@
 
       function scheduleSplashIconSwaps() {
         clearSplashIconSwapTimers();
-        if (!document.body || document.body.dataset.view !== "splash") return;
+        if (!document.body) return;
+        const view = document.body.dataset.view;
+        const isSplash = view === "splash";
+        const isHomeIdle = view === "home" && document.body.dataset.state === "idle";
+        if (!(isSplash || isHomeIdle)) return;
         SPLASH_ICON_SWAP_OFFSETS_MS.forEach((offsetMs) => {
           const timerId = window.setTimeout(() => {
-            if (!document.body || document.body.dataset.view !== "splash") return;
+            if (!document.body) return;
+            const nextView = document.body.dataset.view;
+            const nextIsSplash = nextView === "splash";
+            const nextIsHomeIdle = nextView === "home" && document.body.dataset.state === "idle";
+            if (!(nextIsSplash || nextIsHomeIdle)) return;
             const nextIcon = pickRandomSplashIcon();
             if (nextIcon) {
               applySplashIcon(nextIcon);
@@ -1531,6 +1540,14 @@
 
       function startSplashIconSwap() {
         if (splashIconSwapInterval) return;
+        if (document.body) {
+          const view = document.body.dataset.view;
+          const isSplash = view === "splash";
+          const isHomeIdle = view === "home" && document.body.dataset.state === "idle";
+          if (!(isSplash || isHomeIdle)) {
+            return;
+          }
+        }
         const initial = pickRandomSplashIcon();
         if (initial) {
           applySplashIcon(initial);
@@ -3984,6 +4001,7 @@ function runFlashCountdown(onComplete) {
 
       function openStagesScreen(animate = false) {
         clearResultAutoActionCountdown();
+        stopSplashIconSwap();
         if (stagesScreen) {
           stagesScreen.classList.remove("stages-anim");
           if (animate) {
@@ -4020,6 +4038,7 @@ function runFlashCountdown(onComplete) {
         }
         document.body.dataset.view = "home";
         syncPrismParadePhase();
+        startSplashIconSwap();
         scheduleMenuMusicFadeIn();
         clearFirstLetterHint();
         clearFlashCountdown();
@@ -4063,7 +4082,6 @@ function runFlashCountdown(onComplete) {
         clearSplashAutoStart();
         resetSplashAnyKeySequence();
         stopSplashTurboCycle();
-        stopSplashIconSwap();
         if (splashScreen) {
           splashScreen.setAttribute("aria-hidden", "true");
           splashScreen.setAttribute("hidden", "");
@@ -4075,6 +4093,7 @@ function runFlashCountdown(onComplete) {
         if (document.body.dataset.view === "splash") {
           document.body.dataset.view = "home";
         }
+        startSplashIconSwap();
         scheduleMenuMusicFadeIn();
       }
 
@@ -4122,6 +4141,9 @@ function runFlashCountdown(onComplete) {
         }
         if (!skipViewReset && document.body.dataset.view === "loading") {
           document.body.dataset.view = "home";
+          if (document.body.dataset.state === "idle") {
+            startSplashIconSwap();
+          }
         }
       }
 
