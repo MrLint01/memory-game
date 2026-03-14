@@ -2,7 +2,7 @@
   window.stagesConfig = [
     {
       id: 1,
-      version: 3,
+      version: 10,
       name: "Stage 1",
       stageType: "tutorial",
       rounds: 3,
@@ -19,7 +19,7 @@
     },
     {
       id: 2,
-      version: 3,
+      version: 10,
       name: "Stage 2",
       stageType: "tutorial",
       rounds: 2,
@@ -36,7 +36,7 @@
     },
     {
       id: 3,
-      version: 2,
+      version: 10,
       name: "Stage 3",
       stageType: "tutorial",
       rounds: 3,
@@ -54,7 +54,7 @@
     },
     {
       id: 4,
-      version: 2,
+      version: 10,
       name: "Stage 4",
       stageType: "tutorial",
       rounds: 3,
@@ -72,7 +72,7 @@
     },
     {
       id: 5,
-      version: 2,
+      version: 10,
       name: "Stage 5",
       stageType: "memory",
       rounds: 3,
@@ -90,7 +90,7 @@
     },
     {
       id: 6,
-      version: 2,
+      version: 10,
       name: "Stage 6",
       stageType: "tutorial",
       rounds: 3,
@@ -108,7 +108,7 @@
     },
     {
       id: 7,
-      version: 2,
+      version: 10,
       name: "Stage 7",
       stageType: "flash",
       rounds: 3,
@@ -124,7 +124,7 @@
     },
     {
       id: 8,
-      version: 2,
+      version: 10,
       name: "Stage 8",
       stageType: "tutorial",
       rounds: 3,
@@ -144,7 +144,7 @@
     },
     {
       id: 9,
-      version: 3,
+      version: 10,
       name: "Stage 9",
       stageType: "memory",
       rounds: 2,
@@ -165,7 +165,7 @@
     },
     {
       id: 10,
-      version: 2,
+      version: 10,
       name: "Stage 10",
       stageType: "flash",
       rounds: 3,
@@ -185,7 +185,7 @@
     },
     {
       id: 11,
-      version: 2,
+      version: 10,
       name: "Stage 11",
       stageType: "tutorial",
       rounds: 3,
@@ -212,7 +212,7 @@
     },
     {
       id: 12,
-      version: 3,
+      version: 10,
       name: "Stage 12",
       stageType: "challenge",
       rounds: 2,
@@ -238,7 +238,7 @@
     },
     {
       id: 13,
-      version: 2,
+      version: 10,
       name: "Stage 13",
       stageType: "flash",
       rounds: 3,
@@ -262,7 +262,7 @@
     },
     {
       id: 14,
-      version: 2,
+      version: 10,
       name: "Stage 14",
       stageType: "challenge",
       rounds: 1,
@@ -288,7 +288,7 @@
     },
     {
       id: 15,
-      version: 2,
+      version: 10,
       name: "Stage 15",
       stageType: "tutorial",
       rounds: 3,
@@ -314,7 +314,7 @@
     },
     {
       id: 16,
-      version: 2,
+      version: 10,
       name: "Stage 16",
       stageType: "memory",
       rounds: 1,
@@ -338,7 +338,7 @@
     },
     {
       id: 17,
-      version: 2,
+      version: 10,
       name: "Stage 17",
       stageType: "flash",
       rounds: 3,
@@ -364,11 +364,11 @@
     },
     {
       id: 18,
-      version: 2,
+      version: 10,
       name: "Stage 18",
       stageType: "sequence",
       rounds: 2,
-      cards: 2,
+      cards: 3,
       revealSeconds: 0.2,
       recallSeconds: 20,
       categories: ["numbers"],
@@ -378,7 +378,7 @@
     },
     {
       id: 19,
-      version: 2,
+      version: 10,
       name: "Stage 19",
       stageType: "tutorial",
       rounds: 3,
@@ -394,7 +394,7 @@
     },
     {
       id: 20,
-      version: 2,
+      version: 10,
       name: "Stage 20",
       stageType: "challenge",
       rounds: 1,
@@ -422,11 +422,11 @@
     },
     {
       id: 21,
-      version: 3,
+      version: 10,
       name: "Stage 21",
       stageType: "sequence",
       rounds: 1,
-      cards: 3,
+      cards: 4,
       revealSeconds: 0.2,
       recallSeconds: 20,
       categories: ["numbers"],
@@ -436,7 +436,7 @@
     },
     {
       id: 22,
-      version: 2,
+      version: 10,
       name: "Stage 22",
       stageType: "tutorial",
       rounds: 3,
@@ -458,7 +458,7 @@
     },
     {
       id: 23,
-      version: 2,
+      version: 10,
       name: "Stage 23",
       stageType: "memory",
       rounds: 3,
@@ -485,7 +485,7 @@
     },
     {
       id: 24,
-      version: 2,
+      version: 10,
       name: "Stage 24",
       stageType: "memory",
       rounds: 3,
@@ -518,7 +518,7 @@
     },
     {
       id: 25,
-      version: 2,
+      version: 10,
       name: "Stage 25",
       stageType: "challenge",
       rounds: 1,
@@ -555,7 +555,7 @@
     },
     {
       id: 26,
-      version: 2,
+      version: 10,
       name: "Stage 26",
       stageType: "tutorial",
       rounds: 3,
@@ -576,7 +576,7 @@
     },
     {
       id: 27,
-      version: 2,
+      version: 10,
       name: "Stage 27",
       stageType: "memory",
       rounds: 2,
@@ -596,7 +596,7 @@
     },
     {
       id: 28,
-      version: 2,
+      version: 10,
       name: "Stage 28",
       stageType: "memory",
       rounds: 1,
@@ -615,7 +615,7 @@
     },
     {
       id: 29,
-      version: 2,
+      version: 10,
       name: "Stage 29",
       stageType: "challenge",
       rounds: 1,
@@ -642,7 +642,7 @@
     },
     {
       id: 30,
-      version: 2,
+      version: 10,
       name: "Stage 30",
       stageType: "flash",
       rounds: 3,
@@ -667,7 +667,7 @@
     },
     {
       id: 31,
-      version: 2,
+      version: 10,
       name: "Stage 31",
       stageType: "tutorial",
       rounds: 3,
@@ -686,7 +686,7 @@
     },
     {
       id: 32,
-      version: 2,
+      version: 10,
       name: "Stage 32",
       stageType: "challenge",
       rounds: 1,
@@ -711,7 +711,7 @@
     },
     {
       id: 33,
-      version: 2,
+      version: 10,
       name: "Stage 33",
       stageType: "challenge",
       rounds: 1,
@@ -746,7 +746,7 @@
     },
     {
       id: 34,
-      version: 2,
+      version: 10,
       name: "Stage 34",
       stageType: "tutorial",
       rounds: 1,
@@ -764,7 +764,7 @@
     },
     {
       id: 35,
-      version: 3,
+      version: 10,
       name: "Stage 35",
       stageType: "sequence",
       rounds: 2,
@@ -779,7 +779,7 @@
     },
     {
       id: 36,
-      version: 2,
+      version: 10,
       name: "Stage 36",
       stageType: "challenge",
       rounds: 1,
@@ -811,7 +811,7 @@
     },
     {
       id: 37,
-      version: 2,
+      version: 10,
       name: "Stage 37",
       stageType: "tutorial",
       rounds: 1,
@@ -830,7 +830,7 @@
     },
     {
       id: 38,
-      version: 2,
+      version: 10,
       name: "Stage 38",
       stageType: "challenge",
       rounds: 1,
@@ -858,7 +858,7 @@
     },
     {
       id: 39,
-      version: 2,
+      version: 10,
       name: "Stage 39",
       stageType: "flash",
       rounds: 3,
@@ -888,7 +888,7 @@
     },
     {
       id: 40,
-      version: 2,
+      version: 10,
       name: "Stage 40",
       stageType: "tutorial",
       rounds: 1,
@@ -910,7 +910,7 @@
     },
     {
       id: 41,
-      version: 2,
+      version: 10,
       name: "Stage 41",
       stageType: "challenge",
       rounds: 1,
@@ -937,7 +937,7 @@
     },
     {
       id: 42,
-      version: 2,
+      version: 10,
       name: "Stage 42",
       stageType: "tutorial",
       rounds: 3,
@@ -958,7 +958,7 @@
     },
     {
       id: 43,
-      version: 2,
+      version: 10,
       name: "Stage 43",
       stageType: "challenge",
       rounds: 1,
@@ -980,7 +980,7 @@
     },
     {
       id: 44,
-      version: 2,
+      version: 10,
       name: "Stage 44",
       stageType: "flash",
       rounds: 3,
@@ -996,7 +996,7 @@
     },
     {
       id: 45,
-      version: 2,
+      version: 10,
       name: "Stage 45",
       stageType: "challenge",
       rounds: 1,
@@ -1020,7 +1020,7 @@
     },
     {
       id: 46,
-      version: 2,
+      version: 10,
       name: "Stage 46",
       stageType: "flash",
       rounds: 3,
@@ -1041,7 +1041,7 @@
     },
     {
       id: 47,
-      version: 2,
+      version: 10,
       name: "Stage 47",
       stageType: "tutorial",
       rounds: 2,
@@ -1060,7 +1060,7 @@
     },
     {
       id: 48,
-      version: 2,
+      version: 10,
       name: "Stage 48",
       stageType: "tutorial",
       rounds: 3,
@@ -1079,7 +1079,7 @@
     },
     {
       id: 49,
-      version: 2,
+      version: 10,
       name: "Stage 49",
       stageType: "memory",
       rounds: 2,
@@ -1105,7 +1105,7 @@
     },
     {
       id: 50,
-      version: 2,
+      version: 10,
       name: "Stage 50",
       stageType: "challenge",
       rounds: 3,
@@ -1128,7 +1128,7 @@
     },
     {
       id: 51,
-      version: 2,
+      version: 10,
       name: "Stage 51",
       stageType: "sequence",
       rounds: 1,
@@ -1147,7 +1147,7 @@
     },
     {
       id: 52,
-      version: 2,
+      version: 10,
       name: "Stage 52",
       stageType: "tutorial",
       rounds: 3,
@@ -1167,6 +1167,7 @@
       instructions: window.stageInstructions[52] || []
     }
   ];
+  window.stagesConfigA = window.stagesConfig;
 })();
 
   // mathOps: true,

@@ -792,7 +792,10 @@ function getLocalStatsSnapshot() {
   const sessionStats = window.flashRecallSessionStats || {};
   let stored = null;
   try {
-    const raw = window.localStorage.getItem("flashRecallStats");
+    const statsKey = typeof window.getStatsStorageKey === "function"
+      ? window.getStatsStorageKey()
+      : "flashRecallStats";
+    const raw = window.localStorage.getItem(statsKey);
     stored = raw ? JSON.parse(raw) : null;
   } catch (error) {
     stored = null;
@@ -2408,6 +2411,19 @@ function getAdaptiveTelemetrySnapshot() {
   }
 }
 
+function getAbTelemetrySnapshot() {
+  if (typeof window.getAbVariant !== "function") {
+    return {};
+  }
+  try {
+    const variant = window.getAbVariant();
+    const normalized = variant === "A" || variant === "B" ? variant : "unknown";
+    return sanitizeTelemetryMap({ ab_variant: normalized });
+  } catch (error) {
+    return {};
+  }
+}
+
 function getFullscreenTotalSeconds(nowMs = Date.now()) {
   const liveSeconds = fullscreenEnteredAtMs
     ? Math.max(0, (nowMs - fullscreenEnteredAtMs) / 1000)
@@ -2421,6 +2437,7 @@ function trackUiInteraction(target, metadata = {}, options = {}) {
     target,
     ...getTelemetryUiContextSnapshot(),
     ...getAdaptiveTelemetrySnapshot(),
+    ...getAbTelemetrySnapshot(),
     ...sanitizeTelemetryMap(metadata)
   }, options);
 }
@@ -2432,6 +2449,7 @@ function trackSettingsChange(settingName, value, metadata = {}, options = {}) {
     setting_value: value,
     ...getTelemetryUiContextSnapshot(),
     ...getAdaptiveTelemetrySnapshot(),
+    ...getAbTelemetrySnapshot(),
     ...sanitizeTelemetryMap(metadata)
   }, options);
 }
@@ -2440,6 +2458,7 @@ function trackSettingsSnapshot(snapshot = {}, metadata = {}, options = {}) {
   const payload = {
     ...getTelemetryUiContextSnapshot(),
     ...getAdaptiveTelemetrySnapshot(),
+    ...getAbTelemetrySnapshot(),
     ...sanitizeTelemetryMap(snapshot),
     ...sanitizeTelemetryMap(metadata)
   };
@@ -2461,6 +2480,7 @@ function trackAutoplayEvent(target, metadata = {}, options = {}) {
     target,
     ...getTelemetryUiContextSnapshot(),
     ...getAdaptiveTelemetrySnapshot(),
+    ...getAbTelemetrySnapshot(),
     ...sanitizeTelemetryMap(metadata)
   }, options);
 }
@@ -2482,6 +2502,7 @@ function trackFullscreenState(enabled, metadata = {}, options = {}) {
     fullscreen_total_seconds: totalFullscreenSeconds,
     ...getTelemetryUiContextSnapshot(),
     ...getAdaptiveTelemetrySnapshot(),
+    ...getAbTelemetrySnapshot(),
     ...sanitizeTelemetryMap(metadata)
   }, options);
   const sessionRef = getSessionRef();
@@ -2623,6 +2644,7 @@ async function createNewSession() {
       user_id: currentUserId,
       player_id: playerId,
       session_id: sessionId,
+      ab_variant: typeof window.getAbVariant === "function" ? window.getAbVariant() : null,
       game_version: gameVersion,
       release_channel: releaseChannel,
       site_host: window.location.host,
@@ -2654,7 +2676,8 @@ async function createNewSession() {
       game_build: window.FLASH_RECALL_BUILD_ID || null,
       ...getTelemetrySettingsSnapshot(),
       ...getTelemetryUiContextSnapshot(),
-      ...getAdaptiveTelemetrySnapshot()
+      ...getAdaptiveTelemetrySnapshot(),
+      ...getAbTelemetrySnapshot()
     }, { immediate: true });
 
     if (typeof window.getAdaptiveProfileSnapshot === "function") {
@@ -2689,6 +2712,7 @@ function trackRoundCompletion(roundNumber, passed, timeSpent, metadata = {}) {
     round_number: roundNumber,
     passed: Boolean(passed),
     time_spent_seconds: Number.isFinite(timeSpent) ? parseFloat(timeSpent.toFixed(2)) : null,
+    ...getAbTelemetrySnapshot(),
     ...metadata
   });
 }
@@ -2698,6 +2722,7 @@ async function trackLevelStart(levelNumber, metadata = {}) {
   if (!isReadyForWrites()) {
     enqueueEvent("level_start_buffered", {
       level_number: normalizeLevelNumber(levelNumber),
+      ...getAbTelemetrySnapshot(),
       ...metadata
     });
     return;
@@ -2710,6 +2735,7 @@ async function trackLevelStart(levelNumber, metadata = {}) {
 
   enqueueEvent("level_start", {
     level_number: normalizedLevel,
+    ...getAbTelemetrySnapshot(),
     ...metadata
   }, { immediate: true });
 
@@ -2750,11 +2776,13 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
     const mode = metadata.mode || (typeof window.getCurrentGameMode === "function" ? window.getCurrentGameMode() : null);
     const stageName = metadata.stage_name || null;
     const activeModifiers = Array.isArray(metadata.active_modifiers) ? metadata.active_modifiers : [];
+    const abVariant = typeof window.getAbVariant === "function" ? window.getAbVariant() : null;
 
     const attemptData = {
       user_id: currentUserId,
       player_id: playerId,
       session_id: sessionId,
+      ab_variant: abVariant,
       game_version: gameVersion,
       release_channel: releaseChannel,
       level_number: normalizedLevel,
@@ -2785,7 +2813,8 @@ async function trackLevelSession(levelNumber, passed, stars, elapsedSeconds, ent
       rounds_count: roundsForCurrentLevel.length,
       total_cards: safeEntries.length,
       cards_failed_count: failedCards.length,
-      end_reason: endReason
+      end_reason: endReason,
+      ...getAbTelemetrySnapshot()
     }, { immediate: true });
 
     if (endReason && endReason !== "level_end") {
@@ -2880,7 +2909,8 @@ async function trackSessionEnd(totalSessionSeconds, lastLevelCompleted, endReaso
     reported_session_seconds: Number.isFinite(totalSessionSeconds) ? parseFloat(totalSessionSeconds.toFixed(2)) : null,
     last_level_completed: Number.isFinite(lastLevelCompleted) ? lastLevelCompleted : 0,
     end_reason: endReason,
-    inactive_ms_before_end: Date.now() - lastActivityAtMs
+    inactive_ms_before_end: Date.now() - lastActivityAtMs,
+    ...getAbTelemetrySnapshot()
   }, { immediate: true });
 
   await flushEvents();
@@ -2923,6 +2953,7 @@ function trackQuitReason(reason, metadata = {}) {
     reason: reason || "unknown",
     ...getTelemetryUiContextSnapshot(),
     ...getAdaptiveTelemetrySnapshot(),
+    ...getAbTelemetrySnapshot(),
     ...metadata
   }, { immediate: true });
 }

@@ -2878,13 +2878,30 @@
         6: "FIRST LETTER\n(Right -> R, Left -> L, Up -> U, ...)",
         7: "FIRST LETTER\n(White -> W, Red -> R, Blue -> B, ...)"
       };
-      const getFirstLetterHintMessage = (stage) => {
+      const getFirstLetterHintMessage = (stage, roundIndex) => {
         if (!stage) return "";
         if (stage.firstLetterHintEnabled === false) return "";
+        if (stage.firstLetterHintByRound && typeof stage.firstLetterHintByRound === "object") {
+          const roundMessage = stage.firstLetterHintByRound[roundIndex];
+          if (typeof roundMessage === "string" && roundMessage.trim()) {
+            return roundMessage;
+          }
+          if (roundIndex in stage.firstLetterHintByRound) {
+            return "";
+          }
+        }
+        if (Array.isArray(stage.firstLetterHintRounds) && stage.firstLetterHintRounds.length) {
+          if (!stage.firstLetterHintRounds.includes(roundIndex)) {
+            return "";
+          }
+        }
         if (typeof stage.firstLetterHintMessage === "string" && stage.firstLetterHintMessage.trim()) {
           return stage.firstLetterHintMessage;
         }
-        return legacyFirstLetterHintMessages[stage.id] || "";
+        if (stage.legacyFirstLetterHintEnabled === true) {
+          return legacyFirstLetterHintMessages[stage.id] || "";
+        }
+        return "";
       };
       let stageListAnimTimeout = null;
       let stageListStarTimeout = null;
@@ -5509,7 +5526,7 @@ function runFlashCountdown(onComplete) {
           if (gameMode !== "stages" || phase !== "recall") return;
           const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
           if (!stage) return;
-          const hintMessage = getFirstLetterHintMessage(stage);
+          const hintMessage = getFirstLetterHintMessage(stage, round);
           if (tabTutorialActive && !hintMessage) return;
           if (isTabTutorialEnabledForStage(stage) && !enterToNextEnabled) {
             if (tabTutorialShownRound !== round) {
@@ -5836,7 +5853,18 @@ function runFlashCountdown(onComplete) {
             cardTypeCounts: {},
             modifierVariantCounts: {}
           };
-          window.localStorage.removeItem("flashRecallStats");
+          const statsKey = typeof window.getStatsStorageKey === "function"
+            ? window.getStatsStorageKey()
+            : "flashRecallStats";
+          const legacyStatsKey = "flashRecallStats";
+          window.localStorage.removeItem(statsKey);
+          window.localStorage.removeItem(legacyStatsKey);
+          const progressKey = typeof window.getStageProgressStorageKey === "function"
+            ? window.getStageProgressStorageKey()
+            : "flashRecallStageProgress";
+          const legacyProgressKey = "flashRecallStageProgress";
+          window.localStorage.removeItem(progressKey);
+          window.localStorage.removeItem(legacyProgressKey);
           window.localStorage.removeItem(FLASH_WARNING_KEY);
           window.localStorage.removeItem(SANDBOX_UNLOCK_CONFIRM_KEY);
           window.localStorage.removeItem("flashRecallSandboxUnlocks");
@@ -5859,6 +5887,7 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem(AUDIO_MASTER_KEY);
           window.localStorage.removeItem(AUDIO_MUSIC_KEY);
           window.localStorage.removeItem(AUDIO_EFFECTS_KEY);
+          window.localStorage.removeItem("flashRecallABVariant");
           turboStoryState = TURBO_STORY_STATE_ACTIVE;
           applyTurboStoryState(turboStoryState, { skipFloatingAngelSchedule: false });
           const resetTheme = appearanceOptions.themes.includes(defaultAppearance.theme)
@@ -6499,7 +6528,9 @@ function runFlashCountdown(onComplete) {
             if (achievementsTotalEl) achievementsTotalEl.textContent = String(totalValue);
           }
 
-          const key = "flashRecallStats";
+          const key = typeof window.getStatsStorageKey === "function"
+            ? window.getStatsStorageKey()
+            : "flashRecallStats";
           let avgText = "-";
           let trackedTotalSeconds = 0;
           let totalLevelAttempts = 0;

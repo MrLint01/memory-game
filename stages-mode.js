@@ -2,6 +2,7 @@
   let stageRoundOverridePlan = null;
   let stageRoundOverrideStageId = null;
   let stageRoundOverrideLastRound = null;
+  let stageRoundOverridePlanType = null;
 
   function shuffleArray(list) {
     for (let i = list.length - 1; i > 0; i -= 1) {
@@ -21,43 +22,80 @@
     return plan;
   }
 
+  function buildRoundGuaranteePlan(stage, guarantee, cardCount) {
+    const rounds = Number(stage && stage.rounds) || 1;
+    const stageCategories = window.getStageCategories ? window.getStageCategories(stage) : guarantee;
+    const required = guarantee.filter((key) => stageCategories.includes(key));
+    const totalSlots = Math.max(1, rounds * Math.max(1, cardCount));
+    const pool = shuffleArray(required.slice());
+    while (pool.length < totalSlots) {
+      pool.push(stageCategories[Math.floor(Math.random() * stageCategories.length)]);
+    }
+    const plan = {};
+    for (let round = 1; round <= rounds; round += 1) {
+      const start = (round - 1) * cardCount;
+      const slice = pool.slice(start, start + cardCount);
+      const counts = {};
+      slice.forEach((category) => {
+        if (!category) return;
+        counts[category] = (counts[category] || 0) + 1;
+      });
+      plan[round] = { cards: { total: cardCount, counts } };
+    }
+    return plan;
+  }
+
   window.getStageRoundOverride = function getStageRoundOverride(stage, currentRound) {
     if (!stage || !Number.isFinite(currentRound)) return null;
     if (stage.roundOverrides && typeof stage.roundOverrides === "object") {
       return stage.roundOverrides[currentRound] || null;
     }
     const pool = Array.isArray(stage.roundOverridePool) ? stage.roundOverridePool : null;
-    if (!pool || !pool.length) return null;
-    const stageId = stage.id ?? null;
-    const shouldReset =
-      stageRoundOverrideStageId !== stageId ||
-      stageRoundOverridePlan === null ||
-      (stageRoundOverrideLastRound !== null &&
-        (currentRound < stageRoundOverrideLastRound || (currentRound === 1 && stageRoundOverrideLastRound !== 1)));
-    if (shouldReset) {
-      stageRoundOverridePlan = buildRoundOverridePlan(stage, pool);
-      stageRoundOverrideStageId = stageId;
+    if (pool && pool.length) {
+      const stageId = stage.id ?? null;
+      const shouldReset =
+        stageRoundOverrideStageId !== stageId ||
+        stageRoundOverridePlan === null ||
+        stageRoundOverridePlanType !== "pool" ||
+        (stageRoundOverrideLastRound !== null &&
+          (currentRound < stageRoundOverrideLastRound || (currentRound === 1 && stageRoundOverrideLastRound !== 1)));
+      if (shouldReset) {
+        stageRoundOverridePlan = buildRoundOverridePlan(stage, pool);
+        stageRoundOverrideStageId = stageId;
+        stageRoundOverridePlanType = "pool";
+      }
+      stageRoundOverrideLastRound = currentRound;
+      return stageRoundOverridePlan ? stageRoundOverridePlan[currentRound] || null : null;
     }
-    stageRoundOverrideLastRound = currentRound;
-    return stageRoundOverridePlan ? stageRoundOverridePlan[currentRound] || null : null;
+    const guarantee = Array.isArray(stage.roundCategoryGuarantee)
+      ? stage.roundCategoryGuarantee.filter((key) => typeof key === "string")
+      : null;
+    const cardCount = window.getStageCardCount ? window.getStageCardCount(stage) : Number(stage.cards) || 1;
+    if (guarantee && guarantee.length && cardCount > 1) {
+      const stageId = stage.id ?? null;
+      const shouldReset =
+        stageRoundOverrideStageId !== stageId ||
+        stageRoundOverridePlan === null ||
+        stageRoundOverridePlanType !== "guarantee" ||
+        (stageRoundOverrideLastRound !== null &&
+          (currentRound < stageRoundOverrideLastRound || (currentRound === 1 && stageRoundOverrideLastRound !== 1)));
+      if (shouldReset) {
+        stageRoundOverridePlan = buildRoundGuaranteePlan(stage, guarantee, cardCount);
+        stageRoundOverrideStageId = stageId;
+        stageRoundOverridePlanType = "guarantee";
+      }
+      stageRoundOverrideLastRound = currentRound;
+      return stageRoundOverridePlan ? stageRoundOverridePlan[currentRound] || null : null;
+    }
+    return null;
   };
 
   window.resetStageRoundOverridePlan = function resetStageRoundOverridePlan() {
     stageRoundOverridePlan = null;
     stageRoundOverrideStageId = null;
     stageRoundOverrideLastRound = null;
+    stageRoundOverridePlanType = null;
   };
-  const progressKey = "flashRecallStageProgress";
-  const statsKey = "flashRecallStats";
-  const playerNameKey = "flashRecallPlayerName";
-  const playerNamePromptKey = "flashRecallPlayerNamePrompted";
-  const splashSeenKey = "flashRecallSplashSeen";
-  const contentResetVersion = window.FLASH_RECALL_CONTENT_RESET_VERSION || "";
-  const contentResetStorageKey = "flashRecallContentResetVersion";
-  window.stagesConfig = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
-  window.stageStars = {};
-  window.stageBestTimes = {};
-  window.stageCompleted = {};
 
   function safeGetStorageItem(key) {
     try {
@@ -96,6 +134,98 @@
       });
     } catch (error) {}
   }
+
+  const AB_VARIANT_STORAGE_KEY = "flashRecallABVariant";
+  const AB_VARIANTS = ["A", "B"];
+  const normalizeAbVariant = (value) => {
+    const normalized = String(value || "").trim().toUpperCase();
+    return AB_VARIANTS.includes(normalized) ? normalized : "";
+  };
+  const getStoredAbVariant = () => normalizeAbVariant(safeGetStorageItem(AB_VARIANT_STORAGE_KEY));
+  const assignAbVariant = () => {
+    const stored = getStoredAbVariant();
+    if (stored) return stored;
+    const assigned = Math.random() < 0.5 ? "A" : "B";
+    safeSetStorageItem(AB_VARIANT_STORAGE_KEY, assigned);
+    return assigned;
+  };
+  const getStagesConfigA = () =>
+    Array.isArray(window.stagesConfigA) && window.stagesConfigA.length ? window.stagesConfigA : null;
+  const getStagesConfigB = () =>
+    Array.isArray(window.stagesConfigB) && window.stagesConfigB.length ? window.stagesConfigB : null;
+  const applyAbVariantStages = (variant) => {
+    const normalized = normalizeAbVariant(variant) || "A";
+    const configA = getStagesConfigA();
+    const configB = getStagesConfigB();
+    if (normalized === "B" && configB) {
+      window.stagesConfig = configB;
+      return true;
+    }
+    if (configA) {
+      window.stagesConfig = configA;
+      return true;
+    }
+    if (configB) {
+      window.stagesConfig = configB;
+      return true;
+    }
+    window.stagesConfig = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+    return false;
+  };
+
+  let abVariant = assignAbVariant();
+  applyAbVariantStages(abVariant);
+
+  window.getAbVariant = function getAbVariant() {
+    return abVariant;
+  };
+  window.setAbVariant = function setAbVariant(nextVariant, options = {}) {
+    const normalized = normalizeAbVariant(nextVariant);
+    if (!normalized) return false;
+    abVariant = normalized;
+    safeSetStorageItem(AB_VARIANT_STORAGE_KEY, abVariant);
+    applyAbVariantStages(abVariant);
+    if (!options || options.reload !== false) {
+      try {
+        window.location.reload();
+      } catch (error) {}
+    }
+    return true;
+  };
+  window.getStageProgressStorageKey = function getStageProgressStorageKey(variant) {
+    const normalized = normalizeAbVariant(variant) || abVariant;
+    return `flashRecallStageProgress_${normalized}`;
+  };
+  window.getStatsStorageKey = function getStatsStorageKey(variant) {
+    const normalized = normalizeAbVariant(variant) || abVariant;
+    return `flashRecallStats_${normalized}`;
+  };
+
+  const progressKey = window.getStageProgressStorageKey();
+  const statsKey = window.getStatsStorageKey();
+  const legacyProgressKey = "flashRecallStageProgress";
+  const legacyStatsKey = "flashRecallStats";
+  const playerNameKey = "flashRecallPlayerName";
+  const playerNamePromptKey = "flashRecallPlayerNamePrompted";
+  const splashSeenKey = "flashRecallSplashSeen";
+  const contentResetVersion = window.FLASH_RECALL_CONTENT_RESET_VERSION || "";
+  const contentResetStorageKey = "flashRecallContentResetVersion";
+  window.stagesConfig = Array.isArray(window.stagesConfig) ? window.stagesConfig : [];
+  window.stageStars = {};
+  window.stageBestTimes = {};
+  window.stageCompleted = {};
+
+  function migrateLegacyStorageKey(fromKey, toKey) {
+    if (!fromKey || !toKey || fromKey === toKey) return;
+    if (safeGetStorageItem(toKey)) return;
+    const raw = safeGetStorageItem(fromKey);
+    if (raw) {
+      safeSetStorageItem(toKey, raw);
+    }
+  }
+
+  migrateLegacyStorageKey(legacyProgressKey, progressKey);
+  migrateLegacyStorageKey(legacyStatsKey, statsKey);
 
   function parseJsonStorage(key) {
     const raw = safeGetStorageItem(key);

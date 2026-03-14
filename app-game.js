@@ -1333,7 +1333,10 @@
       function loadStoredStatsPayload() {
         const payload = getDefaultStatsPayload();
         try {
-          const raw = window.localStorage.getItem("flashRecallStats");
+          const statsKey = typeof window.getStatsStorageKey === "function"
+            ? window.getStatsStorageKey()
+            : "flashRecallStats";
+          const raw = window.localStorage.getItem(statsKey);
           if (!raw) return payload;
           const parsed = JSON.parse(raw);
           if (!parsed || typeof parsed !== "object") return payload;
@@ -1357,7 +1360,10 @@
 
       function saveStoredStatsPayload(payload) {
         try {
-          window.localStorage.setItem("flashRecallStats", JSON.stringify(payload));
+          const statsKey = typeof window.getStatsStorageKey === "function"
+            ? window.getStatsStorageKey()
+            : "flashRecallStats";
+          window.localStorage.setItem(statsKey, JSON.stringify(payload));
         } catch (error) {
           // ignore storage errors
         }
@@ -1868,7 +1874,7 @@
         }
         const startRecall = () => {
           lockInputs(false);
-          const recallSubmitDelayMs = 150;
+          const recallSubmitDelayMs = 0;
           const isStage1 =
             gameMode === "stages" &&
             typeof window.getStageConfig === "function" &&
