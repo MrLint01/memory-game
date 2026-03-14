@@ -1861,6 +1861,7 @@ body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   justify-content: flex-start;
   min-height: 260px;
 }
+
 .stage-instruction {
   position: relative;
   padding: 0.9rem 1.2rem;

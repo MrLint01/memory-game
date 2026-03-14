@@ -846,6 +846,7 @@ const revealInput = document.getElementById("revealTime");
       }
 
       function setPhase(text, nextState) {
+        const previousPhase = phase;
         if (nextState) {
           phase = nextState;
           page.dataset.state = nextState;

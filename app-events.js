@@ -7172,7 +7172,7 @@ function runFlashCountdown(onComplete) {
           }
           resetStageProgress();
           resetGame();
-          openStagesScreen(false);
+          openStagesScreen(true);
           return;
         }
         const nextButton = event.target.closest("#stageNextButton");
