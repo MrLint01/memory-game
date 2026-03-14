@@ -26,7 +26,7 @@
     },
     controls: {
       successAnimation: true,
-      flashCountdown: true,
+      flashCountdown: false,
       autoAdvanceNext: true,
       autoRetry: true,
       autoStartStagePreview: true,

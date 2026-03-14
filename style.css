@@ -820,7 +820,8 @@ body[data-view="home"][data-state="idle"] main {
   background: var(--main-bg);
 }
 body[data-view="splash"]::before,
-body[data-view="home"][data-state="idle"]::before {
+body[data-view="home"][data-state="idle"]::before,
+body[data-view="stages"][data-state="idle"]::before {
   content: "";
   display: block;
   position: fixed;

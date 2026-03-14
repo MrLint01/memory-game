@@ -104,7 +104,7 @@
       };
       const defaultControlSettings = {
         successAnimation: true,
-        flashCountdown: true,
+        flashCountdown: false,
         autoAdvanceNext: true,
         enterToNext: true,
         flashWarningEnabled: true,
@@ -122,7 +122,7 @@
       let activeRebindAction = null;
       let stageIntroPendingIndex = null;
       let flashWarningEnabled = true;
-      let flashCountdownEnabled = true;
+      let flashCountdownEnabled = defaultControlSettings.flashCountdown;
       let enterToNextEnabled = true;
       let leaderboardsEnabled = true;
       const keybindButtons = {
@@ -1429,7 +1429,7 @@
       let splashIconSwapInterval = null;
       let splashIconSwapTimers = [];
       let splashIconSwapLast = null;
-      const SPLASH_ICON_SWAP_VIEWS = new Set(["splash", "home"]);
+      const SPLASH_ICON_SWAP_VIEWS = new Set(["splash", "home", "stages"]);
 
       function normalizeTurboStoryState(value) {
         const raw = String(value || "").trim().toLowerCase();
@@ -1521,14 +1521,16 @@
         const view = document.body.dataset.view;
         const isSplash = view === "splash";
         const isHomeIdle = view === "home" && document.body.dataset.state === "idle";
-        if (!(isSplash || isHomeIdle)) return;
+        const isStagesIdle = view === "stages" && document.body.dataset.state === "idle";
+        if (!(isSplash || isHomeIdle || isStagesIdle)) return;
         SPLASH_ICON_SWAP_OFFSETS_MS.forEach((offsetMs) => {
           const timerId = window.setTimeout(() => {
             if (!document.body) return;
             const nextView = document.body.dataset.view;
             const nextIsSplash = nextView === "splash";
             const nextIsHomeIdle = nextView === "home" && document.body.dataset.state === "idle";
-            if (!(nextIsSplash || nextIsHomeIdle)) return;
+            const nextIsStagesIdle = nextView === "stages" && document.body.dataset.state === "idle";
+            if (!(nextIsSplash || nextIsHomeIdle || nextIsStagesIdle)) return;
             const nextIcon = pickRandomSplashIcon();
             if (nextIcon) {
               applySplashIcon(nextIcon);
@@ -1544,7 +1546,8 @@
           const view = document.body.dataset.view;
           const isSplash = view === "splash";
           const isHomeIdle = view === "home" && document.body.dataset.state === "idle";
-          if (!(isSplash || isHomeIdle)) {
+          const isStagesIdle = view === "stages" && document.body.dataset.state === "idle";
+          if (!(isSplash || isHomeIdle || isStagesIdle)) {
             return;
           }
         }
@@ -2819,7 +2822,7 @@
       let stageListAnimActive = false;
       let stageListMouseListenerAttached = false;
       let stageListSkipListener = null;
-      flashCountdownEnabled = true;
+      flashCountdownEnabled = defaultControlSettings.flashCountdown;
       enterToNextEnabled = true;
       leaderboardsEnabled = true;
       let stageStarShineInterval = null;
@@ -4001,7 +4004,6 @@ function runFlashCountdown(onComplete) {
 
       function openStagesScreen(animate = false) {
         clearResultAutoActionCountdown();
-        stopSplashIconSwap();
         if (stagesScreen) {
           stagesScreen.classList.remove("stages-anim");
           if (animate) {
@@ -4015,6 +4017,7 @@ function runFlashCountdown(onComplete) {
         }
         document.body.dataset.view = "stages";
         syncPrismParadePhase();
+        startSplashIconSwap();
         startStarShineLoop();
         scheduleMenuMusicFadeIn();
       }
