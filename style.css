@@ -4173,6 +4173,30 @@ body[data-turbo-story="ascended"] .stage-card__turbo-guide {
   width: 100%;
   height: 48px;
 }
+.audio-toggle {
+  position: fixed;
+  top: 1.1rem;
+  right: 1.1rem;
+  width: 46px;
+  height: 46px;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.audio-toggle:hover,
+.audio-toggle:focus-visible {
+  opacity: 1;
+}
+@media (max-width: 720px) {
+  .audio-toggle {
+    top: 0.7rem;
+    right: 0.7rem;
+    width: 42px;
+    height: 42px;
+  }
+}
 .quick-action--square {
   width: 48px;
 }

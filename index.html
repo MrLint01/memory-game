@@ -69,6 +69,8 @@
     <link rel="preload" href="imgs/icons/mod-platformer.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-swapcards.svg" as="image" />
     <link rel="preload" href="imgs/icons/mod-sequence.svg" as="image" />
+    <link rel="preload" href="imgs/mute.png" as="image" />
+    <link rel="preload" href="imgs/unmute.png" as="image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -227,6 +229,9 @@
       <div class="splash-loading__text">Loading…</div>
       <div class="splash-loading__bar" aria-hidden="true"><span></span></div>
     </section>
+    <button id="audioToggle" class="audio-toggle icon-button" type="button" aria-label="Mute audio">
+      <img id="audioToggleIcon" class="action-icon" src="imgs/unmute.png" alt="" />
+    </button>
     <div class="modal" id="practiceModal" aria-hidden="true">
       <div class="modal-card modal-card--sandbox">
         <div class="sandbox-header">

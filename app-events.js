@@ -39,6 +39,8 @@
       const AUDIO_MUSIC_KEY = "flashRecallAudioMusicVolume";
       const AUDIO_EFFECTS_KEY = "flashRecallAudioEffectsVolume";
       const AUDIO_MIGRATION_KEY = "flashRecallAudioDefaults2026a";
+      const AUDIO_MUTE_KEY = "flashRecallAudioMuted";
+      const AUDIO_MASTER_BEFORE_MUTE_KEY = "flashRecallAudioMasterBeforeMute";
       const FLASH_WARNING_KEY = "flashRecallFlashWarning";
       const SANDBOX_UNLOCK_CONFIRM_KEY = "flashRecallSandboxUnlockConfirm";
       const TURBO_STORY_STATE_KEY = "flashRecallTurboStoryState";
@@ -118,6 +120,8 @@
         ...(settingsDefaults.audio || {})
       };
       let audioSettings = { ...defaultAudioSettings };
+      let audioMuted = false;
+      let audioMasterBeforeMute = null;
       let keybinds = { ...defaultKeybinds };
       let activeRebindAction = null;
       let stageIntroPendingIndex = null;
@@ -371,6 +375,25 @@
         };
       }
 
+      function getStoredAudioMuteState() {
+        try {
+          return window.localStorage.getItem(AUDIO_MUTE_KEY) === "1";
+        } catch {
+          return false;
+        }
+      }
+
+      function getStoredAudioMasterBeforeMute() {
+        try {
+          return normalizeAudioVolume(
+            window.localStorage.getItem(AUDIO_MASTER_BEFORE_MUTE_KEY),
+            normalizeAudioVolume(defaultAudioSettings.master, 50)
+          );
+        } catch {
+          return normalizeAudioVolume(defaultAudioSettings.master, 50);
+        }
+      }
+
       function migrateAudioDefaultsIfNeeded() {
         try {
           if (window.localStorage.getItem(AUDIO_MIGRATION_KEY) === "1") return;
@@ -422,6 +445,25 @@
         setAudioSliderValue(audioMusicValue, audioSettings.music);
         setAudioSliderValue(audioEffectsValue, audioSettings.effects);
 
+        if (audioSettings.master > 0) {
+          audioMasterBeforeMute = audioSettings.master;
+          try {
+            window.localStorage.setItem(AUDIO_MASTER_BEFORE_MUTE_KEY, String(audioMasterBeforeMute));
+          } catch {
+            // ignore storage errors
+          }
+        }
+        const nextMuted = audioSettings.master <= 0;
+        if (nextMuted !== audioMuted) {
+          audioMuted = nextMuted;
+          try {
+            window.localStorage.setItem(AUDIO_MUTE_KEY, audioMuted ? "1" : "0");
+          } catch {
+            // ignore storage errors
+          }
+        }
+        updateAudioToggleUI();
+
         if (persist) {
           try {
             window.localStorage.setItem(AUDIO_MASTER_KEY, String(audioSettings.master));
@@ -433,6 +475,38 @@
         }
         emitAudioSettingsChanged();
         applyMusicVolume();
+      }
+
+      const audioToggle = document.getElementById("audioToggle");
+      const audioToggleIcon = document.getElementById("audioToggleIcon");
+      const AUDIO_ICON_MUTED = "imgs/mute.png";
+      const AUDIO_ICON_UNMUTED = "imgs/unmute.png";
+
+      function updateAudioToggleUI() {
+        if (!audioToggle || !audioToggleIcon) return;
+        audioToggleIcon.src = audioMuted ? AUDIO_ICON_MUTED : AUDIO_ICON_UNMUTED;
+        audioToggle.setAttribute("aria-label", audioMuted ? "Unmute audio" : "Mute audio");
+        audioToggle.dataset.muted = audioMuted ? "true" : "false";
+      }
+
+      function setAudioMuted(nextMuted) {
+        const targetMuted = Boolean(nextMuted);
+        if (targetMuted === audioMuted) return;
+        if (targetMuted) {
+          if (audioSettings.master > 0) {
+            audioMasterBeforeMute = audioSettings.master;
+            try {
+              window.localStorage.setItem(AUDIO_MASTER_BEFORE_MUTE_KEY, String(audioMasterBeforeMute));
+            } catch {
+              // ignore storage errors
+            }
+          }
+          applyAudioSettings({ ...audioSettings, master: 0 }, true);
+          return;
+        }
+        const restoredMaster = audioMasterBeforeMute || getStoredAudioMasterBeforeMute();
+        const nextMaster = Math.max(1, normalizeAudioVolume(restoredMaster, defaultAudioSettings.master));
+        applyAudioSettings({ ...audioSettings, master: nextMaster }, true);
       }
 
       window.getAudioMix = function getAudioMix() {
@@ -7692,7 +7766,13 @@ function runFlashCountdown(onComplete) {
         {
           migrateAudioDefaultsIfNeeded();
           const storedAudio = getStoredAudioSettings();
-          applyAudioSettings(storedAudio, false);
+          audioMuted = getStoredAudioMuteState();
+          audioMasterBeforeMute = getStoredAudioMasterBeforeMute();
+          if (audioMuted) {
+            applyAudioSettings({ ...storedAudio, master: 0 }, false);
+          } else {
+            applyAudioSettings(storedAudio, false);
+          }
         }
 
       if (audioMasterVolume && audioMusicVolume && audioEffectsVolume) {
@@ -7721,13 +7801,20 @@ function runFlashCountdown(onComplete) {
           });
         });
       }
-        if (audioTestSfx) {
-          audioTestSfx.addEventListener("click", () => {
-            if (typeof window.playCorrectSound === "function") {
-              window.playCorrectSound();
-            }
-          });
-        }
+      if (audioTestSfx) {
+        audioTestSfx.addEventListener("click", () => {
+          if (typeof window.playCorrectSound === "function") {
+            window.playCorrectSound();
+          }
+        });
+      }
+
+      if (audioToggle) {
+        updateAudioToggleUI();
+        audioToggle.addEventListener("click", () => {
+          setAudioMuted(!audioMuted);
+        });
+      }
 
       updateModeUI();
       updatePracticeLock();
