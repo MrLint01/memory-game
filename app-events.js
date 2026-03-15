@@ -6200,7 +6200,7 @@ function runFlashCountdown(onComplete) {
         achievements_unlocked: { title: "Achievements leaderboard", valueLabel: "Achievements" }
       };
       let activeStatsLeaderboardTab = "stars_earned";
-      const REVEAL_SECRET_ACHIEVEMENTS = true;
+      const REVEAL_SECRET_ACHIEVEMENTS = false;
 
       function maskAchievementText(text) {
         return String(text || "").replace(/[^\s]/g, "?");
