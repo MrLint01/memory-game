@@ -45,6 +45,7 @@ body::before {
   display: none;
 }
 
+
 body[data-theme="studio-light"] {
   color-scheme: light;
   --ink: #162033;
@@ -3214,6 +3215,50 @@ body[data-state="paused"] .hud-pause {
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap: 1rem;
       }
+body[data-mode="stages"][data-state="show"] #cardGrid .card,
+body[data-mode="stages"][data-state="recall"] #cardGrid .card,
+body[data-mode="stages"][data-state="show"] #cardGrid .hidden-card,
+body[data-mode="stages"][data-state="recall"] #cardGrid .hidden-card,
+body.stage-fail #cardGrid .card,
+body.stage-fail #cardGrid .hidden-card,
+body.stage-fail #promptGrid .card,
+body.stage-fail #promptGrid .hidden-card {
+  font-family: "Atkinson Hyperlegible", "Arial", sans-serif;
+}
+body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .card,
+body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .card,
+body[data-theme^="night-"].stage-fail #cardGrid .card,
+body[data-theme^="night-"].stage-fail #promptGrid .card {
+  color: #ffffff !important;
+}
+body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .card svg,
+body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .card svg,
+body[data-theme^="night-"].stage-fail #cardGrid .card svg,
+body[data-theme^="night-"].stage-fail #promptGrid .card svg {
+  color: #ffffff !important;
+  fill: currentColor;
+  stroke: currentColor;
+}
+body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .direction-arrow,
+body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .direction-arrow,
+body[data-theme^="night-"].stage-fail #cardGrid .direction-arrow,
+body[data-theme^="night-"].stage-fail #promptGrid .direction-arrow {
+  filter: brightness(0) invert(1);
+}
+body:not([data-theme^="night-"])[data-mode="stages"][data-state="show"] #cardGrid .card,
+body:not([data-theme^="night-"])[data-mode="stages"][data-state="recall"] #cardGrid .card,
+body:not([data-theme^="night-"]).stage-fail #cardGrid .card,
+body:not([data-theme^="night-"]).stage-fail #promptGrid .card {
+  color: #000000 !important;
+}
+body:not([data-theme^="night-"])[data-mode="stages"][data-state="show"] #cardGrid .card svg,
+body:not([data-theme^="night-"])[data-mode="stages"][data-state="recall"] #cardGrid .card svg,
+body:not([data-theme^="night-"]).stage-fail #cardGrid .card svg,
+body:not([data-theme^="night-"]).stage-fail #promptGrid .card svg {
+  color: #000000 !important;
+  fill: currentColor;
+  stroke: currentColor;
+}
       .prompts {
         display: none;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -6787,4 +6832,21 @@ body[data-theme] .settings-tab {
 }
 body[data-theme] .settings-tab.is-active {
   background: var(--panel);
+}
+
+body[data-sloth="off"] .splash-turbo-layer,
+body[data-sloth="off"] .mode-card__turbo,
+body[data-sloth="off"] .modal-card__turbo-art,
+body[data-sloth="off"] .stage-card__turbo-guide,
+body[data-sloth="off"] .stage-intro-start__turbo,
+body[data-sloth="off"] .stage-instruction__turbo-layout,
+body[data-sloth="off"] .stage-complete__competitive-wrap,
+body[data-sloth="off"] .stage-complete__competitive-turbo,
+body[data-sloth="off"] .sandbox-turbo-story,
+body[data-sloth="off"] .floating-angel-layer {
+  display: none !important;
+}
+
+body[data-sloth="off"] img[src*="imgs/Sloths/"] {
+  display: none !important;
 }

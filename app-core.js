@@ -810,8 +810,12 @@ const revealInput = document.getElementById("revealTime");
       function positionStageInstructionPanel() {
         if (!stageInstructionPanel || !stagePanel) return;
         const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        const slothEnabled = typeof window.isSlothEnabled === "function" ? window.isSlothEnabled() : true;
         const isTurboTutorial =
-          gameMode === "stages" && stage && String(stage.stageType || "").toLowerCase() === "tutorial";
+          slothEnabled &&
+          gameMode === "stages" &&
+          stage &&
+          String(stage.stageType || "").toLowerCase() === "tutorial";
         if (isTurboTutorial) {
           const viewportPadding = window.innerWidth <= 720 ? 14 : 20;
           const bottomOffset = window.innerWidth <= 720 ? -24 : -40;
@@ -919,8 +923,12 @@ const revealInput = document.getElementById("revealTime");
           positionStageInstructionPanel();
         }
         const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        const slothEnabled = typeof window.isSlothEnabled === "function" ? window.isSlothEnabled() : true;
         const isTurboTutorial =
-          gameMode === "stages" && stage && String(stage.stageType || "").toLowerCase() === "tutorial";
+          slothEnabled &&
+          gameMode === "stages" &&
+          stage &&
+          String(stage.stageType || "").toLowerCase() === "tutorial";
         stageInstructions.classList.toggle("stage-instructions--turbo", Boolean(isTurboTutorial));
         if (stageInstructionPanel) {
           stageInstructionPanel.classList.toggle("stage-instruction-panel--turbo", Boolean(isTurboTutorial));
@@ -955,8 +963,12 @@ const revealInput = document.getElementById("revealTime");
         const renderToken = stageInstructionToken;
         const fadeMs = 500;
         const stage = window.getStageConfig ? window.getStageConfig(stageState.index) : null;
+        const slothEnabled = typeof window.isSlothEnabled === "function" ? window.isSlothEnabled() : true;
         const isTurboTutorial =
-          gameMode === "stages" && stage && String(stage.stageType || "").toLowerCase() === "tutorial";
+          slothEnabled &&
+          gameMode === "stages" &&
+          stage &&
+          String(stage.stageType || "").toLowerCase() === "tutorial";
         const buildInstructionFragments = (rawText) => {
           return String(rawText || "")
             .split("**")
@@ -1085,7 +1097,7 @@ const revealInput = document.getElementById("revealTime");
             }
             if (entry.color) {
               const theme = String(document.body && document.body.dataset ? document.body.dataset.theme || "" : "");
-              const forceThemeInk = theme.startsWith("night-");
+              const forceThemeInk = !slothEnabled || theme.startsWith("night-");
               box.style.color = forceThemeInk ? "var(--ink)" : entry.color;
             }
           }

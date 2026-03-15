@@ -1,6 +1,6 @@
 (function () {
   var version = "2026.04.0";
-  var contentResetVersion = "2026.04.0-stage-reset-1";
+  var contentResetVersion = "2026.04.0-stage-reset-2";
   var host = String(window.location.hostname || "").toLowerCase();
   var channel = "custom";
 
