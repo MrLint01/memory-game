@@ -12,6 +12,7 @@ $excludeNames = @(
   ".git",
   ".github",
   ".firebase",
+  ".firebaserc",
   ".venv",
   "analysis_output",
   "dataconnect",
@@ -38,7 +39,13 @@ $excludeNames = @(
   "webpage.txt",
   "data_combined.json",
   "stage-idea-slop.txt",
-  "Jira.csv"
+  "Jira.csv",
+  "404.html",
+  "app.js",
+  "endless-mode.js",
+  "tutorial-mode.js",
+  "stages-data-old.js",
+  "stages-instructions-old.js"
 )
 
 $excludePatterns = @(
@@ -47,6 +54,60 @@ $excludePatterns = @(
   "*.txt",
   "*.ps1"
 )
+
+$allowedTransparentSlothFiles = @(
+  "jump_scare.png",
+  "turbo_angel.png",
+  "turbo_catching_branch.png",
+  "turbo_climbing_splash.png",
+  "turbo_flag_splash.png",
+  "turbo_hanging_happy_splash.png",
+  "turbo_holding_branch.png",
+  "turbo_napping_on_log_splash.png",
+  "turbo_painting.png",
+  "turbo_tired_splash.png",
+  "turbo_waving.png"
+)
+
+function Test-ShouldExcludeRelativePath {
+  param(
+    [string]$RelativePath
+  )
+
+  $normalized = ($RelativePath -replace '\\', '/').ToLowerInvariant()
+  $fileName = [System.IO.Path]::GetFileName($normalized)
+
+  if ([string]::IsNullOrWhiteSpace($normalized)) {
+    return $true
+  }
+
+  if ($fileName.StartsWith(".")) {
+    return $true
+  }
+
+  if ($normalized.StartsWith("imgs/sloths/") -and -not $normalized.StartsWith("imgs/sloths/transparent/")) {
+    return $true
+  }
+
+  if ($normalized.StartsWith("imgs/sloths/transparent/")) {
+    return ($allowedTransparentSlothFiles -notcontains $fileName)
+  }
+
+  if ($normalized -in @(
+    "audio/regular-level-music-1.wav",
+    "audio/wrong.wav",
+    "imgs/home_button.clip",
+    "imgs/fruits.clip",
+    "imgs/chains.clip",
+    "imgs/skip.png",
+    "imgs/turbo.png",
+    "imgs/the_red_penguin_resist.webp"
+  )) {
+    return $true
+  }
+
+  return $false
+}
 
 if (!(Test-Path $outputDir)) {
   New-Item -ItemType Directory -Path $outputDir | Out-Null
@@ -70,7 +131,12 @@ try {
   foreach ($item in $rootItems) {
     if ($item.PSIsContainer) {
       $files = Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force | Where-Object {
-        -not $_.Name.StartsWith(".") -and $_.FullName -notmatch '[\\/]\.'
+        $relativePath = $_.FullName.Substring($projectRootPrefix.Length)
+        (
+          -not $_.Name.StartsWith(".") -and
+          $_.FullName -notmatch '[\\/]\.' -and
+          -not (Test-ShouldExcludeRelativePath $relativePath)
+        )
       }
       foreach ($file in $files) {
         $relativePath = $file.FullName.Substring($projectRootPrefix.Length)
