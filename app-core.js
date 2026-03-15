@@ -1347,6 +1347,12 @@ const revealInput = document.getElementById("revealTime");
         inputGrid.innerHTML = "";
         resultsPanel.classList.remove("show");
         resultsPanel.innerHTML = "";
+        if (typeof window.closeStageSharePreviewModal === "function") {
+          window.closeStageSharePreviewModal();
+        }
+        if (typeof window.clearStageSharePreview === "function") {
+          window.clearStageSharePreview();
+        }
       }
 
       function normalize(value) {

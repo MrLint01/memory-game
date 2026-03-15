@@ -2264,7 +2264,7 @@ body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button {
 body.stage-fail .stage-fail-actions .icon-button.button-entice,
 body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button.button-entice {
   transform-origin: 50% 85%;
-  animation: resultButtonWiggle 1.75s ease-in-out infinite;
+  animation: resultButtonWiggle 2.4s ease-in-out infinite;
 }
 body.stage-fail .stage-fail-actions .action-countdown,
 body[data-state="result"] #resultsPanel .stage-complete__actions .action-countdown {
@@ -2293,21 +2293,15 @@ body[data-state="result"] #resultsPanel .stage-complete__actions .icon-button.is
 }
 @keyframes resultButtonWiggle {
   0%,
-  68%,
+  72%,
   100% {
-    transform: rotate(0deg) scale(1);
+    transform: translateY(0) scale(1);
   }
-  74% {
-    transform: rotate(-6deg) scale(1.04);
+  82% {
+    transform: translateY(-1px) scale(1.018);
   }
-  80% {
-    transform: rotate(6deg) scale(1.04);
-  }
-  86% {
-    transform: rotate(-4deg) scale(1.02);
-  }
-  92% {
-    transform: rotate(4deg) scale(1.02);
+  90% {
+    transform: translateY(0) scale(1.01);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2790,10 +2784,12 @@ body[data-state="result"] #resultsPanel .stage-complete__stars[data-stars="4"] .
 }
 body[data-state="result"] #resultsPanel .stage-complete__actions {
   position: static;
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 52px);
+  grid-auto-rows: 52px;
   justify-content: center;
-  gap: 0.5rem;
+  justify-items: center;
+  gap: 0.75rem;
 }
 body[data-state="result"] #resultsPanel .stage-complete__actions .secondary {
   margin-right: 0;
@@ -2817,33 +2813,49 @@ body[data-state="result"] #resultsPanel .stage-next-wrap {
   display: inline-flex;
   align-items: center;
   position: relative;
+  width: 52px;
+  height: 52px;
+  justify-self: center;
 }
 body.stage-fail .stage-retry-wrap {
   display: inline-flex;
   align-items: center;
   position: relative;
-}
-body.stage-fail .stage-retry-timer {
+  isolation: isolate;
   width: 52px;
-  height: 6px;
-  border: 1px solid var(--border);
-  background: var(--panel-muted);
+  height: 52px;
+}
+body[data-state="result"] #resultsPanel .stage-next-wrap {
+  isolation: isolate;
+}
+body.stage-fail .stage-retry-wrap .icon-button,
+body[data-state="result"] #resultsPanel .stage-next-wrap .icon-button,
+.stage-intro-start {
+  position: relative;
+  z-index: 1;
+}
+body.stage-fail .stage-retry-timer,
+body[data-state="result"] #resultsPanel .stage-next-timer {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 0.35rem);
-  transform: translateX(-50%);
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--panel-muted) 54%, #d6dfeb 46%);
   overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
 }
 body.stage-fail .stage-retry-timer__fill {
   position: absolute;
   inset: 0;
-  background: var(--ink);
+  background: color-mix(in srgb, var(--panel-muted) 28%, #aebdd2 72%);
   transform-origin: left;
-  transform: scaleX(1);
+  transform: scaleX(0);
   transition: transform 3000ms linear;
+  will-change: transform;
 }
 body.stage-fail .stage-retry-timer.is-running .stage-retry-timer__fill {
-  transform: scaleX(0);
+  transform: scaleX(1);
 }
 body.stage-fail .stage-retry-timer.is-canceled .stage-retry-timer__fill {
   transition: none !important;
@@ -2852,42 +2864,49 @@ body.stage-fail .stage-retry-timer.is-canceled .stage-retry-timer__fill {
 body.stage-fail .stage-retry-timer.is-canceled,
 body.stage-fail .stage-retry-timer.is-disabled,
 body.stage-fail .stage-retry-timer.is-waiting {
-  display: none;
+  opacity: 0;
 }
-body[data-state="result"] #resultsPanel .stage-next-timer {
-  width: 52px;
-  height: 6px;
-  border: 1px solid var(--border);
-  background: var(--panel-muted);
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 0.35rem);
-  transform: translateX(-50%);
-  overflow: hidden;
+body.stage-fail .stage-retry-timer.is-running {
+  opacity: 1;
 }
 body[data-state="result"] #resultsPanel .stage-next-timer__fill {
   position: absolute;
   inset: 0;
-  background: var(--ink);
+  background: color-mix(in srgb, var(--panel-muted) 28%, #aebdd2 72%);
   transform-origin: left;
-  transform: scaleX(1);
+  transform: scaleX(0);
   transition: transform 3000ms linear;
+  will-change: transform;
 }
 body[data-state="result"] #resultsPanel .stage-next-timer.is-running .stage-next-timer__fill {
-  transform: scaleX(0);
+  transform: scaleX(1);
 }
 body[data-state="result"] #resultsPanel .stage-next-timer.is-canceled .stage-next-timer__fill {
   transition: none !important;
   transform: scaleX(0) !important;
 }
 body[data-state="result"] #resultsPanel .stage-next-timer.is-canceled {
-  display: none;
+  opacity: 0;
 }
 body[data-state="result"] #resultsPanel .stage-next-timer.is-disabled {
-  display: none;
+  opacity: 0;
 }
 body[data-state="result"] #resultsPanel .stage-next-timer.is-waiting {
-  display: none;
+  opacity: 0;
+}
+body[data-state="result"] #resultsPanel .stage-next-timer.is-running {
+  opacity: 1;
+}
+body.stage-fail .stage-retry-timer.is-running + .icon-button,
+body[data-state="result"] #resultsPanel .stage-next-timer.is-running + .icon-button,
+.stage-intro-start-timer.is-running + .stage-intro-start {
+  background: transparent !important;
+}
+body.stage-fail .stage-retry-timer.is-running + .icon-button.button-entice,
+body[data-state="result"] #resultsPanel .stage-next-timer.is-running + .icon-button.button-entice,
+.stage-intro-start-timer.is-running + .stage-intro-start {
+  animation: none;
+  transform: none !important;
 }
 body[data-state="result"] #resultsPanel .stage-complete__actions .action-title {
   text-transform: none;
@@ -4317,6 +4336,66 @@ body.pause-active .interrupt-close {
 .modal-card--muted {
   background: var(--panel-muted);
 }
+.modal-card--share-preview {
+  width: min(860px, 96vw);
+  padding: 1.2rem 1.2rem 1rem;
+  display: grid;
+  gap: 0.9rem;
+}
+.modal-card--share-preview h3 {
+  margin: 0;
+  padding-right: 3.5rem;
+}
+.share-preview-frame {
+  display: grid;
+  place-items: center;
+  padding: 0.85rem;
+  border: 2px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 88%, #ffffff 12%);
+}
+.share-preview-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(70vh, 960px);
+  object-fit: contain;
+}
+.share-preview-status {
+  min-height: 1.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+.share-preview-status.is-error {
+  color: #9f1239;
+}
+.share-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.share-preview-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-width: 156px;
+  padding: 0.65rem 1rem;
+}
+.share-preview-action .action-icon {
+  width: 22px;
+  height: 22px;
+}
+.share-preview-action.secondary .action-icon {
+  filter: none;
+}
+#sharePreviewClose {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  z-index: 3;
+}
 .modal-card__turbo-art {
   position: absolute;
   pointer-events: auto;
@@ -5070,11 +5149,17 @@ body[data-theme] .credits-like-button:focus-visible {
   align-items: center;
   justify-content: center;
   position: relative;
+  isolation: isolate;
+  width: 140px;
+  height: 52px;
 }
 .stage-intro-start-wrap--turbo {
   transform-origin: 50% 100%;
   animation: stageIntroStartBob 2.2s ease-in-out infinite;
   margin-top: 0.8rem;
+}
+.modal-card--intro.intro-auto .stage-intro-start-wrap--turbo {
+  animation: none;
 }
 .stage-intro-start--with-turbo {
   z-index: 1;
@@ -5096,16 +5181,17 @@ body[data-theme] .credits-like-button:focus-visible {
 }
 .stage-intro-start-timer {
   width: 140px;
-  height: 6px;
-  border: 1px solid var(--border);
-  background: var(--panel-muted);
+  height: 52px;
+  border: 0;
+  background: color-mix(in srgb, var(--panel-muted) 54%, #d6dfeb 46%);
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 0.35rem);
-  transform: translateX(-50%);
+  left: 0;
+  bottom: -1.4rem;
+  transform: translateY(-1%);
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
+  z-index: 0;
 }
 .modal-card--intro.intro-auto .stage-intro-start-timer {
   opacity: 1;
@@ -5113,17 +5199,21 @@ body[data-theme] .credits-like-button:focus-visible {
 .stage-intro-start-timer__fill {
   position: absolute;
   inset: 0;
-  background: var(--ink);
+  background: color-mix(in srgb, var(--panel-muted) 28%, #aebdd2 72%);
   transform-origin: left;
-  transform: scaleX(1);
+  transform: scaleX(0);
   transition: transform 3000ms linear;
+  will-change: transform;
 }
 .stage-intro-start-timer.is-running .stage-intro-start-timer__fill {
-  transform: scaleX(0);
+  transform: scaleX(1);
 }
 .stage-intro-start-timer.is-canceled .stage-intro-start-timer__fill {
   transition: none !important;
   transform: scaleX(0) !important;
+}
+.stage-intro-start-timer.is-running {
+  opacity: 1;
 }
 @keyframes stageIntroStartBob {
   0%,
@@ -5231,12 +5321,13 @@ body[data-theme] .credits-like-button:focus-visible {
   transform: translateX(-50%) translateY(2px);
 }
 .modal-card--intro.intro-auto .stage-intro-start-timer {
-  top: auto !important;
-  bottom: calc(52px - 1.4rem + 0.35rem) !important;
+  left: 0 !important;
+  bottom: -1.4rem !important;
+  transform: translateY(-1%) !important;
 }
 .modal-card--intro.intro-auto .stage-intro-start .action-key-hint {
-  top: auto !important;
-  bottom: calc(52px + 0.35rem + 8px + 0.6rem - 1px) !important;
+  top: -1.3rem !important;
+  bottom: auto !important;
 }
 .stage-intro-shell {
   display: grid;
