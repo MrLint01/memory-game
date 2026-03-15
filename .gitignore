@@ -2,7 +2,7 @@
 node_modules/
 
 # Build / coverage outputs
-dist/
+#dist/
 build/
 coverage/
 .nyc_output/

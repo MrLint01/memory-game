@@ -1,0 +1,119 @@
+window.sandboxUnlockCosts = {
+  cardTypes: {
+    numbers: 1,
+    letters: 1,
+    greekLetters: 1,
+    shapes: 1,
+    directions: 3,
+    colors: 1,
+    diagonal: 3,
+    fruits: 20
+  },
+  modifiers: {
+    practiceMathOps: 5,
+    practiceMathOpsPlus: 10,
+    practiceMisleadColors: 3,
+    practiceBackgroundColor: 5,
+    practiceTextColor: 8,
+    practicePreviousCard: 10,
+    practiceSwap: 7,
+    practicePlatformer: 20,
+    practiceGlitch: 10,
+    practiceRotate: 3,
+    practiceRotatePlus: 5,
+    practiceSequence: 8,
+    practiceFog: 10,
+    practiceBlur: 10,
+    practiceAds: 15
+  }
+};
+
+(() => {
+  const unlockKey = "flashRecallSandboxUnlocks";
+
+  const emptyState = () => ({
+    cardTypes: {},
+    modifiers: {}
+  });
+
+  window.getSandboxUnlockState = function getSandboxUnlockState() {
+    try {
+      const raw = window.localStorage.getItem(unlockKey);
+      if (!raw) return emptyState();
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return emptyState();
+      return {
+        cardTypes: parsed.cardTypes || {},
+        modifiers: parsed.modifiers || {}
+      };
+    } catch {
+      return emptyState();
+    }
+  };
+
+  window.saveSandboxUnlockState = function saveSandboxUnlockState(state) {
+    try {
+      window.localStorage.setItem(unlockKey, JSON.stringify(state));
+    } catch {
+      // ignore
+    }
+  };
+
+  window.getSandboxStarsEarned = function getSandboxStarsEarned() {
+    const stars = window.stageStars || {};
+    return Object.values(stars).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  };
+
+  window.getSandboxStarsSpent = function getSandboxStarsSpent() {
+    const costs = window.sandboxUnlockCosts || { cardTypes: {}, modifiers: {} };
+    const state = window.getSandboxUnlockState ? window.getSandboxUnlockState() : emptyState();
+    let spent = 0;
+    Object.entries(state.cardTypes || {}).forEach(([key, unlocked]) => {
+      if (unlocked) {
+        spent += Number(costs.cardTypes && costs.cardTypes[key]) || 0;
+      }
+    });
+    Object.entries(state.modifiers || {}).forEach(([key, unlocked]) => {
+      if (unlocked) {
+        spent += Number(costs.modifiers && costs.modifiers[key]) || 0;
+      }
+    });
+    return spent;
+  };
+
+  window.getSandboxStarsAvailable = function getSandboxStarsAvailable() {
+    return Math.max(0, window.getSandboxStarsEarned() - window.getSandboxStarsSpent());
+  };
+
+  window.isSandboxItemUnlocked = function isSandboxItemUnlocked(type, key) {
+    const state = window.getSandboxUnlockState ? window.getSandboxUnlockState() : emptyState();
+    if (type === "cardTypes") {
+      return Boolean(state.cardTypes && state.cardTypes[key]);
+    }
+    if (type === "modifiers") {
+      return Boolean(state.modifiers && state.modifiers[key]);
+    }
+    return false;
+  };
+
+  window.unlockSandboxItem = function unlockSandboxItem(type, key) {
+    const costs = window.sandboxUnlockCosts || { cardTypes: {}, modifiers: {} };
+    const state = window.getSandboxUnlockState ? window.getSandboxUnlockState() : emptyState();
+    const cost = Number((costs[type] && costs[type][key]) || 0);
+    if (type === "cardTypes") {
+      if (state.cardTypes[key]) return true;
+      if (window.getSandboxStarsAvailable() < cost) return false;
+      state.cardTypes[key] = true;
+      window.saveSandboxUnlockState(state);
+      return true;
+    }
+    if (type === "modifiers") {
+      if (state.modifiers[key]) return true;
+      if (window.getSandboxStarsAvailable() < cost) return false;
+      state.modifiers[key] = true;
+      window.saveSandboxUnlockState(state);
+      return true;
+    }
+    return false;
+  };
+})();
