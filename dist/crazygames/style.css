@@ -3282,12 +3282,12 @@ body.stage-fail #promptGrid .card,
 body.stage-fail #promptGrid .hidden-card {
   font-family: "Atkinson Hyperlegible", "Arial", sans-serif;
 }
-body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .card,
-body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .card,
-body[data-theme^="night-"][data-mode="practice"][data-state="show"] #cardGrid .card,
-body[data-theme^="night-"][data-mode="practice"][data-state="recall"] #cardGrid .card,
-body[data-theme^="night-"].stage-fail #cardGrid .card,
-body[data-theme^="night-"].stage-fail #promptGrid .card {
+body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .card:not(.card--text-color),
+body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .card:not(.card--text-color),
+body[data-theme^="night-"][data-mode="practice"][data-state="show"] #cardGrid .card:not(.card--text-color),
+body[data-theme^="night-"][data-mode="practice"][data-state="recall"] #cardGrid .card:not(.card--text-color),
+body[data-theme^="night-"].stage-fail #cardGrid .card:not(.card--text-color),
+body[data-theme^="night-"].stage-fail #promptGrid .card:not(.card--text-color) {
   color: #ffffff !important;
 }
 body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .card svg,
@@ -3312,12 +3312,12 @@ body[data-theme^="night-"].stage-fail #cardGrid .direction-arrow,
 body[data-theme^="night-"].stage-fail #promptGrid .direction-arrow {
   filter: brightness(0) invert(1);
 }
-body:not([data-theme^="night-"])[data-mode="stages"][data-state="show"] #cardGrid .card,
-body:not([data-theme^="night-"])[data-mode="stages"][data-state="recall"] #cardGrid .card,
-body:not([data-theme^="night-"])[data-mode="practice"][data-state="show"] #cardGrid .card,
-body:not([data-theme^="night-"])[data-mode="practice"][data-state="recall"] #cardGrid .card,
-body:not([data-theme^="night-"]).stage-fail #cardGrid .card,
-body:not([data-theme^="night-"]).stage-fail #promptGrid .card {
+body:not([data-theme^="night-"])[data-mode="stages"][data-state="show"] #cardGrid .card:not(.card--text-color),
+body:not([data-theme^="night-"])[data-mode="stages"][data-state="recall"] #cardGrid .card:not(.card--text-color),
+body:not([data-theme^="night-"])[data-mode="practice"][data-state="show"] #cardGrid .card:not(.card--text-color),
+body:not([data-theme^="night-"])[data-mode="practice"][data-state="recall"] #cardGrid .card:not(.card--text-color),
+body:not([data-theme^="night-"]).stage-fail #cardGrid .card:not(.card--text-color),
+body:not([data-theme^="night-"]).stage-fail #promptGrid .card:not(.card--text-color) {
   color: #000000 !important;
 }
 body:not([data-theme^="night-"])[data-mode="stages"][data-state="show"] #cardGrid .card svg,

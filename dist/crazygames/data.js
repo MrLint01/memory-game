@@ -5,7 +5,6 @@ const dataSets = {
           { label: "Blue", color: "#3b82f6" },
           { label: "Yellow", color: "#facc15" },
           { label: "Green", color: "#22c55e" },
-          { label: "White", color: "#f8fafc" },
           { label: "Orange", color: "#f97316" },
           { label: "Pink", color: "#ec4899" },
           { label: "Brown", color: "#8b5e34" },
