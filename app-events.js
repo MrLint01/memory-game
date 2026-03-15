@@ -2958,7 +2958,31 @@
       let stageListSkipListener = null;
       flashCountdownEnabled = defaultControlSettings.flashCountdown;
       enterToNextEnabled = true;
-      leaderboardsEnabled = true;
+      if (leaderboardsEnabledToggle) {
+        const storageKey = LEADERBOARDS_ENABLED_STORAGE_KEY;
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          leaderboardsEnabledToggle.checked = saved === "1";
+        } else {
+          leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
+        }
+        leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+        leaderboardsEnabledToggle.addEventListener("change", () => {
+          leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+          window.localStorage.setItem(storageKey, leaderboardsEnabled ? "1" : "0");
+          logSettingChange("leaderboards_enabled", leaderboardsEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "leaderboards_enabled"
+          });
+          if (typeof window.refreshVisibleLeaderboards === "function") {
+            window.refreshVisibleLeaderboards();
+          }
+        });
+      } else {
+        leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
+      }
       let stageStarShineInterval = null;
       let resultAutoActionTimers = [];
       const RESULT_AUTO_ACTION_SECONDS = 3;
@@ -6005,7 +6029,7 @@ function runFlashCountdown(onComplete) {
             leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
             leaderboardsEnabled = leaderboardsEnabledToggle.checked;
           }
-            applyAudioSettings(defaultAudioSettings, true);
+          applyAudioSettings(defaultAudioSettings, true);
           keybinds = { ...defaultKeybinds };
           activeRebindAction = null;
           refreshKeybindButtons();
@@ -8095,31 +8119,7 @@ function runFlashCountdown(onComplete) {
         stageIntroAutoStartEnabled = Boolean(defaultControlSettings.autoStartStagePreview);
       }
 
-      if (leaderboardsEnabledToggle) {
-        const storageKey = LEADERBOARDS_ENABLED_STORAGE_KEY;
-        const saved = window.localStorage.getItem(storageKey);
-        if (saved !== null) {
-          leaderboardsEnabledToggle.checked = saved === "1";
-        } else {
-          leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
-        }
-        leaderboardsEnabled = leaderboardsEnabledToggle.checked;
-        leaderboardsEnabledToggle.addEventListener("change", () => {
-          leaderboardsEnabled = leaderboardsEnabledToggle.checked;
-          window.localStorage.setItem(storageKey, leaderboardsEnabled ? "1" : "0");
-          logSettingChange("leaderboards_enabled", leaderboardsEnabled, {
-            setting_category: "controls"
-          });
-          logSettingsSnapshot("setting_change", {
-            setting_name: "leaderboards_enabled"
-          });
-          if (typeof window.refreshVisibleLeaderboards === "function") {
-            window.refreshVisibleLeaderboards();
-          }
-        });
-      } else {
-        leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
-      }
+      leaderboardsEnabled = true;
 
       let persistAndApplyAppearance = null;
       if (appearanceTheme) {
