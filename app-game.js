@@ -234,6 +234,7 @@
         if (!sharePreviewModal) return;
         sharePreviewModal.classList.remove("show");
         sharePreviewModal.setAttribute("aria-hidden", "true");
+        clearStageSharePreview();
         setStageSharePreviewStatus("");
       }
 
@@ -623,7 +624,7 @@
           const leaderboardRows = await getStageShareLeaderboardRows(payload);
           const canvas = document.createElement("canvas");
           canvas.width = 1200;
-          canvas.height = 1500;
+          canvas.height = 1328;
           const ctx = canvas.getContext("2d");
           const stageNumber = Number(payload.stageIndex) + 1;
           const levelLabel = `LEVEL ${stageNumber}`;
@@ -636,14 +637,18 @@
           const cardFrameX = 86;
           const cardFrameY = 72;
           const cardFrameWidth = 1028;
-          const cardFrameHeight = 1356;
+          const cardFrameHeight = 1200;
 
-          ctx.fillStyle = "#eadfc8";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          const backdropRadius = 42;
+          fillStageShareRoundRect(ctx, 0, 0, canvas.width, canvas.height, backdropRadius, "#eadfc8");
+          ctx.save();
+          roundedStageShareRectPath(ctx, 0, 0, canvas.width, canvas.height, backdropRadius);
+          ctx.clip();
           for (let index = 0; index < 18; index += 1) {
             ctx.fillStyle = `rgba(255, 255, 255, ${index % 2 === 0 ? 0.08 : 0.04})`;
             ctx.fillRect(index * 80, 0, 2, canvas.height);
           }
+          ctx.restore();
 
           ctx.save();
           ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -755,7 +760,7 @@
 
           ctx.fillStyle = "#10233c";
           ctx.font = '700 34px "Space Grotesk", "Trebuchet MS", sans-serif';
-          drawWrappedStageShareText(ctx, footerCta, 168, 1178, 840, 42, 2);
+          drawWrappedStageShareText(ctx, footerCta, 168, 1128, 840, 42, 2);
 
           ctx.restore();
           return canvas;

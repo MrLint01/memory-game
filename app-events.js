@@ -71,7 +71,8 @@
           "pastel-green",
           "pastel-blue",
           "pastel-purple",
-          "pastel-pink"
+          "pastel-pink",
+          "pastel-sage"
         ],
         colorVisionModes: ["standard", "protanopia", "deuteranopia", "tritanopia", "monochromacy"],
         layouts: ["classic"]
