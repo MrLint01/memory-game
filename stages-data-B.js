@@ -150,7 +150,7 @@
   },
   "modifiers": {},
   "starTimes": {
-    "platinum": 1.5,
+    "platinum": 2,
     "gold": 3,
     "silver": 10,
     "bronze": 20
@@ -187,8 +187,8 @@
   ],
   "modifiers": {},
   "starTimes": {
-    "platinum": 1.5,
-    "gold": 3,
+    "platinum": 3,
+    "gold": 4,
     "silver": 10,
     "bronze": 20
   },
@@ -210,10 +210,10 @@
   "firstLetterHintEnabled": false,
   "modifiers": {},
   "starTimes": {
-    "platinum": 1.5,
-    "gold": 2,
-    "silver": 4,
-    "bronze": 8
+    "platinum": 2,
+    "gold": 3,
+    "silver": 6,
+    "bronze": 10
   },
   "instructions": window.stageInstructionsB ? window.stageInstructionsB[5] || [] : []
 },
@@ -222,7 +222,7 @@
   "version": 11,
   "name": "Stage 6",
   "stageType": "challenge",
-  "rounds": 2,
+  "rounds": 1,
   "cards": 4,
   "noRepeatAcrossRounds": true,
   "tabTutorialEnabled": true,
@@ -247,8 +247,8 @@
   ],
   "modifiers": {},
   "starTimes": {
-    "platinum": 1.5,
-    "gold": 3,
+    "platinum": 3.5,
+    "gold": 4,
     "silver": 10,
     "bronze": 20
   },
@@ -260,7 +260,7 @@
   "version": 11,
   "name": "Stage 7",
   "stageType": "sequence",
-  "rounds": 1,
+  "rounds": 2,
   "cards": 3,
   "noRepeatAcrossRounds": true,
   "revealSeconds": 0.2,
@@ -271,10 +271,10 @@
   "cardCounts": {},
   "modifiers": {},
   "starTimes": {
-    "platinum": 1.5,
-    "gold": 2,
-    "silver": 4,
-    "bronze": 8
+    "platinum": 4,
+    "gold": 5,
+    "silver": 8,
+    "bronze": 12
   },
   "instructions": window.stageInstructionsB ? window.stageInstructionsB[7] || [] : [],
   "firstLetterHintEnabled": false
@@ -1853,6 +1853,69 @@
     "bronze": 18
   },
   "instructions": window.stageInstructionsB ? window.stageInstructionsB[50] || [] : [],
+  "firstLetterHintEnabled": false
+},
+    {
+  "id": 51,
+  "version": 10,
+  "name": "Stage 51",
+  "stageType": "sequence",
+  "rounds": 1,
+  "cards": 3,
+  "revealSeconds": 0.2,
+  "recallSeconds": 20,
+  "categories": [
+    "numbers",
+    "directions",
+    "shapes"
+  ],
+  "cardCounts": {
+    "numbers": 1,
+    "directions": 1,
+    "shapes": 1
+  },
+  "modifiers": {
+    "rotate": true,
+    "rotateMinCount": 1,
+    "rotateMaxCount": 1
+  },
+  "starTimes": {
+    "platinum": 3,
+    "gold": 4,
+    "silver": 8,
+    "bronze": 12
+  },
+  "instructions": window.stageInstructionsB ? window.stageInstructionsB[51] || [] : [],
+  "firstLetterHintEnabled": false
+},
+    {
+  "id": 52,
+  "version": 10,
+  "name": "Stage 52",
+  "stageType": "tutorial",
+  "rounds": 3,
+  "cards": 1,
+  "noRepeatAcrossRounds": true,
+  "revealSeconds": 8,
+  "recallSeconds": 20,
+  "categories": [
+    "directions",
+    "diagonal"
+  ],
+  "cardCounts": {},
+  "modifiers": {
+    "rotatePlus": true,
+    "rotatePlusMinCount": 1,
+    "rotatePlusMaxCount": 1,
+    "rotateNoRepeatPromptsAcrossRounds": true
+  },
+  "starTimes": {
+    "platinum": 8,
+    "gold": 12,
+    "silver": 16,
+    "bronze": 20
+  },
+  "instructions": window.stageInstructionsB ? window.stageInstructionsB[52] || [] : [],
   "firstLetterHintEnabled": false
 }
   ];

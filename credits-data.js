@@ -38,7 +38,7 @@
     },
     {
       id: "lintaro-developer",
-      name: "Lintaro",
+      name: "MrLint",
       role: "Developer",
       linkLabel: "",
       linkUrl: "",
