@@ -671,7 +671,7 @@ function getDefaultAchievementTheme() {
     ? window.getFlashRecallSettingsDefaults()
     : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
   const appearance = defaults && typeof defaults === "object" ? defaults.appearance || {} : {};
-  return appearance && appearance.theme ? String(appearance.theme) : "studio-light";
+  return appearance && appearance.theme ? String(appearance.theme) : "night-orange";
 }
 
 function getAchievementProfileRef() {
@@ -1138,7 +1138,9 @@ function getLocalAchievementSyncUpdate(extra = {}) {
   const starSnapshot = getStarProgressSnapshot();
   const completedStageFlags = getCompletedStageAchievementFlags();
   const currentTheme = String(document.body && document.body.dataset ? document.body.dataset.theme || "" : "");
-  const themeChanged = currentTheme && currentTheme !== getDefaultAchievementTheme();
+  const themeChanged = window.FLASH_RECALL_APPEARANCE_READY === true
+    && currentTheme
+    && currentTheme !== getDefaultAchievementTheme();
   return mergeAchievementUpdateInputs({
     playerName: getDisplayNameFallback(),
     attemptCount: stats.totalLevelAttempts,

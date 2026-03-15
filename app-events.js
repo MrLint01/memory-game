@@ -53,7 +53,7 @@
         ? window.getFlashRecallSettingsDefaults()
         : (window.FLASH_RECALL_SETTINGS_DEFAULTS || {});
       const fallbackAppearance = {
-        theme: "studio-light",
+        theme: "night-orange",
         colorVision: "standard",
         layout: "classic",
         themes: [
@@ -320,6 +320,7 @@
         delete document.body.dataset.font;
         document.body.dataset.colorVision = nextColorVision;
         document.body.dataset.layout = nextLayout;
+        window.FLASH_RECALL_APPEARANCE_READY = true;
         syncAppearanceThemeControl(nextTheme);
         if (appearanceColorVision) appearanceColorVision.value = nextColorVision;
         if (appearanceLayout) appearanceLayout.value = nextLayout;
@@ -4242,7 +4243,8 @@ function runFlashCountdown(onComplete) {
         scheduleSplashAutoStart();
       }
 
-      function closeSplashScreen() {
+      function closeSplashScreen(options = {}) {
+        const resumeMenuMusic = options.resumeMenuMusic !== false;
         clearSplashAutoStart();
         resetSplashAnyKeySequence();
         stopSplashTurboCycle();
@@ -4258,7 +4260,12 @@ function runFlashCountdown(onComplete) {
           document.body.dataset.view = "home";
         }
         startSplashIconSwap();
-        scheduleMenuMusicFadeIn();
+        if (resumeMenuMusic) {
+          scheduleMenuMusicFadeIn();
+        } else {
+          clearScheduledMenuMusicFadeIn();
+          setBackgroundMusicMode("off");
+        }
       }
 
       function openSplashLoading(message = null) {
@@ -4402,7 +4409,9 @@ function runFlashCountdown(onComplete) {
           splashStartInProgress = false;
           return;
         }
-        closeSplashScreen();
+        closeSplashScreen({
+          resumeMenuMusic: !shouldCountdownToFirstStage
+        });
         markSplashSeen();
         openSplashLoading();
         const minimumDelay = new Promise((resolve) => {

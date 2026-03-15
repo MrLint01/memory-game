@@ -66,16 +66,27 @@ firebase deploy --only hosting,firestore:rules
 ```
 
 ## Packaging
-Build a distributable zip with `index.html` at the zip root:
+Build the standard publish set:
+- `dist/crazygames-small`
+- `dist/crazygames-large`
+- `gamejolt-small.zip`
+- `gamejolt-large.zip`
+- `dist/flash-recall-small.zip`
+- `dist/flash-recall-large.zip`
+
+The small build is also copied to the compatibility paths:
+- `dist/crazygames`
+- `gamejolt.zip`
+- `dist/flash-recall.zip`
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\package-site.ps1
 ```
 
-Optional output path:
+Optional one-off zip output:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\package-site.ps1 -OutputPath .\dist\flash-recall.zip
+powershell -NoProfile -ExecutionPolicy Bypass -File .\package-site.ps1 -Variant large -OutputPath .\dist\flash-recall-custom.zip
 ```
 
 ## Versioning

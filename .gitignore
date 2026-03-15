@@ -6,6 +6,15 @@ node_modules/
 build/
 coverage/
 .nyc_output/
+.package-staging/
+
+# Generated publish artifacts
+dist/crazygames-small/
+dist/crazygames-large/
+dist/flash-recall-small.zip
+dist/flash-recall-large.zip
+gamejolt-small.zip
+gamejolt-large.zip
 
 # Logs
 logs/
