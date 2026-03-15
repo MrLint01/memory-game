@@ -154,6 +154,32 @@
       let currentStageSharePreviewUrl = "";
       let currentStageSharePreviewFileName = "";
       let currentStageSharePreviewKey = "";
+      const stageShareImageCache = new Map();
+
+      function loadStageShareImage(src) {
+        if (!src) return Promise.resolve(null);
+        if (stageShareImageCache.has(src)) {
+          return stageShareImageCache.get(src);
+        }
+        const imagePromise = new Promise((resolve) => {
+          const image = new Image();
+          let settled = false;
+          const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+          };
+          image.decoding = "async";
+          image.onload = () => finish(image);
+          image.onerror = () => finish(null);
+          image.src = src;
+          if (typeof image.decode === "function") {
+            image.decode().then(() => finish(image)).catch(() => {});
+          }
+        });
+        stageShareImageCache.set(src, imagePromise);
+        return imagePromise;
+      }
 
       function getStageSharePlayerName() {
         if (typeof window.getPlayerName === "function") {
@@ -622,6 +648,7 @@
         {
           const playerName = getStageSharePlayerName();
           const leaderboardRows = await getStageShareLeaderboardRows(payload);
+          const turboWavingImage = await loadStageShareImage("imgs/Sloths/transparent/turbo_waving.png");
           const canvas = document.createElement("canvas");
           canvas.width = 1200;
           canvas.height = 1328;
@@ -758,9 +785,23 @@
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
 
+          if (turboWavingImage && turboWavingImage.naturalWidth > 0 && turboWavingImage.naturalHeight > 0) {
+            const turboHeight = 204;
+            const turboWidth = turboWavingImage.naturalWidth * (turboHeight / turboWavingImage.naturalHeight);
+            const turboX = cardFrameX + cardFrameWidth - turboWidth - 72;
+            const turboY = photoY + photoHeight + 8;
+            ctx.save();
+            ctx.shadowColor = "rgba(67, 37, 16, 0.26)";
+            ctx.shadowBlur = 18;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 10;
+            ctx.drawImage(turboWavingImage, turboX, turboY, turboWidth, turboHeight);
+            ctx.restore();
+          }
+
           ctx.fillStyle = "#10233c";
           ctx.font = '700 34px "Space Grotesk", "Trebuchet MS", sans-serif';
-          drawWrappedStageShareText(ctx, footerCta, 168, 1128, 840, 42, 2);
+          drawWrappedStageShareText(ctx, footerCta, 168, 1128, 620, 42, 2);
 
           ctx.restore();
           return canvas;

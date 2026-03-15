@@ -1077,6 +1077,7 @@
           area: "content_reset_modal",
           action: "open"
         });
+        clearSplashAutoStart();
         setModalState(modal, true);
       }
 
@@ -2550,6 +2551,7 @@
         splashStartListener = (event) => {
           if (document.body.classList.contains("loading-overlay") || document.body.dataset.view === "loading") return;
           if (document.body.dataset.view !== "splash") return;
+          if (document.querySelector('.modal.show:not([aria-hidden="true"])')) return;
           if (
             event &&
             event.target &&
@@ -6837,6 +6839,9 @@ function runFlashCountdown(onComplete) {
           close_source: source || "unknown"
         });
         setModalState(contentResetModal, false);
+        if (document.body && document.body.dataset.view === "splash") {
+          scheduleSplashAutoStart();
+        }
       };
       if (contentResetClose && contentResetModal) {
         contentResetClose.addEventListener("click", () => {
