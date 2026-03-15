@@ -1505,6 +1505,8 @@
       let splashIconSwapTimers = [];
       let splashIconSwapLast = null;
       const SPLASH_ICON_SWAP_VIEWS = new Set(["splash", "home", "stages"]);
+      const isSlothEnabled = () =>
+        typeof window.isSlothEnabled === "function" ? window.isSlothEnabled() : true;
 
       function normalizeTurboStoryState(value) {
         const raw = String(value || "").trim().toLowerCase();
@@ -1535,18 +1537,22 @@
       }
 
       function shouldShowTurboCompanions() {
+        if (!isSlothEnabled()) return false;
         return turboStoryState !== TURBO_STORY_STATE_ASCENDED;
       }
 
       function shouldShowSandboxAngelTurbo() {
+        if (!isSlothEnabled()) return false;
         return turboStoryState === TURBO_STORY_STATE_ASCENDED;
       }
 
       function shouldShowSandboxWavingTurbo() {
+        if (!isSlothEnabled()) return false;
         return turboStoryState === TURBO_STORY_STATE_RESTORED;
       }
 
       function shouldShowFloatingAngel() {
+        if (!isSlothEnabled()) return false;
         return Boolean(
           turboStoryState === TURBO_STORY_STATE_RESTORED &&
           document.body &&
@@ -1757,6 +1763,7 @@
       }
 
       function ensureFloatingAngelActor() {
+        if (!isSlothEnabled()) return;
         if (floatingAngelLayer && document.body && floatingAngelLayer.parentNode !== document.body) {
           document.body.appendChild(floatingAngelLayer);
         }
@@ -1829,6 +1836,13 @@
         const buttonEl = document.getElementById("sandboxTurboStoryButton");
         const imageEl = document.getElementById("sandboxTurboStoryImage");
         if (!(storyEl && buttonEl && imageEl)) return;
+        if (!isSlothEnabled()) {
+          storyEl.hidden = true;
+          storyEl.style.removeProperty("--sandbox-turbo-opacity");
+          storyEl.classList.remove("is-restoring", "is-restored");
+          buttonEl.disabled = true;
+          return;
+        }
         const showAngel = shouldShowSandboxAngelTurbo();
         const showWaving = shouldShowSandboxWavingTurbo();
         if (!showAngel && !showWaving) {
@@ -1856,6 +1870,12 @@
         const startButton = stageIntroStart;
         const startWrap = startButton && startButton.parentElement;
         if (!(turboEl && startButton && startWrap)) return;
+        if (!isSlothEnabled()) {
+          turboEl.hidden = true;
+          startButton.classList.remove("stage-intro-start--with-turbo");
+          startWrap.classList.remove("stage-intro-start-wrap--turbo");
+          return;
+        }
         const latestUnlockedStageIndex = getLatestUnlockedStageIndex();
         const showTurbo = Number.isFinite(stageIndex) &&
           stageIndex === latestUnlockedStageIndex &&
@@ -1867,6 +1887,17 @@
 
       function applyTurboStoryState(nextState, options = {}) {
         turboStoryState = normalizeTurboStoryState(nextState);
+        if (!isSlothEnabled()) {
+          if (document.body && document.body.dataset) {
+            document.body.dataset.turboStory = TURBO_STORY_STATE_ACTIVE;
+          }
+          stopSplashTurboCycle();
+          hideFloatingAngel();
+          clearFloatingAngelTimer();
+          syncSandboxTurboStory();
+          syncStageIntroPreviewTurbo();
+          return;
+        }
         if (document.body && document.body.dataset) {
           document.body.dataset.turboStory = turboStoryState;
         }
@@ -1964,12 +1995,14 @@
       }
 
       function syncSplashTurboAchievementProgress() {
+        if (!isSlothEnabled()) return;
         if (typeof window.syncAchievementsFromLocal === "function") {
           window.syncAchievementsFromLocal({ turboBestStreak: splashTurboBestStreak });
         }
       }
 
       function preloadTurboClickSounds() {
+        if (!isSlothEnabled()) return;
         if (turboClickAudioPools.length) {
           return;
         }
@@ -2005,6 +2038,7 @@
       }
 
       function playRandomTurboClickSound() {
+        if (!isSlothEnabled()) return;
         preloadTurboClickSounds();
         if (!turboClickAudioPools.length) return;
         const volume = getEffectsMixVolume();
@@ -2070,6 +2104,7 @@
       }
 
       function handleTurboSoundInteraction(event) {
+        if (!isSlothEnabled()) return;
         if (event && "button" in event && Number(event.button) !== 0) return;
         const turboTarget = resolveTurboSoundTarget(event.target);
         if (!turboTarget) return;
@@ -2111,6 +2146,7 @@
       }
 
       function preloadSplashTurboSprites() {
+        if (!isSlothEnabled()) return;
         if (splashTurboPreloadImages.length) {
           return;
         }
@@ -2127,6 +2163,7 @@
       }
 
       function preloadGameplayTurboSprites() {
+        if (!isSlothEnabled()) return;
         if (gameplayTurboPreloadImages.length) {
           return;
         }
@@ -2198,6 +2235,9 @@
       }
 
       function canShowSplashTurbo() {
+        if (!isSlothEnabled()) {
+          return false;
+        }
         return Boolean(
           shouldShowTurboCompanions() &&
           splashScreen &&
@@ -2400,6 +2440,7 @@
       }
 
       function startSplashTurboCycle() {
+        if (!isSlothEnabled()) return;
         splashTurboBestStreak = 0;
         try {
           window.localStorage.removeItem(SPLASH_TURBO_BEST_STREAK_STORAGE_KEY);
@@ -2977,6 +3018,7 @@
       }
 
       function preloadSlothJumpscareImage() {
+        if (!isSlothEnabled()) return;
         if (jumpscarePreloadImage) {
           return;
         }
@@ -2990,7 +3032,7 @@
       preloadSlothJumpscareImage();
 
       function shouldTriggerSlothJumpscare() {
-        return JUMPSCARE_TEST_ALWAYS;
+        return isSlothEnabled() && JUMPSCARE_TEST_ALWAYS;
       }
 
       function hideSlothJumpscare() {
@@ -4518,6 +4560,7 @@ function runFlashCountdown(onComplete) {
       }
 
       function maybeUnlockTurboImposterAchievement(stageId, stageVersion) {
+        if (!isSlothEnabled()) return;
         const messageEl = getResultCompetitionMessageElement(stageId, stageVersion);
         if (!messageEl || messageEl.dataset.imposterAchievementUnlocked === "1") {
           return;

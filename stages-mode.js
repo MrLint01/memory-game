@@ -175,9 +175,20 @@
 
   let abVariant = assignAbVariant();
   applyAbVariantStages(abVariant);
+  const updateSlothVariantState = () => {
+    const enabled = abVariant !== "B";
+    if (document.body && document.body.dataset) {
+      document.body.dataset.sloth = enabled ? "on" : "off";
+    }
+    return enabled;
+  };
+  updateSlothVariantState();
 
   window.getAbVariant = function getAbVariant() {
     return abVariant;
+  };
+  window.isSlothEnabled = function isSlothEnabled() {
+    return abVariant !== "B";
   };
   window.setAbVariant = function setAbVariant(nextVariant, options = {}) {
     const normalized = normalizeAbVariant(nextVariant);
@@ -185,6 +196,7 @@
     abVariant = normalized;
     safeSetStorageItem(AB_VARIANT_STORAGE_KEY, abVariant);
     applyAbVariantStages(abVariant);
+    updateSlothVariantState();
     if (!options || options.reload !== false) {
       try {
         window.location.reload();

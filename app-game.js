@@ -766,6 +766,9 @@
       }
 
       function buildResultCompetitionSpeakerMarkup(stageId, stageVersion, elapsedSeconds, initialMessage, isFinalStage = false) {
+        if (typeof window.isSlothEnabled === "function" && !window.isSlothEnabled()) {
+          return "";
+        }
         const safeInitialMessage = initialMessage || "Good job completing the level!";
         const finalStageMessage = "You beat the final level, looks like you have nothing left to learn from me.";
         return `
