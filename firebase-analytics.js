@@ -325,6 +325,7 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "stars_total_100", title: "Star Hoard", description: "Collect 100 stars.", iconText: "100\u2605" },
   { id: "stars_total_150", title: "Star Vault", description: "Collect 150 stars.", iconText: "150\u2605" },
   ...buildLeaderboardPlacementAchievementDefinitions(),
+  { id: "share_leaderboard", title: "Share It", description: "Share your leaderboard position with your friends!", iconSrc: "imgs/icons/export-share-icon.svg" },
   { id: "time_minutes_10", title: "Ten Minutes In", description: "Spend 10 total in-level minutes in game.", iconSrc: HOURGLASS_ICON_SRC, iconBadge: "I" },
   { id: "time_minutes_100", title: "Century Club", description: "Spend 100 total in-level minutes in game.", iconSrc: HOURGLASS_ICON_SRC, iconBadge: "II" },
   { id: "theme_changed", title: "Fresh Paint", description: "Change your theme.", iconSrc: PAINT_ICON_SRC },
@@ -374,7 +375,7 @@ function getAchievementDifficultyScore(definition) {
   if (/^sandbox_complete_100$/.test(id)) return 80;
   if (/^sandbox_complete_10$/.test(id)) return 58;
   if (/^sandbox_complete_1$/.test(id)) return 20;
-  if (/^first_steps$/.test(id)) return 10;
+  if (/^first_steps$|^share_leaderboard$/.test(id)) return 10;
   if (/^complete_1$|^attempt_10$|^fail_1$|^stars_level_1$|^stars_total_50$|^complete_(flash|tutorial|challenge)_1$/.test(id)) return 18;
   return 45;
 }
@@ -723,6 +724,7 @@ function getDefaultAchievementProfile() {
     monochrome_win: false,
     leaderboard_top_5: false,
     leaderboard_first_place: false,
+    shared_leaderboard: false,
     leaderboard_placements: {},
     used_modifiers: {},
     card_type_counts: {},
@@ -777,6 +779,7 @@ function normalizeAchievementProfile(raw) {
   base.monochrome_win = Boolean(source.monochrome_win);
   base.leaderboard_top_5 = Boolean(source.leaderboard_top_5);
   base.leaderboard_first_place = Boolean(source.leaderboard_first_place);
+  base.shared_leaderboard = Boolean(source.shared_leaderboard);
   base.leaderboard_placements = normalizeAchievementCounterMap(source.leaderboard_placements);
   base.used_modifiers = source.used_modifiers && typeof source.used_modifiers === "object"
     ? { ...source.used_modifiers }
@@ -963,6 +966,7 @@ function normalizeAchievementUpdate(update = {}) {
     monochromeWin: false,
     leaderboardTop5: false,
     leaderboardFirstPlace: false,
+    sharedLeaderboard: false,
     leaderboardPlacements: [],
     usedModifiers: [],
     cardTypeCounts: {},
@@ -1011,6 +1015,7 @@ function normalizeAchievementUpdate(update = {}) {
   base.monochromeWin = Boolean(update.monochromeWin);
   base.leaderboardTop5 = Boolean(update.leaderboardTop5);
   base.leaderboardFirstPlace = Boolean(update.leaderboardFirstPlace);
+  base.sharedLeaderboard = Boolean(update.sharedLeaderboard);
   base.leaderboardPlacements = Array.isArray(update.leaderboardPlacements)
     ? Array.from(new Set(
       update.leaderboardPlacements
@@ -1103,6 +1108,7 @@ function mergeAchievementUpdateInputs(...updates) {
     merged.monochromeWin = merged.monochromeWin || update.monochromeWin;
     merged.leaderboardTop5 = merged.leaderboardTop5 || update.leaderboardTop5;
     merged.leaderboardFirstPlace = merged.leaderboardFirstPlace || update.leaderboardFirstPlace;
+    merged.sharedLeaderboard = merged.sharedLeaderboard || update.sharedLeaderboard;
     merged.leaderboardPlacements = Array.from(new Set(merged.leaderboardPlacements.concat(update.leaderboardPlacements)));
     merged.usedModifiers = Array.from(new Set(merged.usedModifiers.concat(update.usedModifiers)));
     merged.cardTypeCounts = {
@@ -1224,6 +1230,7 @@ function mergeAchievementProfileWithUpdate(profile, update) {
   next.monochrome_win = next.monochrome_win || normalized.monochromeWin;
   next.leaderboard_top_5 = next.leaderboard_top_5 || normalized.leaderboardTop5;
   next.leaderboard_first_place = next.leaderboard_first_place || normalized.leaderboardFirstPlace;
+  next.shared_leaderboard = next.shared_leaderboard || normalized.sharedLeaderboard;
   normalized.leaderboardPlacements.forEach((place) => {
     next.leaderboard_placements[place] = 1;
   });
@@ -1317,6 +1324,7 @@ function getAchievementUnlockIds(profile) {
       unlocks.push(`leaderboard_place_${numericPlace}`);
     }
   });
+  if (profile.shared_leaderboard) unlocks.push("share_leaderboard");
   if (profile.total_time_seconds >= 10 * 60) unlocks.push("time_minutes_10");
   if (profile.total_time_seconds >= 100 * 60) unlocks.push("time_minutes_100");
   if (profile.theme_changed) unlocks.push("theme_changed");
@@ -1434,6 +1442,7 @@ async function applyAchievementUpdate(update = {}, options = {}) {
         monochrome_win: nextProfile.monochrome_win,
         leaderboard_top_5: nextProfile.leaderboard_top_5,
         leaderboard_first_place: nextProfile.leaderboard_first_place,
+        shared_leaderboard: nextProfile.shared_leaderboard,
         leaderboard_placements: nextProfile.leaderboard_placements,
         used_modifiers: nextProfile.used_modifiers,
         card_type_counts: nextProfile.card_type_counts,

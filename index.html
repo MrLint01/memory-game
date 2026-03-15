@@ -14,7 +14,7 @@
         display: flex !important;
       }
     </style>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=20260314" />
     <link rel="preload" href="imgs/back_button.png" as="image" />
     <link rel="preload" href="imgs/chain_1.png" as="image" />
     <link rel="preload" href="imgs/chain_2.png" as="image" />
@@ -541,6 +541,28 @@
         <div class="modal-actions">
           <button id="sandboxUnlockCancel" class="secondary" type="button">Cancel</button>
           <button id="sandboxUnlockConfirm" type="button">Unlock</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal" id="sharePreviewModal" aria-hidden="true">
+      <div class="modal-card modal-card--muted modal-card--share-preview">
+        <button class="interrupt-close icon-button modal-close" id="sharePreviewClose" type="button" aria-label="Close share preview">
+          <img class="action-icon" src="imgs/x_button.png" alt="" />
+        </button>
+        <h3>Share Result</h3>
+        <div class="share-preview-frame">
+          <img id="sharePreviewImage" alt="Preview of the score share image" />
+        </div>
+        <div class="share-preview-status" id="sharePreviewStatus" aria-live="polite"></div>
+        <div class="modal-actions share-preview-actions">
+          <button id="sharePreviewCopy" class="secondary share-preview-action" type="button" aria-label="Copy share image">
+            <img class="action-icon" src="imgs/icons/copy-icon.svg" alt="" />
+            <span>Copy</span>
+          </button>
+          <button id="sharePreviewDownload" class="share-preview-action" type="button" aria-label="Download share image">
+            <img class="action-icon" src="imgs/icons/download.svg" alt="" />
+            <span>Download</span>
+          </button>
         </div>
       </div>
     </div>

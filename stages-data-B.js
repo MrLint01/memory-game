@@ -160,7 +160,7 @@
     {
   "id": 4,
   "version": 11,
-  "name": "Stage 3",
+  "name": "Stage 4",
   "stageType": "memory",
   "rounds": 2,
   "cards": 3,

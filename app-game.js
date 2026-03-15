@@ -45,7 +45,8 @@
         correct: createEffectAudio("audio/correct.wav"),
         wrong: createEffectAudio("audio/funny-fail.wav"),
         button: createEffectAudio("audio/button-click.wav"),
-        levelComplete: createEffectAudio("audio/level-completed.wav")
+        levelComplete: createEffectAudio("audio/level-completed.wav"),
+        achievement: createEffectAudio("audio/acheivement.mp3")
       };
       let effectsAudioUnlocked = false;
       let pendingEffectAudio = null;
@@ -137,6 +138,905 @@
       function playLevelCompletedSound() {
         playEffectAudio(effectAudioClips.levelComplete);
       }
+      function playAchievementSound() {
+        playEffectAudio(effectAudioClips.achievement);
+      }
+
+      const sharePreviewModal = document.getElementById("sharePreviewModal");
+      const sharePreviewImage = document.getElementById("sharePreviewImage");
+      const sharePreviewStatus = document.getElementById("sharePreviewStatus");
+      const sharePreviewCopy = document.getElementById("sharePreviewCopy");
+      const sharePreviewDownload = document.getElementById("sharePreviewDownload");
+      const sharePreviewClose = document.getElementById("sharePreviewClose");
+      let currentStageResultShareData = null;
+      let stageResultShareBusy = false;
+      let currentStageSharePreviewBlob = null;
+      let currentStageSharePreviewUrl = "";
+      let currentStageSharePreviewFileName = "";
+      let currentStageSharePreviewKey = "";
+
+      function getStageSharePlayerName() {
+        if (typeof window.getPlayerName === "function") {
+          const direct = String(window.getPlayerName() || "").trim();
+          if (direct) return direct;
+        }
+        if (typeof window.getLeaderboardDisplayName === "function") {
+          const fallback = String(window.getLeaderboardDisplayName() || "").trim();
+          if (fallback) return fallback;
+        }
+        return "A player";
+      }
+
+      function getStageShareUrl() {
+        try {
+          const current = new URL(window.location.href);
+          const path = `${current.origin}${current.pathname}`.replace(/\/+$/, "");
+          return path || current.href;
+        } catch (error) {
+          return String(window.location.href || "");
+        }
+      }
+
+      function getStageShareUrlDisplay(url) {
+        try {
+          const current = new URL(url);
+          const compactPath = current.pathname === "/" ? "" : current.pathname.replace(/\/+$/, "");
+          return `${current.host}${compactPath}`;
+        } catch (error) {
+          return String(url || "");
+        }
+      }
+
+      function formatStageShareTime(seconds) {
+        const value = Number(seconds);
+        return Number.isFinite(value) ? `${value.toFixed(2)}s` : "--";
+      }
+
+      function buildStageSharePreviewKey(payload = currentStageResultShareData) {
+        if (!payload) return "";
+        return [
+          payload.stageId || "",
+          payload.stageVersion || "",
+          Number(payload.elapsedSeconds || 0).toFixed(3),
+          Number(payload.stars || 0),
+          getStageSharePlayerName()
+        ].join("|");
+      }
+
+      function setStageSharePreviewStatus(message = "", isError = false) {
+        if (!sharePreviewStatus) return;
+        sharePreviewStatus.textContent = message;
+        sharePreviewStatus.classList.toggle("is-error", Boolean(isError && message));
+      }
+
+      function revokeStageSharePreviewUrl() {
+        if (!currentStageSharePreviewUrl) return;
+        URL.revokeObjectURL(currentStageSharePreviewUrl);
+        currentStageSharePreviewUrl = "";
+      }
+
+      function clearStageSharePreview() {
+        revokeStageSharePreviewUrl();
+        currentStageSharePreviewBlob = null;
+        currentStageSharePreviewFileName = "";
+        currentStageSharePreviewKey = "";
+        if (sharePreviewImage) {
+          sharePreviewImage.removeAttribute("src");
+        }
+        setStageSharePreviewStatus("");
+      }
+
+      function isStageSharePreviewOpen() {
+        return Boolean(sharePreviewModal && sharePreviewModal.classList.contains("show"));
+      }
+
+      function closeStageSharePreviewModal() {
+        if (!sharePreviewModal) return;
+        sharePreviewModal.classList.remove("show");
+        sharePreviewModal.setAttribute("aria-hidden", "true");
+        clearStageSharePreview();
+        setStageSharePreviewStatus("");
+      }
+
+      function openStageSharePreviewModal() {
+        if (!sharePreviewModal) return false;
+        sharePreviewModal.classList.add("show");
+        sharePreviewModal.setAttribute("aria-hidden", "false");
+        return true;
+      }
+
+      function canCopyStageSharePreviewImage() {
+        return Boolean(
+          currentStageSharePreviewBlob &&
+          typeof ClipboardItem !== "undefined" &&
+          typeof navigator !== "undefined" &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.write === "function"
+        );
+      }
+
+      function syncStageSharePreviewActions() {
+        if (sharePreviewCopy) {
+          sharePreviewCopy.disabled = !canCopyStageSharePreviewImage();
+        }
+        if (sharePreviewDownload) {
+          sharePreviewDownload.disabled = !currentStageSharePreviewBlob;
+        }
+      }
+
+      function setStageSharePreviewBlob(blob, fileName, previewKey) {
+        if (!blob) return;
+        revokeStageSharePreviewUrl();
+        currentStageSharePreviewBlob = blob;
+        currentStageSharePreviewFileName = fileName || "flash-recall-level.png";
+        currentStageSharePreviewKey = previewKey || "";
+        currentStageSharePreviewUrl = URL.createObjectURL(blob);
+        if (sharePreviewImage) {
+          sharePreviewImage.src = currentStageSharePreviewUrl;
+        }
+        syncStageSharePreviewActions();
+      }
+
+      function unlockStageShareAchievement() {
+        if (typeof window.syncAchievementsFromLocal !== "function") return;
+        window.syncAchievementsFromLocal({
+          sharedLeaderboard: true
+        }).catch((error) => {
+          console.warn("Failed to unlock share achievement", error);
+        });
+      }
+
+      async function copyStageSharePreviewToClipboard() {
+        if (!currentStageSharePreviewBlob) {
+          setStageSharePreviewStatus("Create a preview first.", true);
+          return false;
+        }
+        if (!canCopyStageSharePreviewImage()) {
+          setStageSharePreviewStatus("Image copy is not supported in this browser.", true);
+          return false;
+        }
+        try {
+          const item = new ClipboardItem({
+            [currentStageSharePreviewBlob.type || "image/png"]: currentStageSharePreviewBlob
+          });
+          await navigator.clipboard.write([item]);
+          setStageSharePreviewStatus("Share image copied.");
+          unlockStageShareAchievement();
+          return true;
+        } catch (error) {
+          console.warn("Failed to copy share image", error);
+          setStageSharePreviewStatus("Couldn't copy the share image.", true);
+          return false;
+        }
+      }
+
+      function downloadStageSharePreview() {
+        if (!currentStageSharePreviewBlob) {
+          setStageSharePreviewStatus("Create a preview first.", true);
+          return false;
+        }
+        downloadStageResultShareBlob(
+          currentStageSharePreviewBlob,
+          currentStageSharePreviewFileName || "flash-recall-level.png"
+        );
+        setStageSharePreviewStatus("Share image downloaded.");
+        unlockStageShareAchievement();
+        return true;
+      }
+
+      function truncateStageShareText(value, maxLength = 28) {
+        const text = String(value || "").trim();
+        if (text.length <= maxLength) return text;
+        return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+      }
+
+      function wrapStageShareText(ctx, text, maxWidth, maxLines = Infinity) {
+        const tokens = String(text || "").split(/\s+/).filter(Boolean);
+        if (!tokens.length) return [""];
+        const lines = [];
+        let current = "";
+        tokens.forEach((token) => {
+          const candidate = current ? `${current} ${token}` : token;
+          if (current && ctx.measureText(candidate).width > maxWidth) {
+            lines.push(current);
+            current = token;
+            return;
+          }
+          current = candidate;
+        });
+        if (current) {
+          lines.push(current);
+        }
+        if (lines.length <= maxLines) {
+          return lines;
+        }
+        const clipped = lines.slice(0, maxLines);
+        const lastIndex = maxLines - 1;
+        while (clipped[lastIndex] && ctx.measureText(`${clipped[lastIndex]}…`).width > maxWidth) {
+          clipped[lastIndex] = clipped[lastIndex].slice(0, -1).trim();
+        }
+        clipped[lastIndex] = `${clipped[lastIndex]}…`;
+        return clipped;
+      }
+
+      function drawWrappedStageShareText(ctx, text, x, y, maxWidth, lineHeight, maxLines = Infinity) {
+        const lines = wrapStageShareText(ctx, text, maxWidth, maxLines);
+        lines.forEach((line, index) => {
+          ctx.fillText(line, x, y + index * lineHeight);
+        });
+        return lines.length;
+      }
+
+      function roundedStageShareRectPath(ctx, x, y, width, height, radius) {
+        const nextRadius = Math.max(0, Math.min(radius, width / 2, height / 2));
+        ctx.beginPath();
+        ctx.moveTo(x + nextRadius, y);
+        ctx.lineTo(x + width - nextRadius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + nextRadius);
+        ctx.lineTo(x + width, y + height - nextRadius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - nextRadius, y + height);
+        ctx.lineTo(x + nextRadius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - nextRadius);
+        ctx.lineTo(x, y + nextRadius);
+        ctx.quadraticCurveTo(x, y, x + nextRadius, y);
+        ctx.closePath();
+      }
+
+      function fillStageShareRoundRect(ctx, x, y, width, height, radius, fillStyle) {
+        ctx.save();
+        roundedStageShareRectPath(ctx, x, y, width, height, radius);
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function strokeStageShareRoundRect(ctx, x, y, width, height, radius, strokeStyle, lineWidth = 1) {
+        ctx.save();
+        roundedStageShareRectPath(ctx, x, y, width, height, radius);
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawStageSharePill(ctx, x, y, text, options = {}) {
+        const paddingX = Number.isFinite(options.paddingX) ? options.paddingX : 18;
+        const paddingY = Number.isFinite(options.paddingY) ? options.paddingY : 10;
+        const radius = Number.isFinite(options.radius) ? options.radius : 999;
+        ctx.save();
+        ctx.font = options.font || '700 24px "Space Grotesk", "Trebuchet MS", sans-serif';
+        const width = ctx.measureText(text).width + paddingX * 2;
+        const height = (Number.isFinite(options.height) ? options.height : 42);
+        fillStageShareRoundRect(
+          ctx,
+          x,
+          y,
+          width,
+          height,
+          radius,
+          options.fill || "rgba(255, 255, 255, 0.18)"
+        );
+        if (options.stroke) {
+          strokeStageShareRoundRect(ctx, x, y, width, height, radius, options.stroke, options.lineWidth || 1.5);
+        }
+        ctx.fillStyle = options.color || "#ffffff";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, x + paddingX, y + height / 2 + 1);
+        ctx.restore();
+        return { width, height };
+      }
+
+      function drawStageShareStars(ctx, x, y, stars, size = 34) {
+        {
+          const earnedStars = Math.max(0, Math.floor(Number(stars) || 0));
+          ctx.save();
+          ctx.font = `700 ${size}px "Trebuchet MS", sans-serif`;
+          ctx.textBaseline = "middle";
+          for (let index = 0; index < earnedStars; index += 1) {
+            const isSecret = index === 3;
+            ctx.fillStyle = isSecret ? "#93C5FD" : "#FDB022";
+            ctx.shadowColor = isSecret ? "rgba(147, 197, 253, 0.75)" : "rgba(49, 22, 1, 0.45)";
+            ctx.shadowBlur = isSecret ? 12 : 6;
+            ctx.fillText("\u2726", x + index * (size + 12), y);
+          }
+          ctx.restore();
+          return;
+        }
+        ctx.save();
+        ctx.font = `700 ${size}px "Trebuchet MS", sans-serif`;
+        ctx.textBaseline = "middle";
+        for (let index = 0; index < total; index += 1) {
+          const filled = index < stars;
+          ctx.fillStyle = filled ? "#f5b942" : "rgba(255, 255, 255, 0.28)";
+          ctx.fillText("★", x + index * (size + 10), y);
+        }
+        ctx.restore();
+      }
+
+      function createStageShareRandom(seed = 1) {
+        let value = Math.floor(Number(seed) || 1) % 2147483647;
+        if (value <= 0) value += 2147483646;
+        return () => {
+          value = value * 16807 % 2147483647;
+          return (value - 1) / 2147483646;
+        };
+      }
+
+      function collectRenderedStageShareLeaderboardRows() {
+        const listEl = document.getElementById("stageClearLeaderboardList");
+        if (!listEl) return [];
+        return Array.from(listEl.querySelectorAll(".leaderboard-row"))
+          .filter((row) => !row.classList.contains("leaderboard-row--empty"))
+          .map((row) => {
+            const spans = row.querySelectorAll("span");
+            if (spans.length < 3) return null;
+            const rank = String(spans[0].textContent || "").trim();
+            const name = String(spans[1].textContent || "").trim();
+            const time = String(spans[2].textContent || "").trim();
+            if (!rank || rank === "#" || !name || name === "Player") return null;
+            return {
+              rank,
+              name,
+              time,
+              isPlayer: row.classList.contains("leaderboard-row--me")
+                || row.classList.contains("leaderboard-row--me-top")
+            };
+          })
+          .filter(Boolean);
+      }
+
+      function buildStageShareLeaderboardRowsFromResult(result, payload) {
+        const localPlayerId = typeof window.getLeaderboardPlayerId === "function"
+          ? window.getLeaderboardPlayerId()
+          : "";
+        const localName = getStageSharePlayerName();
+        const currentTimeMs = Math.round(Number(payload.elapsedSeconds || 0) * 1000);
+        const currentRunRank = result && Number.isFinite(Number(result.currentRunRank))
+          ? Math.max(1, Number(result.currentRunRank))
+          : null;
+        const rows = [];
+        const top = result && Array.isArray(result.top) ? result.top : [];
+        const insertCurrentRunInTop = Boolean(currentRunRank && currentRunRank <= 5);
+        const otherEntries = top
+          .filter((entry) => !(entry && entry.player_id && entry.player_id === localPlayerId))
+          .slice(0, insertCurrentRunInTop ? 4 : 5);
+
+        otherEntries.forEach((entry, index) => {
+          const bestTimeMs = Number(entry && entry.best_time_ms);
+          const displayRank = insertCurrentRunInTop && index + 1 >= currentRunRank
+            ? index + 2
+            : index + 1;
+          const resolvedName = String(entry && entry.player_name ? entry.player_name : `Player ${displayRank}`);
+          rows.push({
+            rank: String(displayRank),
+            name: truncateStageShareText(resolvedName, 20),
+            time: Number.isFinite(bestTimeMs) ? `${(bestTimeMs / 1000).toFixed(2)}s` : "--",
+            isPlayer: false
+          });
+        });
+
+        const playerRow = {
+          rank: currentRunRank ? String(currentRunRank) : "YOU",
+          name: truncateStageShareText(localName, 20),
+          time: Number.isFinite(currentTimeMs) ? `${(currentTimeMs / 1000).toFixed(2)}s` : "--",
+          isPlayer: true
+        };
+
+        if (insertCurrentRunInTop) {
+          rows.splice(currentRunRank - 1, 0, playerRow);
+        } else {
+          rows.push(playerRow);
+        }
+
+        return rows.slice(0, 6);
+      }
+
+      async function getStageShareLeaderboardRows(payload) {
+        if (typeof window.fetchStageLeaderboard === "function") {
+          try {
+            const result = await window.fetchStageLeaderboard(
+              payload.stageId,
+              payload.stageVersion,
+              6,
+              Math.round(Number(payload.elapsedSeconds || 0) * 1000)
+            );
+            const fetchedRows = buildStageShareLeaderboardRowsFromResult(result, payload);
+            if (fetchedRows.length) {
+              return fetchedRows;
+            }
+          } catch (error) {
+            console.warn("Failed to fetch leaderboard for share image", error);
+          }
+        }
+        const renderedRows = collectRenderedStageShareLeaderboardRows()
+          .filter((row) => !row.isPlayer)
+          .slice(0, 5);
+        if (renderedRows.length) {
+          return renderedRows.concat([{
+            rank: "YOU",
+            name: truncateStageShareText(getStageSharePlayerName(), 20),
+            time: formatStageShareTime(payload.elapsedSeconds),
+            isPlayer: true
+          }]).slice(0, 6);
+        }
+        return [{
+          rank: "YOU",
+          name: truncateStageShareText(getStageSharePlayerName(), 20),
+          time: formatStageShareTime(payload.elapsedSeconds),
+          isPlayer: true
+        }];
+      }
+
+      function drawStageShareSnapshotCards(ctx, x, y, width, height, payload) {
+        const seed = (Number(payload.stageIndex) + 1) * 997 + Math.round(Number(payload.elapsedSeconds || 0) * 100);
+        const random = createStageShareRandom(seed);
+        const labels = [
+          `L${Number(payload.stageIndex) + 1}`,
+          truncateStageShareText(payload.stageType || "flash", 8).toUpperCase(),
+          `${payload.stars}★`,
+          "GO!",
+          truncateStageShareText(payload.stageName || "Stage", 7).toUpperCase(),
+          truncateStageShareText(getStageSharePlayerName(), 7).toUpperCase()
+        ];
+        const palette = [
+          "#f97316",
+          "#22c55e",
+          "#38bdf8",
+          "#f43f5e",
+          "#facc15",
+          "#c084fc",
+          "#fb7185",
+          "#2dd4bf"
+        ];
+        const columns = 2;
+        const rows = 3;
+        const gap = 16;
+        const cardWidth = (width - gap * (columns - 1)) / columns;
+        const cardHeight = (height - gap * (rows - 1)) / rows;
+        let labelIndex = 0;
+        for (let row = 0; row < rows; row += 1) {
+          for (let column = 0; column < columns; column += 1) {
+            const cardX = x + column * (cardWidth + gap);
+            const cardY = y + row * (cardHeight + gap);
+            const hueColor = palette[Math.floor(random() * palette.length) % palette.length];
+            fillStageShareRoundRect(ctx, cardX, cardY, cardWidth, cardHeight, 18, hueColor);
+            strokeStageShareRoundRect(ctx, cardX, cardY, cardWidth, cardHeight, 18, "rgba(255, 255, 255, 0.28)", 3);
+            ctx.save();
+            ctx.fillStyle = "rgba(15, 23, 42, 0.16)";
+            for (let stripe = 0; stripe < 5; stripe += 1) {
+              const stripeY = cardY + 10 + stripe * 18;
+              ctx.fillRect(cardX + 10, stripeY, cardWidth - 20, 8);
+            }
+            ctx.fillStyle = "#ffffff";
+            ctx.font = '700 32px "Anton", "Trebuchet MS", sans-serif';
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(labels[labelIndex], cardX + cardWidth / 2, cardY + cardHeight / 2 + 6);
+            ctx.restore();
+            labelIndex += 1;
+          }
+        }
+      }
+
+      async function buildStageResultShareCanvas(payload) {
+        {
+          const playerName = getStageSharePlayerName();
+          const leaderboardRows = await getStageShareLeaderboardRows(payload);
+          const canvas = document.createElement("canvas");
+          canvas.width = 1200;
+          canvas.height = 1328;
+          const ctx = canvas.getContext("2d");
+          const stageNumber = Number(payload.stageIndex) + 1;
+          const levelLabel = `LEVEL ${stageNumber}`;
+          const caption = `Check out the time ${playerName} got in Flash Recall!`;
+          const footerCta = "Come play the game yourself to beat their time!";
+          const photoX = 140;
+          const photoY = 270;
+          const photoWidth = 920;
+          const photoHeight = 790;
+          const cardFrameX = 86;
+          const cardFrameY = 72;
+          const cardFrameWidth = 1028;
+          const cardFrameHeight = 1200;
+
+          const backdropRadius = 42;
+          fillStageShareRoundRect(ctx, 0, 0, canvas.width, canvas.height, backdropRadius, "#eadfc8");
+          ctx.save();
+          roundedStageShareRectPath(ctx, 0, 0, canvas.width, canvas.height, backdropRadius);
+          ctx.clip();
+          for (let index = 0; index < 18; index += 1) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${index % 2 === 0 ? 0.08 : 0.04})`;
+            ctx.fillRect(index * 80, 0, 2, canvas.height);
+          }
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(-0.018);
+          ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+          ctx.save();
+          ctx.shadowColor = "rgba(60, 37, 14, 0.24)";
+          ctx.shadowBlur = 52;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 26;
+          fillStageShareRoundRect(ctx, cardFrameX, cardFrameY, cardFrameWidth, cardFrameHeight, 22, "#fffdf7");
+          ctx.restore();
+
+          fillStageShareRoundRect(ctx, cardFrameX, cardFrameY, cardFrameWidth, cardFrameHeight, 22, "#fffdf8");
+          strokeStageShareRoundRect(ctx, cardFrameX, cardFrameY, cardFrameWidth, cardFrameHeight, 22, "rgba(15, 23, 42, 0.08)", 2);
+
+          ctx.fillStyle = "#12243d";
+          ctx.font = '700 46px "Space Grotesk", "Trebuchet MS", sans-serif';
+          ctx.textBaseline = "top";
+          drawWrappedStageShareText(ctx, caption, 130, 128, 930, 54, 2);
+
+          const photoGradient = ctx.createLinearGradient(photoX, photoY, photoX + photoWidth, photoY + photoHeight);
+          photoGradient.addColorStop(0, "#17314b");
+          photoGradient.addColorStop(0.52, "#1f6c72");
+          photoGradient.addColorStop(1, "#f97316");
+          fillStageShareRoundRect(ctx, photoX, photoY, photoWidth, photoHeight, 14, photoGradient);
+          strokeStageShareRoundRect(ctx, photoX, photoY, photoWidth, photoHeight, 14, "rgba(255, 255, 255, 0.35)", 2);
+
+          const glow = ctx.createRadialGradient(photoX + 220, photoY + 170, 40, photoX + 220, photoY + 170, 340);
+          glow.addColorStop(0, "rgba(255,255,255,0.28)");
+          glow.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = glow;
+          ctx.fillRect(photoX, photoY, photoWidth, photoHeight);
+
+          const confettiRandom = createStageShareRandom(stageNumber * 41 + Math.round(Number(payload.elapsedSeconds || 0) * 100));
+          for (let index = 0; index < 42; index += 1) {
+            const dotX = photoX + confettiRandom() * photoWidth;
+            const dotY = photoY + confettiRandom() * photoHeight;
+            const dotSize = 3 + confettiRandom() * 7;
+            const hue = 190 + Math.floor(confettiRandom() * 170);
+            ctx.fillStyle = `hsla(${hue}, 90%, 78%, 0.38)`;
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, dotSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          const levelPill = drawStageSharePill(ctx, 176, 304, levelLabel, {
+            fill: "rgba(15, 23, 42, 0.68)",
+            stroke: "rgba(255, 255, 255, 0.18)",
+            color: "#ffffff",
+            font: '700 20px "Space Grotesk", "Trebuchet MS", sans-serif',
+            paddingX: 16,
+            height: 34
+          });
+          drawStageShareStars(ctx, 176 + levelPill.width + 54, 322, Number(payload.stars) || 0, 34);
+
+          fillStageShareRoundRect(ctx, 176, 362, 848, 660, 28, "rgba(255, 251, 245, 0.94)");
+          strokeStageShareRoundRect(ctx, 176, 362, 848, 660, 28, "rgba(15, 23, 42, 0.12)", 2);
+          ctx.fillStyle = "#10233c";
+          ctx.font = '700 34px "Space Grotesk", "Trebuchet MS", sans-serif';
+          ctx.fillText("Leaderboard", 216, 410);
+          const rowX = 208;
+          const rowWidth = 784;
+          const rankColumnWidth = 96;
+          const timeColumnWidth = 180;
+          const nameColumnWidth = rowWidth - rankColumnWidth - timeColumnWidth;
+          const rankCenterX = rowX + rankColumnWidth / 2;
+          const nameCenterX = rowX + rankColumnWidth + nameColumnWidth / 2;
+          const timeCenterX = rowX + rankColumnWidth + nameColumnWidth + timeColumnWidth / 2;
+
+          ctx.fillStyle = "rgba(16, 35, 60, 0.68)";
+          ctx.font = '700 16px "Space Grotesk", "Trebuchet MS", sans-serif';
+          ctx.textBaseline = "middle";
+          ctx.textAlign = "center";
+          ctx.fillText("#", rankCenterX, 478);
+          ctx.fillText("PLAYER", nameCenterX, 478);
+          ctx.fillText("TIME", timeCenterX, 478);
+
+          const renderedRows = leaderboardRows.length ? leaderboardRows : [{
+            rank: "YOU",
+            name: truncateStageShareText(playerName, 20),
+            time: formatStageShareTime(payload.elapsedSeconds),
+            isPlayer: true
+          }];
+          renderedRows.slice(0, 6).forEach((row, index) => {
+            const rowY = 510 + index * 76;
+            const rowCenterY = rowY + 29;
+            const isPlayer = Boolean(row.isPlayer);
+            fillStageShareRoundRect(
+              ctx,
+              rowX,
+              rowY,
+              rowWidth,
+              58,
+              18,
+              isPlayer ? "#10233c" : index % 2 === 0 ? "rgba(16, 35, 60, 0.04)" : "rgba(16, 35, 60, 0.09)"
+            );
+            ctx.fillStyle = isPlayer ? "#f9fafb" : "#10233c";
+            ctx.font = '700 21px "Space Grotesk", "Trebuchet MS", sans-serif';
+            ctx.textAlign = "center";
+            ctx.fillText(String(row.rank || "-"), rankCenterX, rowCenterY);
+            ctx.font = '700 20px "Space Grotesk", "Trebuchet MS", sans-serif';
+            ctx.fillText(truncateStageShareText(row.name || "Player", 24), nameCenterX, rowCenterY);
+            ctx.fillText(String(row.time || "--"), timeCenterX, rowCenterY);
+          });
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+
+          ctx.fillStyle = "#10233c";
+          ctx.font = '700 34px "Space Grotesk", "Trebuchet MS", sans-serif';
+          drawWrappedStageShareText(ctx, footerCta, 168, 1128, 840, 42, 2);
+
+          ctx.restore();
+          return canvas;
+        }
+        const playerName = getStageSharePlayerName();
+        const shareUrl = getStageShareUrl();
+        const urlDisplay = getStageShareUrlDisplay(shareUrl);
+        const leaderboardRows = await getStageShareLeaderboardRows(payload);
+        const canvas = document.createElement("canvas");
+        canvas.width = 1200;
+        canvas.height = 1500;
+        const ctx = canvas.getContext("2d");
+        const stageNumber = Number(payload.stageIndex) + 1;
+        const stageTitle = `Level ${stageNumber}${payload.stageName ? `: ${payload.stageName}` : ""}`;
+        const caption = `Check out the time ${playerName} got on ${stageTitle} in Flash Recall.`;
+        const footerCta = `Come play the game yourself to beat their time.`;
+        const photoX = 140;
+        const photoY = 270;
+        const photoWidth = 920;
+        const photoHeight = 790;
+        const cardFrameX = 86;
+        const cardFrameY = 72;
+        const cardFrameWidth = 1028;
+        const cardFrameHeight = 1356;
+        const titleChipText = truncateStageShareText(stageTitle, 28).toUpperCase();
+
+        ctx.fillStyle = "#eadfc8";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let index = 0; index < 18; index += 1) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${index % 2 === 0 ? 0.08 : 0.04})`;
+          ctx.fillRect(index * 80, 0, 2, canvas.height);
+        }
+
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(-0.018);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+        ctx.save();
+        ctx.shadowColor = "rgba(60, 37, 14, 0.24)";
+        ctx.shadowBlur = 52;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 26;
+        fillStageShareRoundRect(ctx, cardFrameX, cardFrameY, cardFrameWidth, cardFrameHeight, 22, "#fffdf7");
+        ctx.restore();
+
+        fillStageShareRoundRect(ctx, cardFrameX, cardFrameY, cardFrameWidth, cardFrameHeight, 22, "#fffdf8");
+        strokeStageShareRoundRect(ctx, cardFrameX, cardFrameY, cardFrameWidth, cardFrameHeight, 22, "rgba(15, 23, 42, 0.08)", 2);
+
+        ctx.fillStyle = "#12243d";
+        ctx.font = '700 46px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.textBaseline = "top";
+        drawWrappedStageShareText(ctx, caption, 130, 128, 860, 54, 3);
+
+        ctx.font = '700 18px "Space Grotesk", "Trebuchet MS", sans-serif';
+        drawStageSharePill(ctx, 926, 118, "FLASH RECALL", {
+          fill: "#12243d",
+          color: "#fffdf8",
+          font: '700 18px "Space Grotesk", "Trebuchet MS", sans-serif',
+          paddingX: 18,
+          height: 36
+        });
+
+        const photoGradient = ctx.createLinearGradient(photoX, photoY, photoX + photoWidth, photoY + photoHeight);
+        photoGradient.addColorStop(0, "#17314b");
+        photoGradient.addColorStop(0.45, "#1f6c72");
+        photoGradient.addColorStop(1, "#f97316");
+        fillStageShareRoundRect(ctx, photoX, photoY, photoWidth, photoHeight, 14, photoGradient);
+        strokeStageShareRoundRect(ctx, photoX, photoY, photoWidth, photoHeight, 14, "rgba(255, 255, 255, 0.35)", 2);
+
+        const glow = ctx.createRadialGradient(photoX + 200, photoY + 150, 40, photoX + 200, photoY + 150, 340);
+        glow.addColorStop(0, "rgba(255,255,255,0.28)");
+        glow.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(photoX, photoY, photoWidth, photoHeight);
+
+        const confettiRandom = createStageShareRandom(stageNumber * 41 + Math.round(Number(payload.elapsedSeconds || 0) * 100));
+        for (let index = 0; index < 42; index += 1) {
+          const dotX = photoX + confettiRandom() * photoWidth;
+          const dotY = photoY + confettiRandom() * photoHeight;
+          const dotSize = 3 + confettiRandom() * 7;
+          const hue = 190 + Math.floor(confettiRandom() * 170);
+          ctx.fillStyle = `hsla(${hue}, 90%, 78%, 0.38)`;
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, dotSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        drawStageSharePill(ctx, 176, 304, titleChipText, {
+          fill: "rgba(15, 23, 42, 0.64)",
+          stroke: "rgba(255, 255, 255, 0.18)",
+          color: "#ffffff",
+          font: '700 20px "Space Grotesk", "Trebuchet MS", sans-serif',
+          paddingX: 16,
+          height: 34
+        });
+        drawStageSharePill(ctx, 176, 348, formatStageShareTime(payload.elapsedSeconds), {
+          fill: "rgba(255, 255, 255, 0.18)",
+          color: "#ffffff",
+          font: '700 30px "Anton", "Trebuchet MS", sans-serif',
+          paddingX: 18,
+          height: 48
+        });
+        drawStageShareStars(ctx, 178, 430, Number(payload.stars) || 0, 4, 34);
+
+        fillStageShareRoundRect(ctx, 176, 470, 474, 470, 26, "rgba(10, 17, 32, 0.68)");
+        strokeStageShareRoundRect(ctx, 176, 470, 474, 470, 26, "rgba(255, 255, 255, 0.2)", 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+        ctx.font = '700 22px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillText("SNAPSHOT", 206, 514);
+        drawStageShareSnapshotCards(ctx, 206, 548, 414, 330, payload);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.74)";
+        ctx.font = '600 20px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillText("Beat this run in your next attempt.", 206, 912);
+
+        fillStageShareRoundRect(ctx, 694, 334, 322, 580, 24, "rgba(255, 251, 245, 0.92)");
+        strokeStageShareRoundRect(ctx, 694, 334, 322, 580, 24, "rgba(15, 23, 42, 0.12)", 2);
+        ctx.fillStyle = "#10233c";
+        ctx.font = '700 28px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillText("Leaderboard", 726, 382);
+        ctx.font = '600 17px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillStyle = "rgba(16, 35, 60, 0.66)";
+        ctx.fillText("Best times", 726, 410);
+
+        const renderedRows = leaderboardRows.length ? leaderboardRows : [{
+          rank: "YOU",
+          name: truncateStageShareText(playerName, 20),
+          time: formatStageShareTime(payload.elapsedSeconds),
+          isPlayer: true
+        }];
+        renderedRows.slice(0, 6).forEach((row, index) => {
+          const rowY = 446 + index * 78;
+          const isPlayer = Boolean(row.isPlayer);
+          fillStageShareRoundRect(
+            ctx,
+            716,
+            rowY,
+            278,
+            58,
+            18,
+            isPlayer ? "#10233c" : index % 2 === 0 ? "rgba(16, 35, 60, 0.04)" : "rgba(16, 35, 60, 0.09)"
+          );
+          ctx.fillStyle = isPlayer ? "#f9fafb" : "#10233c";
+          ctx.font = '700 21px "Space Grotesk", "Trebuchet MS", sans-serif';
+          ctx.fillText(String(row.rank || "-"), 738, rowY + 36);
+          ctx.font = '700 20px "Space Grotesk", "Trebuchet MS", sans-serif';
+          ctx.fillText(truncateStageShareText(row.name || "Player", 16), 790, rowY + 36);
+          ctx.textAlign = "right";
+          ctx.fillText(String(row.time || "--"), 972, rowY + 36);
+          ctx.textAlign = "left";
+        });
+
+        fillStageShareRoundRect(ctx, 168, 1128, 180, 92, 18, "#10233c");
+        fillStageShareRoundRect(ctx, 368, 1128, 210, 92, 18, "#f97316");
+        fillStageShareRoundRect(ctx, 598, 1128, 238, 92, 18, "#f5b942");
+        fillStageShareRoundRect(ctx, 856, 1128, 196, 92, 18, "#1f6c72");
+
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = '700 18px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillText("LEVEL", 194, 1152);
+        ctx.font = '700 34px "Anton", "Trebuchet MS", sans-serif';
+        ctx.fillText(String(stageNumber), 194, 1178);
+
+        ctx.font = '700 18px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillText("TIME", 394, 1152);
+        ctx.font = '700 34px "Anton", "Trebuchet MS", sans-serif';
+        ctx.fillText(formatStageShareTime(payload.elapsedSeconds), 394, 1178);
+
+        ctx.fillStyle = "#10233c";
+        ctx.font = '700 18px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillText("STARS", 624, 1152);
+        ctx.font = '700 34px "Anton", "Trebuchet MS", sans-serif';
+        ctx.fillText(`${Number(payload.stars) || 0}/4`, 624, 1178);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = '700 18px "Space Grotesk", "Trebuchet MS", sans-serif';
+        ctx.fillText("PLAYER", 882, 1152);
+        ctx.font = '700 28px "Anton", "Trebuchet MS", sans-serif';
+        ctx.fillText(truncateStageShareText(playerName.toUpperCase(), 11), 882, 1180);
+
+        ctx.fillStyle = "#10233c";
+        ctx.font = '700 30px "Space Grotesk", "Trebuchet MS", sans-serif';
+        drawWrappedStageShareText(ctx, footerCta, 168, 1274, 830, 38, 2);
+        ctx.fillStyle = "rgba(16, 35, 60, 0.76)";
+        ctx.font = '600 22px "Space Grotesk", "Trebuchet MS", sans-serif';
+        drawWrappedStageShareText(ctx, urlDisplay, 168, 1354, 860, 30, 2);
+
+        ctx.restore();
+        return canvas;
+      }
+
+      function stageResultCanvasToBlob(canvas) {
+        return new Promise((resolve) => {
+          if (!canvas || typeof canvas.toBlob !== "function") {
+            resolve(null);
+            return;
+          }
+          canvas.toBlob((blob) => {
+            resolve(blob || null);
+          }, "image/png");
+        });
+      }
+
+      function downloadStageResultShareBlob(blob, fileName) {
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => {
+          URL.revokeObjectURL(objectUrl);
+        }, 2000);
+      }
+
+      async function shareCurrentStageResultCard() {
+        if (stageResultShareBusy || !currentStageResultShareData) {
+          return false;
+        }
+        if (sharePreviewModal && currentStageSharePreviewBlob) {
+          const previewKey = buildStageSharePreviewKey();
+          if (previewKey && previewKey === currentStageSharePreviewKey) {
+            syncStageSharePreviewActions();
+            setStageSharePreviewStatus("");
+            return openStageSharePreviewModal();
+          }
+        }
+        stageResultShareBusy = true;
+        const shareButton = document.getElementById("stageShareButton");
+        const previousLabel = shareButton ? shareButton.getAttribute("aria-label") : "";
+        if (shareButton) {
+          shareButton.disabled = true;
+          shareButton.dataset.busy = "true";
+          shareButton.setAttribute("aria-label", "Preparing share image");
+        }
+        try {
+          if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready.catch(() => {});
+          }
+          const canvas = await buildStageResultShareCanvas(currentStageResultShareData);
+          const blob = await stageResultCanvasToBlob(canvas);
+          if (!blob) {
+            throw new Error("Could not create share image blob.");
+          }
+          const stageNumber = Number(currentStageResultShareData.stageIndex) + 1;
+          const fileName = `flash-recall-level-${stageNumber}.png`;
+          const previewKey = buildStageSharePreviewKey(currentStageResultShareData);
+          if (sharePreviewModal) {
+            setStageSharePreviewBlob(blob, fileName, previewKey);
+            setStageSharePreviewStatus("");
+            if (!canCopyStageSharePreviewImage()) {
+              setStageSharePreviewStatus("Use Download if image copy is not supported here.");
+            }
+            return openStageSharePreviewModal();
+          }
+          downloadStageResultShareBlob(blob, fileName);
+          return true;
+        } catch (error) {
+          console.warn("Failed to create share image", error);
+          setStageSharePreviewStatus("Couldn't create the share image.", true);
+          return false;
+        } finally {
+          if (shareButton) {
+            shareButton.disabled = false;
+            delete shareButton.dataset.busy;
+            if (previousLabel) {
+              shareButton.setAttribute("aria-label", previousLabel);
+            } else {
+              shareButton.removeAttribute("aria-label");
+            }
+          }
+          stageResultShareBusy = false;
+        }
+      }
 
       function getEffectAudioState(audio) {
         if (!audio) {
@@ -162,6 +1062,40 @@
       window.getCorrectSoundState = () => getEffectAudioState(effectAudioClips.correct);
       window.playWrongSound = playRoundWrongSound;
       window.getWrongSoundState = () => getEffectAudioState(effectAudioClips.wrong);
+      window.playAchievementSound = playAchievementSound;
+      window.getAchievementSoundState = () => getEffectAudioState(effectAudioClips.achievement);
+      window.shareCurrentStageResultCard = shareCurrentStageResultCard;
+      window.getCurrentStageResultShareData = () => currentStageResultShareData
+        ? { ...currentStageResultShareData }
+        : null;
+      window.closeStageSharePreviewModal = closeStageSharePreviewModal;
+      window.clearStageSharePreview = clearStageSharePreview;
+
+      if (sharePreviewClose && sharePreviewModal) {
+        sharePreviewClose.addEventListener("click", closeStageSharePreviewModal);
+      }
+      if (sharePreviewModal) {
+        sharePreviewModal.addEventListener("click", (event) => {
+          if (event.target === sharePreviewModal) {
+            closeStageSharePreviewModal();
+          }
+        });
+      }
+      if (sharePreviewCopy) {
+        sharePreviewCopy.addEventListener("click", () => {
+          copyStageSharePreviewToClipboard();
+        });
+      }
+      if (sharePreviewDownload) {
+        sharePreviewDownload.addEventListener("click", () => {
+          downloadStageSharePreview();
+        });
+      }
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !isStageSharePreviewOpen()) return;
+        event.preventDefault();
+        closeStageSharePreviewModal();
+      });
 
       function queuePendingEffectAudio() {
         if (pendingEffectAudioListenerAttached) return;
@@ -926,6 +1860,9 @@
                   <span class="action-countdown" aria-live="polite"></span>
                   <span class="action-key-hint" aria-hidden="true">(${retryKey})</span>
                 </button>
+                <button id="stageShareButton" class="secondary icon-button" type="button" aria-label="Share result image">
+                  <img class="action-icon" src="imgs/icons/export-share-icon.svg" alt="" />
+                </button>
                 <div class="stage-next-wrap">
                   <div class="stage-next-timer" aria-hidden="true">
                     <span class="stage-next-timer__fill"></span>
@@ -940,6 +1877,16 @@
           </div>
         `;
         resultsPanel.classList.add("show");
+        clearStageSharePreview();
+        currentStageResultShareData = {
+          stageIndex: stageState.index,
+          stageId,
+          stageVersion,
+          stageName,
+          stageType: stage && stage.stageType ? String(stage.stageType) : "",
+          elapsedSeconds,
+          stars
+        };
 
         if (typeof window.maybePromptPlayerName === "function") {
           window.maybePromptPlayerName();
@@ -2106,6 +3053,9 @@
           nextBtn.disabled = true;
         }
         resultsPanel.classList.remove("show");
+        closeStageSharePreviewModal();
+        clearStageSharePreview();
+        currentStageResultShareData = null;
         setPhase("Memorize the cards", "show");
         platformerState.required = isPlatformerEnabled();
         adEnabled = isAdEnabled();

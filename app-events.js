@@ -71,7 +71,8 @@
           "pastel-green",
           "pastel-blue",
           "pastel-purple",
-          "pastel-pink"
+          "pastel-pink",
+          "pastel-sage"
         ],
         colorVisionModes: ["standard", "protanopia", "deuteranopia", "tritanopia", "monochromacy"],
         layouts: ["classic"]
@@ -6324,18 +6325,29 @@ function runFlashCountdown(onComplete) {
       }
 
       const shownAchievementToastIds = new Set();
+      const ACHIEVEMENT_SOUND_COOLDOWN_MS = 1800;
+      let lastAchievementSoundAt = 0;
 
       function flushAchievementUnlockToasts(items = []) {
         const queuedItems = Array.isArray(window.flashRecallPendingAchievementUnlocks)
           ? window.flashRecallPendingAchievementUnlocks.splice(0)
           : [];
         const combined = [...queuedItems, ...(Array.isArray(items) ? items : [])];
+        let shownCount = 0;
         combined.forEach((item) => {
           const id = item && item.id ? String(item.id) : "";
           if (!id || shownAchievementToastIds.has(id)) return;
           shownAchievementToastIds.add(id);
           showAchievementUnlockToast(item);
+          shownCount += 1;
         });
+        if (shownCount > 0 && typeof window.playAchievementSound === "function") {
+          const now = Date.now();
+          if (now - lastAchievementSoundAt >= ACHIEVEMENT_SOUND_COOLDOWN_MS) {
+            lastAchievementSoundAt = now;
+            window.playAchievementSound();
+          }
+        }
       }
 
       function renderAchievementsOverviewLegacy(result) {
@@ -7337,6 +7349,19 @@ function runFlashCountdown(onComplete) {
           resetStageProgress();
           resetGame();
           openStagesScreen(true);
+          return;
+        }
+        const shareButton = event.target.closest("#stageShareButton");
+        if (shareButton) {
+          logUiInteraction("stage_share", {
+            area: "result_actions",
+            action: "click"
+          });
+          if (typeof window.shareCurrentStageResultCard === "function") {
+            Promise.resolve(window.shareCurrentStageResultCard()).catch((error) => {
+              console.warn("Failed to share stage result", error);
+            });
+          }
           return;
         }
         const nextButton = event.target.closest("#stageNextButton");
