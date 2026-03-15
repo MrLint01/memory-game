@@ -3281,6 +3281,7 @@ const revealInput = document.getElementById("revealTime");
           card.dataset.index = index;
           const displayItem =
             show && item.sequenceSteps && item.sequenceSteps.length ? item.sequenceSteps[0] : item;
+          card.classList.toggle("card--numbers", Boolean(displayItem && displayItem.category === "numbers"));
           applyCardContent(card, displayItem, show, index);
           cardGrid.appendChild(card);
         });

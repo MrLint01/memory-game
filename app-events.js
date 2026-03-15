@@ -2960,7 +2960,31 @@
       let stageListSkipListener = null;
       flashCountdownEnabled = defaultControlSettings.flashCountdown;
       enterToNextEnabled = true;
-      leaderboardsEnabled = true;
+      if (leaderboardsEnabledToggle) {
+        const storageKey = LEADERBOARDS_ENABLED_STORAGE_KEY;
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved !== null) {
+          leaderboardsEnabledToggle.checked = saved === "1";
+        } else {
+          leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
+        }
+        leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+        leaderboardsEnabledToggle.addEventListener("change", () => {
+          leaderboardsEnabled = leaderboardsEnabledToggle.checked;
+          window.localStorage.setItem(storageKey, leaderboardsEnabled ? "1" : "0");
+          logSettingChange("leaderboards_enabled", leaderboardsEnabled, {
+            setting_category: "controls"
+          });
+          logSettingsSnapshot("setting_change", {
+            setting_name: "leaderboards_enabled"
+          });
+          if (typeof window.refreshVisibleLeaderboards === "function") {
+            window.refreshVisibleLeaderboards();
+          }
+        });
+      } else {
+        leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
+      }
       let stageStarShineInterval = null;
       let resultAutoActionTimers = [];
       const RESULT_AUTO_ACTION_SECONDS = 3;
@@ -6007,7 +6031,7 @@ function runFlashCountdown(onComplete) {
             leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
             leaderboardsEnabled = leaderboardsEnabledToggle.checked;
           }
-            applyAudioSettings(defaultAudioSettings, true);
+          applyAudioSettings(defaultAudioSettings, true);
           keybinds = { ...defaultKeybinds };
           activeRebindAction = null;
           refreshKeybindButtons();
@@ -6202,6 +6226,7 @@ function runFlashCountdown(onComplete) {
         achievements_unlocked: { title: "Achievements leaderboard", valueLabel: "Achievements" }
       };
       let activeStatsLeaderboardTab = "stars_earned";
+      const REVEAL_SECRET_ACHIEVEMENTS = false;
 
       function maskAchievementText(text) {
         return String(text || "").replace(/[^\s]/g, "?");
@@ -6216,23 +6241,31 @@ function runFlashCountdown(onComplete) {
           .replace(/'/g, "&#39;");
       }
 
+      function getAchievementDisplayItem(item) {
+        if (!item) return item;
+        if (!REVEAL_SECRET_ACHIEVEMENTS) return item;
+        if (!item.secret || item.unlocked) return item;
+        return { ...item, unlocked: true, __secretRevealed: true };
+      }
+
       function buildAchievementIconMarkup(item) {
-        const isSecretLocked = item && item.secret && !item.unlocked;
+        const displayItem = getAchievementDisplayItem(item);
+        const isSecretLocked = displayItem && displayItem.secret && !displayItem.unlocked;
         if (isSecretLocked) {
           return '<span class="achievement-icon__text">?</span>';
         }
-        const badgeMarkup = item && item.iconBadge
-          ? `<span class="achievement-icon__badge">${escapeAchievementHtml(item.iconBadge)}</span>`
+        const badgeMarkup = displayItem && displayItem.iconBadge
+          ? `<span class="achievement-icon__badge">${escapeAchievementHtml(displayItem.iconBadge)}</span>`
           : "";
-        if (item && item.iconSrc) {
+        if (displayItem && displayItem.iconSrc) {
           return `
             <span class="achievement-icon__art">
-              <img class="achievement-icon__img" src="${item.iconSrc}" alt="" />
+              <img class="achievement-icon__img" src="${displayItem.iconSrc}" alt="" />
               ${badgeMarkup}
             </span>
           `;
         }
-        const text = item && item.iconText ? String(item.iconText) : "?";
+        const text = displayItem && displayItem.iconText ? String(displayItem.iconText) : "?";
         return `
           <span class="achievement-icon__art">
             <span class="achievement-icon__text">${text}</span>
@@ -6242,10 +6275,11 @@ function runFlashCountdown(onComplete) {
       }
 
       function getAchievementDisplayTitle(item) {
-        if (item && item.secret && !item.unlocked) {
-          return maskAchievementText(item.title);
+        const displayItem = getAchievementDisplayItem(item);
+        if (displayItem && displayItem.secret && !displayItem.unlocked) {
+          return maskAchievementText(displayItem.title);
         }
-        return String(item && item.title ? item.title : "");
+        return String(displayItem && displayItem.title ? displayItem.title : "");
       }
 
       function openAchievementInfoModal(item, totalPlayers) {
@@ -6256,18 +6290,19 @@ function runFlashCountdown(onComplete) {
         const descriptionEl = window.achievementInfoDescription;
         const metaEl = window.achievementInfoMeta;
         if (!(modal && card && icon && titleEl && descriptionEl && metaEl && item)) return;
-        const isSecretLocked = item.secret && !item.unlocked;
-        const title = getAchievementDisplayTitle(item);
-        const description = isSecretLocked ? maskAchievementText(item.description) : item.description;
-        const percentText = item.unlocked
-          ? `${Math.max(0, Number(item.percentUnlocked) || 0)}% of players`
+        const displayItem = getAchievementDisplayItem(item);
+        const isSecretLocked = displayItem.secret && !displayItem.unlocked;
+        const title = getAchievementDisplayTitle(displayItem);
+        const description = isSecretLocked ? maskAchievementText(displayItem.description) : displayItem.description;
+        const percentText = displayItem.unlocked
+          ? `${Math.max(0, Number(displayItem.percentUnlocked) || 0)}% of players`
           : "";
-        const playersText = item.unlocked && Number(totalPlayers) > 0
+        const playersText = displayItem.unlocked && Number(totalPlayers) > 0
           ? `${Math.max(0, Number(totalPlayers) || 0)} tracked players`
           : "";
-        card.style.setProperty("--achievement-accent", item.difficultyColor || "var(--accent)");
-        card.classList.toggle("is-locked", !item.unlocked);
-        icon.innerHTML = buildAchievementIconMarkup(item);
+        card.style.setProperty("--achievement-accent", displayItem.difficultyColor || "var(--accent)");
+        card.classList.toggle("is-locked", !displayItem.unlocked);
+        icon.innerHTML = buildAchievementIconMarkup(displayItem);
         titleEl.textContent = title;
         descriptionEl.textContent = description;
         metaEl.innerHTML = "";
@@ -6367,26 +6402,29 @@ function runFlashCountdown(onComplete) {
         items
           .map((item, index) => ({ item, index }))
           .sort((left, right) => {
-            const unlockedDelta = Number(Boolean(right.item.unlocked)) - Number(Boolean(left.item.unlocked));
+            const leftItem = getAchievementDisplayItem(left.item);
+            const rightItem = getAchievementDisplayItem(right.item);
+            const unlockedDelta = Number(Boolean(rightItem.unlocked)) - Number(Boolean(leftItem.unlocked));
             if (unlockedDelta !== 0) return unlockedDelta;
             const difficultyDelta =
-              (Number(left.item.difficultyScore) || 0) - (Number(right.item.difficultyScore) || 0);
+              (Number(leftItem.difficultyScore) || 0) - (Number(rightItem.difficultyScore) || 0);
             if (difficultyDelta !== 0) return difficultyDelta;
             return left.index - right.index;
           })
           .forEach(({ item }) => {
-          const isSecretLocked = item.secret && !item.unlocked;
+          const displayItem = getAchievementDisplayItem(item);
+          const isSecretLocked = displayItem.secret && !displayItem.unlocked;
           const row = document.createElement("div");
-          row.className = `achievement-row${item.unlocked ? " is-unlocked" : " is-locked"}${isSecretLocked ? " is-secret-locked" : ""}`;
-          const description = isSecretLocked ? maskAchievementText(item.description) : item.description;
-          const percentText = item.unlocked
-            ? `${Math.max(0, Number(item.percentUnlocked) || 0)}% of players`
+          row.className = `achievement-row${displayItem.unlocked ? " is-unlocked" : " is-locked"}${isSecretLocked ? " is-secret-locked" : ""}`;
+          const description = isSecretLocked ? maskAchievementText(displayItem.description) : displayItem.description;
+          const percentText = displayItem.unlocked
+            ? `${Math.max(0, Number(displayItem.percentUnlocked) || 0)}% of players`
             : "";
           row.innerHTML = `
-            <div class="achievement-icon">${buildAchievementIconMarkup(item)}</div>
+            <div class="achievement-icon">${buildAchievementIconMarkup(displayItem)}</div>
             <div class="achievement-copy">
               <div class="achievement-title-row">
-                <strong class="achievement-title">${item.title}</strong>
+                <strong class="achievement-title">${displayItem.title}</strong>
               </div>
               <div class="achievement-description">${description}</div>
             </div>
@@ -6422,14 +6460,16 @@ function runFlashCountdown(onComplete) {
         const sortedItems = items
           .map((item, index) => ({ item, index }))
           .sort((left, right) => {
-            const unlockedDelta = Number(Boolean(right.item.unlocked)) - Number(Boolean(left.item.unlocked));
+            const leftItem = getAchievementDisplayItem(left.item);
+            const rightItem = getAchievementDisplayItem(right.item);
+            const unlockedDelta = Number(Boolean(rightItem.unlocked)) - Number(Boolean(leftItem.unlocked));
             if (unlockedDelta !== 0) return unlockedDelta;
             const difficultyDelta =
-              (Number(left.item.difficultyScore) || 0) - (Number(right.item.difficultyScore) || 0);
+              (Number(leftItem.difficultyScore) || 0) - (Number(rightItem.difficultyScore) || 0);
             if (difficultyDelta !== 0) return difficultyDelta;
             return left.index - right.index;
           })
-          .map(({ item }) => item);
+          .map(({ item }) => getAchievementDisplayItem(item));
 
         sortedItems.forEach((item) => {
           const isSecretLocked = item.secret && !item.unlocked;
@@ -8084,31 +8124,7 @@ function runFlashCountdown(onComplete) {
         stageIntroAutoStartEnabled = Boolean(defaultControlSettings.autoStartStagePreview);
       }
 
-      if (leaderboardsEnabledToggle) {
-        const storageKey = LEADERBOARDS_ENABLED_STORAGE_KEY;
-        const saved = window.localStorage.getItem(storageKey);
-        if (saved !== null) {
-          leaderboardsEnabledToggle.checked = saved === "1";
-        } else {
-          leaderboardsEnabledToggle.checked = Boolean(defaultControlSettings.leaderboardsEnabled);
-        }
-        leaderboardsEnabled = leaderboardsEnabledToggle.checked;
-        leaderboardsEnabledToggle.addEventListener("change", () => {
-          leaderboardsEnabled = leaderboardsEnabledToggle.checked;
-          window.localStorage.setItem(storageKey, leaderboardsEnabled ? "1" : "0");
-          logSettingChange("leaderboards_enabled", leaderboardsEnabled, {
-            setting_category: "controls"
-          });
-          logSettingsSnapshot("setting_change", {
-            setting_name: "leaderboards_enabled"
-          });
-          if (typeof window.refreshVisibleLeaderboards === "function") {
-            window.refreshVisibleLeaderboards();
-          }
-        });
-      } else {
-        leaderboardsEnabled = Boolean(defaultControlSettings.leaderboardsEnabled);
-      }
+      leaderboardsEnabled = true;
 
       let persistAndApplyAppearance = null;
       if (appearanceTheme) {

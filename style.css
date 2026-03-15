@@ -1624,7 +1624,8 @@ body.resetting .splash-loading__text {
   color: var(--ink);
 }
 .stage-card--locked {
-  opacity: 0.5;
+  opacity: 0.42;
+  --stage-card-outline: color-mix(in srgb, var(--stage-card-outline-raw) 45%, var(--panel));
   cursor: not-allowed;
 }
       .stage.panel {
@@ -1813,6 +1814,26 @@ body[data-theme^="night-"] .stage-type-icon[src$="tutorial_icon.png"],
 body[data-theme^="night-"] .stage-type-icon[src$="challenge-icon.svg"],
 body[data-theme^="night-"] .stage-type-icon[src$="sequence-icon.svg"] {
   filter: brightness(0) invert(1);
+}
+body[data-theme^="night-"] .stage-lock {
+  filter: brightness(0) invert(1);
+}
+body[data-theme^="night-"] .achievement-icon__img[src$=".svg"]:not([src*="card-"]):not([src*="mod-"]) {
+  filter: brightness(0) invert(1);
+}
+body[data-theme^="night-"] .achievement-icon__img[src$="flash_icon.png"],
+body[data-theme^="night-"] .achievement-icon__img[src$="tutorial_icon.png"],
+body[data-theme^="night-"] .achievement-icon__img[src$="leaderboard.png"] {
+  filter: brightness(0) invert(1);
+}
+body[data-theme^="night-"] .achievement-icon__img[src$="forget_me.png"] {
+  filter: brightness(0) invert(1);
+}
+body[data-theme^="night-"] .achievement-icon__img[src$="red_penguin_badge.svg"],
+body[data-theme^="night-"] .achievement-icon__img[src$="turbo_waving.png"],
+body[data-theme^="night-"] .achievement-icon__img[src$="turbo_flag_splash.png"],
+body[data-theme^="night-"] .achievement-icon__img[src$="turbo_angel.png"] {
+  filter: none;
 }
 .action-glyph {
   display: inline-flex;
@@ -3251,6 +3272,10 @@ body[data-mode="stages"][data-state="show"] #cardGrid .card,
 body[data-mode="stages"][data-state="recall"] #cardGrid .card,
 body[data-mode="stages"][data-state="show"] #cardGrid .hidden-card,
 body[data-mode="stages"][data-state="recall"] #cardGrid .hidden-card,
+body[data-mode="practice"][data-state="show"] #cardGrid .card,
+body[data-mode="practice"][data-state="recall"] #cardGrid .card,
+body[data-mode="practice"][data-state="show"] #cardGrid .hidden-card,
+body[data-mode="practice"][data-state="recall"] #cardGrid .hidden-card,
 body.stage-fail #cardGrid .card,
 body.stage-fail #cardGrid .hidden-card,
 body.stage-fail #promptGrid .card,
@@ -3259,32 +3284,46 @@ body.stage-fail #promptGrid .hidden-card {
 }
 body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .card,
 body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .card,
+body[data-theme^="night-"][data-mode="practice"][data-state="show"] #cardGrid .card,
+body[data-theme^="night-"][data-mode="practice"][data-state="recall"] #cardGrid .card,
 body[data-theme^="night-"].stage-fail #cardGrid .card,
 body[data-theme^="night-"].stage-fail #promptGrid .card {
   color: #ffffff !important;
 }
 body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .card svg,
 body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .card svg,
+body[data-theme^="night-"][data-mode="practice"][data-state="show"] #cardGrid .card svg,
+body[data-theme^="night-"][data-mode="practice"][data-state="recall"] #cardGrid .card svg,
 body[data-theme^="night-"].stage-fail #cardGrid .card svg,
 body[data-theme^="night-"].stage-fail #promptGrid .card svg {
   color: #ffffff !important;
   fill: currentColor;
   stroke: currentColor;
 }
+body[data-mode="stages"][data-state="show"] #cardGrid .card.card--numbers,
+body[data-mode="practice"][data-state="show"] #cardGrid .card.card--numbers {
+  font-size: 2.4rem;
+}
 body[data-theme^="night-"][data-mode="stages"][data-state="show"] #cardGrid .direction-arrow,
 body[data-theme^="night-"][data-mode="stages"][data-state="recall"] #cardGrid .direction-arrow,
+body[data-theme^="night-"][data-mode="practice"][data-state="show"] #cardGrid .direction-arrow,
+body[data-theme^="night-"][data-mode="practice"][data-state="recall"] #cardGrid .direction-arrow,
 body[data-theme^="night-"].stage-fail #cardGrid .direction-arrow,
 body[data-theme^="night-"].stage-fail #promptGrid .direction-arrow {
   filter: brightness(0) invert(1);
 }
 body:not([data-theme^="night-"])[data-mode="stages"][data-state="show"] #cardGrid .card,
 body:not([data-theme^="night-"])[data-mode="stages"][data-state="recall"] #cardGrid .card,
+body:not([data-theme^="night-"])[data-mode="practice"][data-state="show"] #cardGrid .card,
+body:not([data-theme^="night-"])[data-mode="practice"][data-state="recall"] #cardGrid .card,
 body:not([data-theme^="night-"]).stage-fail #cardGrid .card,
 body:not([data-theme^="night-"]).stage-fail #promptGrid .card {
   color: #000000 !important;
 }
 body:not([data-theme^="night-"])[data-mode="stages"][data-state="show"] #cardGrid .card svg,
 body:not([data-theme^="night-"])[data-mode="stages"][data-state="recall"] #cardGrid .card svg,
+body:not([data-theme^="night-"])[data-mode="practice"][data-state="show"] #cardGrid .card svg,
+body:not([data-theme^="night-"])[data-mode="practice"][data-state="recall"] #cardGrid .card svg,
 body:not([data-theme^="night-"]).stage-fail #cardGrid .card svg,
 body:not([data-theme^="night-"]).stage-fail #promptGrid .card svg {
   color: #000000 !important;
@@ -4011,7 +4050,8 @@ body[data-turbo-story="ascended"] .splash-turbo-layer {
   }
 }
 .stage-card {
-  --stage-card-outline: var(--border);
+  --stage-card-outline-raw: var(--border);
+  --stage-card-outline: var(--stage-card-outline-raw);
   border: 2px solid var(--stage-card-outline);
   padding: 0.95rem 1rem;
   background: var(--panel);
@@ -4032,20 +4072,20 @@ body[data-turbo-story="ascended"] .splash-turbo-layer {
   z-index: 1;
 }
 .stage-card--tutorial {
-  --stage-card-outline: #8b5e34;
-  border-color: #8b5e34;
+  --stage-card-outline-raw: #8b5e34;
+  border-color: var(--stage-card-outline);
 }
 .stage-card--flash {
-  --stage-card-outline: #e0b41b;
-  border-color: #e0b41b;
+  --stage-card-outline-raw: #e0b41b;
+  border-color: var(--stage-card-outline);
 }
 .stage-card--challenge {
-  --stage-card-outline: #ec4899;
-  border-color: #ec4899;
+  --stage-card-outline-raw: #ec4899;
+  border-color: var(--stage-card-outline);
 }
 .stage-card--sequence {
-  --stage-card-outline: #60a5fa;
-  border-color: #60a5fa;
+  --stage-card-outline-raw: #60a5fa;
+  border-color: var(--stage-card-outline);
 }
 .stage-card--animate {
   animation: stageCardPop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -4135,7 +4175,7 @@ body[data-turbo-story="ascended"] .stage-card__turbo-guide {
   height: 56px;
   object-fit: contain;
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 0.6;
 }
 .stage-locked {
   position: absolute;
