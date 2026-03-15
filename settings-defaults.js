@@ -1,7 +1,7 @@
 (() => {
   const defaults = {
     appearance: {
-      theme: "studio-light",
+      theme: "night-orange",
       colorVision: "standard",
       layout: "classic",
       themes: [

@@ -31,7 +31,6 @@
       const PLAYER_NAME_KEY = "flashRecallPlayerName";
       const PLAYER_NAME_PROMPT_KEY = "flashRecallPlayerNamePrompted";
       const APPEARANCE_THEME_KEY = "flashRecallAppearanceTheme";
-      const APPEARANCE_FONT_KEY = "flashRecallAppearanceFont";
       const APPEARANCE_COLOR_VISION_KEY = "flashRecallAppearanceColorVision";
       const APPEARANCE_LAYOUT_KEY = "flashRecallAppearanceLayout";
       const KEYBINDS_STORAGE_KEY = "flashRecallKeybinds";
@@ -328,6 +327,7 @@
         }
       }
 
+
       function getStoredAppearance() {
         const savedTheme = window.localStorage.getItem(APPEARANCE_THEME_KEY);
         const savedColorVision = window.localStorage.getItem(APPEARANCE_COLOR_VISION_KEY);
@@ -350,6 +350,7 @@
           layout: appearanceOptions.layouts.includes(savedLayout) ? savedLayout : fallbackLayout
         };
       }
+
 
       function normalizeAudioVolume(value, fallbackValue) {
         const numeric = Number(value);
@@ -5871,7 +5872,6 @@ function runFlashCountdown(onComplete) {
           window.localStorage.removeItem("flashRecallPlayerName");
           window.localStorage.removeItem("flashRecallPlayerNamePrompted");
           window.localStorage.removeItem(APPEARANCE_THEME_KEY);
-          window.localStorage.removeItem(APPEARANCE_FONT_KEY);
           window.localStorage.removeItem(APPEARANCE_COLOR_VISION_KEY);
           window.localStorage.removeItem(APPEARANCE_LAYOUT_KEY);
           window.localStorage.removeItem(KEYBINDS_STORAGE_KEY);
@@ -8052,7 +8052,6 @@ function runFlashCountdown(onComplete) {
           const colorVision = appearanceColorVision ? appearanceColorVision.value : "standard";
           applyAppearance(theme, "classic", colorVision);
           window.localStorage.setItem(APPEARANCE_THEME_KEY, document.body.dataset.theme || appearanceOptions.themes[0]);
-          window.localStorage.removeItem(APPEARANCE_FONT_KEY);
           if (appearanceColorVision) {
             const colorVisionModes = Array.isArray(appearanceOptions.colorVisionModes)
               ? appearanceOptions.colorVisionModes
@@ -8096,6 +8095,7 @@ function runFlashCountdown(onComplete) {
         }
 
       }
+
 
       if (appearanceShuffle && appearanceTheme) {
         appearanceShuffle.addEventListener("click", () => {
