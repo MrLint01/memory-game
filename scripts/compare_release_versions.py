@@ -29,6 +29,8 @@ ADAPTIVE_GROUP_LABELS = {
     "B": "B - early failure in levels 1-2",
     "unassigned": "Unassigned - no early outcome yet",
 }
+TIME_OUTLIER_THRESHOLD_MINUTES = 200.0
+TIME_OUTLIER_THRESHOLD_SECONDS = TIME_OUTLIER_THRESHOLD_MINUTES * 60.0
 
 
 def bool_series(s: pd.Series) -> pd.Series:
@@ -335,6 +337,29 @@ def retention_curve_time(seconds: pd.Series) -> pd.Series:
     max_minutes = int(np.ceil(seconds.max() / 60.0)) if pd.notna(seconds.max()) else 0
     idx = pd.Index(range(0, max(1, max_minutes) + 1), dtype=int)
     return pd.Series({m: (seconds >= (m * 60.0)).mean() * 100.0 for m in idx}, index=idx)
+
+
+def get_time_played_outlier_player_ids(
+    stats: pd.DataFrame,
+    time_col: str = "total_playtime_seconds",
+    threshold_seconds: float = TIME_OUTLIER_THRESHOLD_SECONDS,
+) -> set[str]:
+    if stats.empty or time_col not in stats.columns or "player_id" not in stats.columns:
+        return set()
+    time_values = pd.to_numeric(stats[time_col], errors="coerce")
+    player_ids = stats["player_id"].astype(str)
+    return set(player_ids[time_values >= threshold_seconds].tolist())
+
+
+def filter_frame_by_player_ids(
+    frame: pd.DataFrame,
+    excluded_player_ids: set[str] | None,
+    player_col: str = "player_id",
+) -> pd.DataFrame:
+    if frame.empty or not excluded_player_ids or player_col not in frame.columns:
+        return frame.copy()
+    keep_mask = ~frame[player_col].astype(str).isin(excluded_player_ids)
+    return frame.loc[keep_mask].copy()
 
 
 def plot_two_lines(
@@ -841,8 +866,11 @@ def plot_adaptive_by_group_panels(
     plt.close(fig)
 
 
-def get_adaptive_cohort_counts(version_dir: Path) -> dict[str, int]:
-    path = version_dir / "adaptive_features" / "adaptive_retention_time_cohorts.csv"
+def get_adaptive_cohort_counts(
+    version_dir: Path,
+    filename: str = "adaptive_retention_time_cohorts.csv",
+) -> dict[str, int]:
+    path = version_dir / "adaptive_features" / filename
     counts = {"unassigned": 0, "B": 0, "A": 0}
     if not path.exists():
         return counts
@@ -896,10 +924,126 @@ def main() -> None:
     new_early_completion = compute_early_level_completion_metrics(new_stats, max_level=5)
     old_level1_flow = load_level_one_player_flow_metrics(old_dir)
     new_level1_flow = load_level_one_player_flow_metrics(new_dir)
+    old_time_played_outlier_player_ids = get_time_played_outlier_player_ids(old_stats)
+    new_time_played_outlier_player_ids = get_time_played_outlier_player_ids(new_stats)
+    old_stats_outliers_removed = filter_frame_by_player_ids(old_stats, old_time_played_outlier_player_ids)
+    new_stats_outliers_removed = filter_frame_by_player_ids(new_stats, new_time_played_outlier_player_ids)
 
     # Keep only superimposed retention curve visuals.
     for old_png in outdir.glob("*.png"):
         old_png.unlink(missing_ok=True)
+
+    def plot_time_metric_variants(
+        metric_col: str,
+        base_name: str,
+        title_root: str,
+        xlabel: str,
+    ) -> None:
+        plot_two_lines(
+            outdir / f"{base_name}.png",
+            title_root,
+            xlabel,
+            args.old_version,
+            args.new_version,
+            retention_curve_time(old_stats[metric_col]),
+            retention_curve_time(new_stats[metric_col]),
+        )
+        plot_two_lines(
+            outdir / f"{base_name}_first_30.png",
+            f"{title_root} (First 30 Minutes)",
+            xlabel,
+            args.old_version,
+            args.new_version,
+            retention_curve_time(old_stats[metric_col]),
+            retention_curve_time(new_stats[metric_col]),
+            x_max=30,
+        )
+        plot_two_lines(
+            outdir / f"{base_name}_outliers_removed.png",
+            f"{title_root} (Outliers Removed)",
+            xlabel,
+            args.old_version,
+            args.new_version,
+            retention_curve_time(old_stats_outliers_removed[metric_col]),
+            retention_curve_time(new_stats_outliers_removed[metric_col]),
+        )
+        plot_two_lines(
+            outdir / f"{base_name}_outliers_removed_first_30.png",
+            f"{title_root} (Outliers Removed, First 30 Minutes)",
+            xlabel,
+            args.old_version,
+            args.new_version,
+            retention_curve_time(old_stats_outliers_removed[metric_col]),
+            retention_curve_time(new_stats_outliers_removed[metric_col]),
+            x_max=30,
+        )
+
+    def plot_adaptive_comparison_set(
+        source_filename: str,
+        value_col: str,
+        base_name: str,
+        title_root: str,
+        ylabel: str,
+        title_modifier: str = "",
+    ) -> None:
+        old_df = load_adaptive_retention_csv(old_dir, source_filename, value_col)
+        new_df = load_adaptive_retention_csv(new_dir, source_filename, value_col)
+        plot_title = title_root
+        plot_first_30_title = f"{title_root} (First 30 Minutes)"
+        plot_by_group_title = f"{title_root} (By Group Panels)"
+        plot_by_group_first_30_title = f"{title_root} (By Group Panels, First 30 Minutes)"
+        if title_modifier:
+            plot_title = f"{title_root} ({title_modifier})"
+            plot_first_30_title = f"{title_root} ({title_modifier}, First 30 Minutes)"
+            plot_by_group_title = f"{title_root} ({title_modifier}, By Group Panels)"
+            plot_by_group_first_30_title = f"{title_root} ({title_modifier}, By Group Panels, First 30 Minutes)"
+
+        plot_adaptive_six_lines(
+            outdir / f"{base_name}.png",
+            plot_title,
+            "Gameplay time (minutes threshold)",
+            ylabel,
+            args.old_version,
+            args.new_version,
+            old_df,
+            new_df,
+            value_col,
+        )
+        plot_adaptive_six_lines(
+            outdir / f"{base_name}_first_30.png",
+            plot_first_30_title,
+            "Gameplay time (minutes threshold)",
+            ylabel,
+            args.old_version,
+            args.new_version,
+            old_df,
+            new_df,
+            value_col,
+            x_max=30,
+        )
+        plot_adaptive_by_group_panels(
+            outdir / f"{base_name}_by_group.png",
+            plot_by_group_title,
+            "Gameplay time (minutes threshold)",
+            ylabel,
+            args.old_version,
+            args.new_version,
+            old_df,
+            new_df,
+            value_col,
+        )
+        plot_adaptive_by_group_panels(
+            outdir / f"{base_name}_by_group_first_30.png",
+            plot_by_group_first_30_title,
+            "Gameplay time (minutes threshold)",
+            ylabel,
+            args.old_version,
+            args.new_version,
+            old_df,
+            new_df,
+            value_col,
+            x_max=30,
+        )
 
     plot_two_lines(
         outdir / "retention_curve_highest_level_completed.png",
@@ -919,62 +1063,23 @@ def main() -> None:
         retention_curve(old_stats["levels_completed_count"]),
         retention_curve(new_stats["levels_completed_count"]),
     )
-    plot_two_lines(
-        outdir / "retention_curve_time_played_minutes.png",
+    plot_time_metric_variants(
+        "total_playtime_seconds",
+        "retention_curve_time_played_minutes",
         "Retention Curve by Time Played",
         "Time played (minutes threshold)",
-        args.old_version,
-        args.new_version,
-        retention_curve_time(old_stats["total_playtime_seconds"]),
-        retention_curve_time(new_stats["total_playtime_seconds"]),
     )
-    plot_two_lines(
-        outdir / "retention_curve_time_played_minutes_first_30.png",
-        "Retention Curve by Time Played (First 30 Minutes)",
-        "Time played (minutes threshold)",
-        args.old_version,
-        args.new_version,
-        retention_curve_time(old_stats["total_playtime_seconds"]),
-        retention_curve_time(new_stats["total_playtime_seconds"]),
-        x_max=30,
-    )
-    plot_two_lines(
-        outdir / "retention_curve_active_playtime_minutes.png",
+    plot_time_metric_variants(
+        "active_playtime_seconds",
+        "retention_curve_active_playtime_minutes",
         "Retention Curve by Active Playtime",
         "Active gameplay time (minutes threshold)",
-        args.old_version,
-        args.new_version,
-        retention_curve_time(old_stats["active_playtime_seconds"]),
-        retention_curve_time(new_stats["active_playtime_seconds"]),
     )
-    plot_two_lines(
-        outdir / "retention_curve_active_playtime_minutes_first_30.png",
-        "Retention Curve by Active Playtime (First 30 Minutes)",
-        "Active gameplay time (minutes threshold)",
-        args.old_version,
-        args.new_version,
-        retention_curve_time(old_stats["active_playtime_seconds"]),
-        retention_curve_time(new_stats["active_playtime_seconds"]),
-        x_max=30,
-    )
-    plot_two_lines(
-        outdir / "retention_curve_stats_like_round_time_minutes.png",
+    plot_time_metric_variants(
+        "stats_like_round_time_seconds",
+        "retention_curve_stats_like_round_time_minutes",
         "Retention Curve by Stats-Like Round Time",
         "Stats-like round time (minutes threshold)",
-        args.old_version,
-        args.new_version,
-        retention_curve_time(old_stats["stats_like_round_time_seconds"]),
-        retention_curve_time(new_stats["stats_like_round_time_seconds"]),
-    )
-    plot_two_lines(
-        outdir / "retention_curve_stats_like_round_time_minutes_first_30.png",
-        "Retention Curve by Stats-Like Round Time (First 30 Minutes)",
-        "Stats-like round time (minutes threshold)",
-        args.old_version,
-        args.new_version,
-        retention_curve_time(old_stats["stats_like_round_time_seconds"]),
-        retention_curve_time(new_stats["stats_like_round_time_seconds"]),
-        x_max=30,
     )
     plot_grouped_feature_bars(
         outdir / "level_1_feature_bar_comparison.png",
@@ -1028,122 +1133,48 @@ def main() -> None:
         ],
     )
 
-    old_adaptive_retention = load_adaptive_retention_csv(
-        old_dir,
+    plot_adaptive_comparison_set(
         "adaptive_group_retention_by_time.csv",
         "percent",
-    )
-    new_adaptive_retention = load_adaptive_retention_csv(
-        new_dir,
-        "adaptive_group_retention_by_time.csv",
-        "percent",
-    )
-    plot_adaptive_six_lines(
-        outdir / "adaptive_group_retention_by_time_comparison.png",
+        "adaptive_group_retention_by_time_comparison",
         "Adaptive Cohort Retention by Time",
-        "Gameplay time (minutes threshold)",
         "Retention (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_retention,
-        new_adaptive_retention,
-        "percent",
     )
-    plot_adaptive_six_lines(
-        outdir / "adaptive_group_retention_by_time_comparison_first_30.png",
-        "Adaptive Cohort Retention by Time (First 30 Minutes)",
-        "Gameplay time (minutes threshold)",
-        "Retention (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_retention,
-        new_adaptive_retention,
+    plot_adaptive_comparison_set(
+        "adaptive_group_retention_by_time_outliers_removed.csv",
         "percent",
-        x_max=30,
-    )
-    plot_adaptive_by_group_panels(
-        outdir / "adaptive_group_retention_by_time_comparison_by_group.png",
-        "Adaptive Cohort Retention by Time (By Group Panels)",
-        "Gameplay time (minutes threshold)",
+        "adaptive_group_retention_by_time_comparison_outliers_removed",
+        "Adaptive Cohort Retention by Time",
         "Retention (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_retention,
-        new_adaptive_retention,
-        "percent",
-    )
-    plot_adaptive_by_group_panels(
-        outdir / "adaptive_group_retention_by_time_comparison_by_group_first_30.png",
-        "Adaptive Cohort Retention by Time (By Group Panels, First 30 Minutes)",
-        "Gameplay time (minutes threshold)",
-        "Retention (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_retention,
-        new_adaptive_retention,
-        "percent",
-        x_max=30,
+        "Outliers Removed",
     )
 
-    old_adaptive_all = load_adaptive_retention_csv(
-        old_dir,
+    plot_adaptive_comparison_set(
         "adaptive_group_retention_by_time_all_players.csv",
         "percent_all_players",
-    )
-    new_adaptive_all = load_adaptive_retention_csv(
-        new_dir,
-        "adaptive_group_retention_by_time_all_players.csv",
-        "percent_all_players",
-    )
-    plot_adaptive_six_lines(
-        outdir / "adaptive_group_retention_by_time_all_players_comparison.png",
+        "adaptive_group_retention_by_time_all_players_comparison",
         "Adaptive Cohort Retention by Time (% of All Cohort Players)",
-        "Gameplay time (minutes threshold)",
         "Percent of All Three-Group Players (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_all,
-        new_adaptive_all,
-        "percent_all_players",
     )
-    plot_adaptive_six_lines(
-        outdir / "adaptive_group_retention_by_time_all_players_comparison_first_30.png",
-        "Adaptive Cohort Retention by Time (% of All Cohort Players, First 30 Minutes)",
-        "Gameplay time (minutes threshold)",
-        "Percent of All Three-Group Players (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_all,
-        new_adaptive_all,
+    plot_adaptive_comparison_set(
+        "adaptive_group_retention_by_time_all_players_outliers_removed.csv",
         "percent_all_players",
-        x_max=30,
-    )
-    plot_adaptive_by_group_panels(
-        outdir / "adaptive_group_retention_by_time_all_players_comparison_by_group.png",
-        "Adaptive Cohort Retention by Time (% of All Cohort Players, By Group Panels)",
-        "Gameplay time (minutes threshold)",
+        "adaptive_group_retention_by_time_all_players_comparison_outliers_removed",
+        "Adaptive Cohort Retention by Time (% of All Cohort Players)",
         "Percent of All Three-Group Players (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_all,
-        new_adaptive_all,
-        "percent_all_players",
-    )
-    plot_adaptive_by_group_panels(
-        outdir / "adaptive_group_retention_by_time_all_players_comparison_by_group_first_30.png",
-        "Adaptive Cohort Retention by Time (% of All Cohort Players, By Group Panels, First 30 Minutes)",
-        "Gameplay time (minutes threshold)",
-        "Percent of All Three-Group Players (%)",
-        args.old_version,
-        args.new_version,
-        old_adaptive_all,
-        new_adaptive_all,
-        "percent_all_players",
-        x_max=30,
+        "Outliers Removed",
     )
 
     old_adaptive_counts = get_adaptive_cohort_counts(old_dir)
     new_adaptive_counts = get_adaptive_cohort_counts(new_dir)
+    old_adaptive_counts_outliers_removed = get_adaptive_cohort_counts(
+        old_dir,
+        "adaptive_retention_time_cohorts_outliers_removed.csv",
+    )
+    new_adaptive_counts_outliers_removed = get_adaptive_cohort_counts(
+        new_dir,
+        "adaptive_retention_time_cohorts_outliers_removed.csv",
+    )
 
     def retention_pct(stats: pd.DataFrame, min_completed_levels: int = 2) -> float:
         if stats.empty:
@@ -1170,16 +1201,29 @@ def main() -> None:
         f"new_avg_active_playtime_minutes: {(new_stats['active_playtime_seconds'].mean() / 60.0) if len(new_stats) else 0:.2f}",
         f"old_avg_stats_like_round_time_minutes: {(old_stats['stats_like_round_time_seconds'].mean() / 60.0) if len(old_stats) else 0:.2f}",
         f"new_avg_stats_like_round_time_minutes: {(new_stats['stats_like_round_time_seconds'].mean() / 60.0) if len(new_stats) else 0:.2f}",
+        f"time_played_outlier_threshold_minutes: {TIME_OUTLIER_THRESHOLD_MINUTES:.0f}",
+        f"old_time_played_outlier_players_count: {len(old_time_played_outlier_player_ids)}",
+        f"new_time_played_outlier_players_count: {len(new_time_played_outlier_player_ids)}",
+        "old_time_played_outlier_player_ids: "
+        + (", ".join(sorted(old_time_played_outlier_player_ids)) if old_time_played_outlier_player_ids else "none"),
+        "new_time_played_outlier_player_ids: "
+        + (", ".join(sorted(new_time_played_outlier_player_ids)) if new_time_played_outlier_player_ids else "none"),
         f"old_median_highest_level: {old_stats['highest_level_completed'].median() if len(old_stats) else 0}",
         f"new_median_highest_level: {new_stats['highest_level_completed'].median() if len(new_stats) else 0}",
         f"old_median_levels_completed_count: {old_stats['levels_completed_count'].median() if len(old_stats) else 0}",
         f"new_median_levels_completed_count: {new_stats['levels_completed_count'].median() if len(new_stats) else 0}",
         f"time_played_comparison_chart: {(outdir / 'retention_curve_time_played_minutes.png').name}",
         f"time_played_first_30_minutes_comparison_chart: {(outdir / 'retention_curve_time_played_minutes_first_30.png').name}",
+        f"time_played_outliers_removed_comparison_chart: {(outdir / 'retention_curve_time_played_minutes_outliers_removed.png').name}",
+        f"time_played_outliers_removed_first_30_comparison_chart: {(outdir / 'retention_curve_time_played_minutes_outliers_removed_first_30.png').name}",
         f"active_playtime_comparison_chart: {(outdir / 'retention_curve_active_playtime_minutes.png').name}",
         f"active_playtime_first_30_comparison_chart: {(outdir / 'retention_curve_active_playtime_minutes_first_30.png').name}",
+        f"active_playtime_outliers_removed_comparison_chart: {(outdir / 'retention_curve_active_playtime_minutes_outliers_removed.png').name}",
+        f"active_playtime_outliers_removed_first_30_comparison_chart: {(outdir / 'retention_curve_active_playtime_minutes_outliers_removed_first_30.png').name}",
         f"stats_like_round_time_comparison_chart: {(outdir / 'retention_curve_stats_like_round_time_minutes.png').name}",
         f"stats_like_round_time_first_30_comparison_chart: {(outdir / 'retention_curve_stats_like_round_time_minutes_first_30.png').name}",
+        f"stats_like_round_time_outliers_removed_comparison_chart: {(outdir / 'retention_curve_stats_like_round_time_minutes_outliers_removed.png').name}",
+        f"stats_like_round_time_outliers_removed_first_30_comparison_chart: {(outdir / 'retention_curve_stats_like_round_time_minutes_outliers_removed_first_30.png').name}",
         "adaptive_group_labels:",
         f"  A: {label_adaptive_group('A')}",
         f"  B: {label_adaptive_group('B')}",
@@ -1212,18 +1256,34 @@ def main() -> None:
         f"new_adaptive_unassigned_players: {new_adaptive_counts['unassigned']}",
         f"new_adaptive_b_players: {new_adaptive_counts['B']}",
         f"new_adaptive_a_players: {new_adaptive_counts['A']}",
+        f"old_adaptive_unassigned_players_outliers_removed: {old_adaptive_counts_outliers_removed['unassigned']}",
+        f"old_adaptive_b_players_outliers_removed: {old_adaptive_counts_outliers_removed['B']}",
+        f"old_adaptive_a_players_outliers_removed: {old_adaptive_counts_outliers_removed['A']}",
+        f"new_adaptive_unassigned_players_outliers_removed: {new_adaptive_counts_outliers_removed['unassigned']}",
+        f"new_adaptive_b_players_outliers_removed: {new_adaptive_counts_outliers_removed['B']}",
+        f"new_adaptive_a_players_outliers_removed: {new_adaptive_counts_outliers_removed['A']}",
         f"adaptive_time_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_comparison.png').name}",
         f"adaptive_time_first_30_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_first_30.png').name}",
         f"adaptive_time_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_by_group.png').name}",
         f"adaptive_time_first_30_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_by_group_first_30.png').name}",
+        f"adaptive_time_outliers_removed_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_outliers_removed.png').name}",
+        f"adaptive_time_outliers_removed_first_30_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_outliers_removed_first_30.png').name}",
+        f"adaptive_time_outliers_removed_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_outliers_removed_by_group.png').name}",
+        f"adaptive_time_outliers_removed_first_30_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_outliers_removed_by_group_first_30.png').name}",
         f"adaptive_time_all_players_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison.png').name}",
         f"adaptive_time_all_players_first_30_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_first_30.png').name}",
         f"adaptive_time_all_players_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_by_group.png').name}",
         f"adaptive_time_all_players_first_30_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_by_group_first_30.png').name}",
+        f"adaptive_time_all_players_outliers_removed_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_outliers_removed.png').name}",
+        f"adaptive_time_all_players_outliers_removed_first_30_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_outliers_removed_first_30.png').name}",
+        f"adaptive_time_all_players_outliers_removed_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_outliers_removed_by_group.png').name}",
+        f"adaptive_time_all_players_outliers_removed_first_30_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_outliers_removed_by_group_first_30.png').name}",
     ]
     (outdir / "summary.txt").write_text("\n".join(map(str, summary)) + "\n", encoding="utf-8")
     old_stats.to_csv(outdir / "old_version_player_stats.csv", index=False)
     new_stats.to_csv(outdir / "new_version_player_stats.csv", index=False)
+    old_stats_outliers_removed.to_csv(outdir / "old_version_player_stats_outliers_removed.csv", index=False)
+    new_stats_outliers_removed.to_csv(outdir / "new_version_player_stats_outliers_removed.csv", index=False)
     old_level1_features.assign(version=args.old_version).to_csv(outdir / "old_version_level_1_feature_rates.csv", index=False)
     new_level1_features.assign(version=args.new_version).to_csv(outdir / "new_version_level_1_feature_rates.csv", index=False)
     old_level1_onboarding.assign(version=args.old_version).to_csv(outdir / "old_version_level_1_onboarding_rates.csv", index=False)

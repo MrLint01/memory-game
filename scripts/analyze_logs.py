@@ -25,6 +25,8 @@ ADAPTIVE_GROUP_LABELS = {
     "B": "B - early failure in levels 1-2",
     "unassigned": "Unassigned - no early outcome yet",
 }
+TIME_OUTLIER_THRESHOLD_MINUTES = 200.0
+TIME_OUTLIER_THRESHOLD_SECONDS = TIME_OUTLIER_THRESHOLD_MINUTES * 60.0
 
 
 def load_table(path: Optional[Path]) -> pd.DataFrame:
@@ -476,6 +478,52 @@ def save_multi_line_percent(
     plt.close()
 
 
+def retention_curve_time_minutes(seconds: pd.Series) -> pd.Series:
+    clean = pd.to_numeric(seconds, errors="coerce").dropna().astype(float)
+    if clean.empty:
+        return pd.Series(dtype=float)
+    max_minutes = int(np.ceil(clean.max() / 60.0)) if pd.notna(clean.max()) else 0
+    minute_index = pd.Index(range(0, max(1, max_minutes) + 1), dtype=int)
+    return pd.Series(
+        {
+            minute: float((clean >= (minute * 60.0)).mean() * 100.0)
+            for minute in minute_index
+        },
+        index=minute_index,
+    )
+
+
+def get_time_played_outlier_player_ids(
+    player_retention_seconds: pd.Series,
+    threshold_seconds: float = TIME_OUTLIER_THRESHOLD_SECONDS,
+) -> set[str]:
+    clean = pd.to_numeric(player_retention_seconds, errors="coerce").dropna().astype(float)
+    if clean.empty:
+        return set()
+    return set(clean[clean >= threshold_seconds].index.astype(str).tolist())
+
+
+def filter_series_by_player_ids(series: pd.Series, excluded_player_ids: set[str] | None) -> pd.Series:
+    if series is None or series.empty or not excluded_player_ids:
+        return series.copy()
+    keep_mask = ~series.index.astype(str).isin(excluded_player_ids)
+    return series.loc[keep_mask].copy()
+
+
+def filter_frame_by_player_ids(
+    frame: pd.DataFrame,
+    excluded_player_ids: set[str] | None,
+    player_col: str = "player_id_norm",
+) -> pd.DataFrame:
+    if frame.empty or not excluded_player_ids:
+        return frame.copy()
+    if player_col in frame.columns:
+        keep_mask = ~frame[player_col].astype(str).isin(excluded_player_ids)
+        return frame.loc[keep_mask].copy()
+    keep_mask = ~frame.index.astype(str).isin(excluded_player_ids)
+    return frame.loc[keep_mask].copy()
+
+
 def infer_adaptive_cohorts_from_attempts(attempts_with_player: pd.DataFrame) -> pd.DataFrame:
     required = {"player_id_norm", "level_number", "passed"}
     if attempts_with_player.empty or not required <= set(attempts_with_player.columns):
@@ -564,10 +612,18 @@ def infer_experiment_variants_by_player(
     return variant_lookup
 
 
-def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataFrame, events: pd.DataFrame, outdir: Path, summary: list[str]) -> None:
+def analyze_feature_usage(
+    sessions: pd.DataFrame,
+    attempts_with_player: pd.DataFrame,
+    events: pd.DataFrame,
+    outdir: Path,
+    summary: list[str],
+    excluded_player_ids: set[str] | None = None,
+) -> None:
     if events.empty and sessions.empty:
         return
 
+    excluded_player_ids = set(excluded_player_ids or set())
     feature_dir = outdir / "feature_usage"
     feature_dir.mkdir(parents=True, exist_ok=True)
     adaptive_dir = outdir / "adaptive_features"
@@ -1100,80 +1156,119 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
 
                 cohort = cohort[cohort["adaptive_retention_group"].isin(["A", "B", "unassigned"])].copy()
                 if not cohort.empty:
-                    cohort.reset_index().to_csv(adaptive_dir / "adaptive_retention_time_cohorts.csv", index=False)
-                    retention_rows: list[dict[str, Any]] = []
-                    max_minutes = int(np.ceil(cohort["retention_seconds"].max() / 60.0)) if not cohort.empty else 0
-                    for group_name, group_rows in cohort.groupby("adaptive_retention_group"):
-                        seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
-                        if seconds.empty:
-                            continue
-                        for minute in range(0, max(1, max_minutes) + 1):
-                            retention_rows.append({
-                                "adaptive_group": group_name,
-                                "minute": minute,
-                                "percent": float((seconds >= (minute * 60.0)).mean() * 100.0),
-                            })
-                    if retention_rows:
-                        retention_curve_df = pd.DataFrame(retention_rows)
-                        retention_curve_df["adaptive_group_label"] = retention_curve_df["adaptive_group"].map(label_adaptive_group)
-                        retention_curve_df.to_csv(adaptive_dir / "adaptive_group_retention_by_time.csv", index=False)
-                        retention_curve_plot = retention_curve_df.pivot(index="minute", columns="adaptive_group_label", values="percent")
-                        retention_curve_plot = retention_curve_plot.reindex(columns=adaptive_group_label_order).dropna(axis=1, how="all")
-                        save_multi_line_percent(
-                            retention_curve_plot,
-                            adaptive_dir / "adaptive_group_retention_by_time.png",
-                            "Retention by Time for Adaptive Cohorts",
-                            "Gameplay time (minutes threshold)",
-                            "Retention (%)",
-                            (0, 100),
-                        )
-                        save_multi_line_percent(
-                            retention_curve_plot,
-                            adaptive_dir / "adaptive_group_retention_by_time_first_30.png",
-                            "Retention by Time for Adaptive Cohorts (First 30 Minutes)",
-                            "Gameplay time (minutes threshold)",
-                            "Retention (%)",
-                            (0, 100),
-                            x_max=30,
-                        )
+                    def save_adaptive_time_outputs(
+                        cohort_frame: pd.DataFrame,
+                        filename_suffix: str = "",
+                        title_modifier: str = "",
+                    ) -> None:
+                        if cohort_frame.empty:
+                            return
 
-                        total_players_denominator = int(cohort.shape[0])
-                        if total_players_denominator > 0:
-                            retention_all_rows: list[dict[str, Any]] = []
-                            for group_name, group_rows in cohort.groupby("adaptive_retention_group"):
-                                seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
-                                if seconds.empty:
-                                    continue
-                                for minute in range(0, max(1, max_minutes) + 1):
-                                    retained_count = int((seconds >= (minute * 60.0)).sum())
-                                    retention_all_rows.append({
+                        cohort_frame = cohort_frame.copy()
+                        cohort_frame.reset_index().to_csv(
+                            adaptive_dir / f"adaptive_retention_time_cohorts{filename_suffix}.csv",
+                            index=False,
+                        )
+                        retention_rows: list[dict[str, Any]] = []
+                        max_minutes = int(np.ceil(cohort_frame["retention_seconds"].max() / 60.0)) if not cohort_frame.empty else 0
+                        for group_name, group_rows in cohort_frame.groupby("adaptive_retention_group"):
+                            seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
+                            if seconds.empty:
+                                continue
+                            for minute in range(0, max(1, max_minutes) + 1):
+                                retention_rows.append(
+                                    {
                                         "adaptive_group": group_name,
                                         "minute": minute,
-                                        "percent_all_players": float((retained_count / total_players_denominator) * 100.0),
-                                    })
-                            if retention_all_rows:
-                                retention_all_df = pd.DataFrame(retention_all_rows)
-                                retention_all_df["adaptive_group_label"] = retention_all_df["adaptive_group"].map(label_adaptive_group)
-                                retention_all_df.to_csv(adaptive_dir / "adaptive_group_retention_by_time_all_players.csv", index=False)
-                                retention_all_plot = retention_all_df.pivot(index="minute", columns="adaptive_group_label", values="percent_all_players")
-                                retention_all_plot = retention_all_plot.reindex(columns=adaptive_group_label_order).dropna(axis=1, how="all")
-                                save_multi_line_percent(
-                                    retention_all_plot,
-                                    adaptive_dir / "adaptive_group_retention_by_time_all_players.png",
-                                    "Retention by Time for Adaptive Cohorts (% of All Cohort Players)",
-                                    "Gameplay time (minutes threshold)",
-                                    "Percent of All Three-Group Players (%)",
-                                    (0, 100),
+                                        "percent": float((seconds >= (minute * 60.0)).mean() * 100.0),
+                                    }
                                 )
-                                save_multi_line_percent(
-                                    retention_all_plot,
-                                    adaptive_dir / "adaptive_group_retention_by_time_all_players_first_30.png",
-                                    "Retention by Time for Adaptive Cohorts (% of All Cohort Players, First 30 Minutes)",
-                                    "Gameplay time (minutes threshold)",
-                                    "Percent of All Three-Group Players (%)",
-                                    (0, 100),
-                                    x_max=30,
-                                )
+                        if retention_rows:
+                            retention_curve_df = pd.DataFrame(retention_rows)
+                            retention_curve_df["adaptive_group_label"] = retention_curve_df["adaptive_group"].map(label_adaptive_group)
+                            retention_curve_df.to_csv(
+                                adaptive_dir / f"adaptive_group_retention_by_time{filename_suffix}.csv",
+                                index=False,
+                            )
+                            retention_curve_plot = retention_curve_df.pivot(index="minute", columns="adaptive_group_label", values="percent")
+                            retention_curve_plot = retention_curve_plot.reindex(columns=adaptive_group_label_order).dropna(axis=1, how="all")
+                            plot_title = "Retention by Time for Adaptive Cohorts"
+                            plot_first_30_title = "Retention by Time for Adaptive Cohorts (First 30 Minutes)"
+                            if title_modifier:
+                                plot_title = f"Retention by Time for Adaptive Cohorts ({title_modifier})"
+                                plot_first_30_title = f"Retention by Time for Adaptive Cohorts ({title_modifier}, First 30 Minutes)"
+                            save_multi_line_percent(
+                                retention_curve_plot,
+                                adaptive_dir / f"adaptive_group_retention_by_time{filename_suffix}.png",
+                                plot_title,
+                                "Gameplay time (minutes threshold)",
+                                "Retention (%)",
+                                (0, 100),
+                            )
+                            save_multi_line_percent(
+                                retention_curve_plot,
+                                adaptive_dir / f"adaptive_group_retention_by_time{filename_suffix}_first_30.png",
+                                plot_first_30_title,
+                                "Gameplay time (minutes threshold)",
+                                "Retention (%)",
+                                (0, 100),
+                                x_max=30,
+                            )
+
+                            total_players_denominator = int(cohort_frame.shape[0])
+                            if total_players_denominator > 0:
+                                retention_all_rows: list[dict[str, Any]] = []
+                                for group_name, group_rows in cohort_frame.groupby("adaptive_retention_group"):
+                                    seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
+                                    if seconds.empty:
+                                        continue
+                                    for minute in range(0, max(1, max_minutes) + 1):
+                                        retained_count = int((seconds >= (minute * 60.0)).sum())
+                                        retention_all_rows.append(
+                                            {
+                                                "adaptive_group": group_name,
+                                                "minute": minute,
+                                                "percent_all_players": float((retained_count / total_players_denominator) * 100.0),
+                                            }
+                                        )
+                                if retention_all_rows:
+                                    retention_all_df = pd.DataFrame(retention_all_rows)
+                                    retention_all_df["adaptive_group_label"] = retention_all_df["adaptive_group"].map(label_adaptive_group)
+                                    retention_all_df.to_csv(
+                                        adaptive_dir / f"adaptive_group_retention_by_time_all_players{filename_suffix}.csv",
+                                        index=False,
+                                    )
+                                    retention_all_plot = retention_all_df.pivot(index="minute", columns="adaptive_group_label", values="percent_all_players")
+                                    retention_all_plot = retention_all_plot.reindex(columns=adaptive_group_label_order).dropna(axis=1, how="all")
+                                    all_players_title = "Retention by Time for Adaptive Cohorts (% of All Cohort Players)"
+                                    all_players_first_30_title = "Retention by Time for Adaptive Cohorts (% of All Cohort Players, First 30 Minutes)"
+                                    if title_modifier:
+                                        all_players_title = f"Retention by Time for Adaptive Cohorts (% of All Cohort Players, {title_modifier})"
+                                        all_players_first_30_title = f"Retention by Time for Adaptive Cohorts (% of All Cohort Players, {title_modifier}, First 30 Minutes)"
+                                    save_multi_line_percent(
+                                        retention_all_plot,
+                                        adaptive_dir / f"adaptive_group_retention_by_time_all_players{filename_suffix}.png",
+                                        all_players_title,
+                                        "Gameplay time (minutes threshold)",
+                                        "Percent of All Three-Group Players (%)",
+                                        (0, 100),
+                                    )
+                                    save_multi_line_percent(
+                                        retention_all_plot,
+                                        adaptive_dir / f"adaptive_group_retention_by_time_all_players{filename_suffix}_first_30.png",
+                                        all_players_first_30_title,
+                                        "Gameplay time (minutes threshold)",
+                                        "Percent of All Three-Group Players (%)",
+                                        (0, 100),
+                                        x_max=30,
+                                    )
+
+                    save_adaptive_time_outputs(cohort)
+                    save_adaptive_time_outputs(
+                        filter_frame_by_player_ids(cohort, excluded_player_ids),
+                        "_outliers_removed",
+                        "Outliers Removed",
+                    )
 
 
 def attempts_before_first_pass(passed_series: pd.Series) -> int:
@@ -1941,95 +2036,97 @@ def main() -> None:
         events,
         player_highest_completed.index if not player_highest_completed.empty else None,
     )
-    if not player_retention_seconds.empty:
-        max_minutes = int(np.ceil(player_retention_seconds.max() / 60.0))
-        minute_index = pd.Index(range(0, max(1, max_minutes) + 1), dtype=int)
-        retention_by_time_percent = pd.Series(
-            {
-                minute: (player_retention_seconds >= (minute * 60.0)).mean() * 100.0
-                for minute in minute_index
-            },
-            index=minute_index,
-        )
+    time_played_outlier_player_ids = get_time_played_outlier_player_ids(player_retention_seconds)
+    summary.append(f"time_played_outlier_threshold_minutes: {TIME_OUTLIER_THRESHOLD_MINUTES:.0f}")
+    summary.append(f"time_played_outlier_players_count: {len(time_played_outlier_player_ids)}")
+    summary.append(
+        "time_played_outlier_player_ids: "
+        + (", ".join(sorted(time_played_outlier_player_ids)) if time_played_outlier_player_ids else "none")
+    )
+
+    def save_time_retention_variants(
+        seconds: pd.Series,
+        base_name: str,
+        title_root: str,
+        xlabel: str,
+    ) -> tuple[int, int]:
+        if seconds.empty:
+            return 0, 0
+
+        retention_percent = retention_curve_time_minutes(seconds)
         save_line(
-            retention_by_time_percent,
-            args.outdir / "retention_percent_by_time_played.png",
-            "Player Retention by Time Played",
-            "Time Played (minutes)",
+            retention_percent,
+            args.outdir / f"{base_name}.png",
+            title_root,
+            xlabel,
             "Retention (%)",
             (0, 100),
         )
         save_line(
-            retention_by_time_percent,
-            args.outdir / "retention_percent_by_time_played_first_30.png",
-            "Player Retention by Time Played (First 30 Minutes)",
-            "Time Played (minutes)",
+            retention_percent,
+            args.outdir / f"{base_name}_first_30.png",
+            f"{title_root} (First 30 Minutes)",
+            xlabel,
             "Retention (%)",
             (0, 100),
             x_max=30,
+        )
+
+        filtered_seconds = filter_series_by_player_ids(seconds, time_played_outlier_player_ids)
+        filtered_retention_percent = retention_curve_time_minutes(filtered_seconds)
+        save_line(
+            filtered_retention_percent,
+            args.outdir / f"{base_name}_outliers_removed.png",
+            f"{title_root} (Outliers Removed)",
+            xlabel,
+            "Retention (%)",
+            (0, 100),
+        )
+        save_line(
+            filtered_retention_percent,
+            args.outdir / f"{base_name}_outliers_removed_first_30.png",
+            f"{title_root} (Outliers Removed, First 30 Minutes)",
+            xlabel,
+            "Retention (%)",
+            (0, 100),
+            x_max=30,
+        )
+        max_minutes = int(retention_percent.index.max()) if not retention_percent.empty else 0
+        filtered_max_minutes = int(filtered_retention_percent.index.max()) if not filtered_retention_percent.empty else 0
+        return max_minutes, filtered_max_minutes
+
+    if not player_retention_seconds.empty:
+        max_minutes, filtered_max_minutes = save_time_retention_variants(
+            player_retention_seconds,
+            "retention_percent_by_time_played",
+            "Player Retention by Time Played",
+            "Time Played (minutes)",
         )
         summary.append("retention_by_time_played_percent_player:")
         summary.append(f"  max_minutes: {max_minutes}")
+        summary.append(f"  max_minutes_outliers_removed: {filtered_max_minutes}")
 
     if not player_active_playtime_seconds.empty:
-        max_active_minutes = int(np.ceil(player_active_playtime_seconds.max() / 60.0))
-        active_minute_index = pd.Index(range(0, max(1, max_active_minutes) + 1), dtype=int)
-        retention_by_active_time_percent = pd.Series(
-            {
-                minute: (player_active_playtime_seconds >= (minute * 60.0)).mean() * 100.0
-                for minute in active_minute_index
-            },
-            index=active_minute_index,
-        )
-        save_line(
-            retention_by_active_time_percent,
-            args.outdir / "retention_percent_by_active_playtime.png",
+        max_active_minutes, filtered_max_active_minutes = save_time_retention_variants(
+            player_active_playtime_seconds,
+            "retention_percent_by_active_playtime",
             "Player Retention by Active Playtime",
             "Active Playtime (minutes)",
-            "Retention (%)",
-            (0, 100),
-        )
-        save_line(
-            retention_by_active_time_percent,
-            args.outdir / "retention_percent_by_active_playtime_first_30.png",
-            "Player Retention by Active Playtime (First 30 Minutes)",
-            "Active Playtime (minutes)",
-            "Retention (%)",
-            (0, 100),
-            x_max=30,
         )
         summary.append("retention_by_active_playtime_percent_player:")
         summary.append(f"  max_minutes: {max_active_minutes}")
+        summary.append(f"  max_minutes_outliers_removed: {filtered_max_active_minutes}")
 
     if not player_stats_like_round_seconds.empty:
-        max_stats_like_minutes = int(np.ceil(player_stats_like_round_seconds.max() / 60.0))
-        stats_like_minute_index = pd.Index(range(0, max(1, max_stats_like_minutes) + 1), dtype=int)
-        retention_by_stats_like_time_percent = pd.Series(
-            {
-                minute: (player_stats_like_round_seconds >= (minute * 60.0)).mean() * 100.0
-                for minute in stats_like_minute_index
-            },
-            index=stats_like_minute_index,
-        )
-        save_line(
-            retention_by_stats_like_time_percent,
-            args.outdir / "retention_percent_by_stats_like_round_time_played.png",
+        max_stats_like_minutes, filtered_max_stats_like_minutes = save_time_retention_variants(
+            player_stats_like_round_seconds,
+            "retention_percent_by_stats_like_round_time_played",
             "Player Retention by Stats-Like Round Time",
             "Stats-Like Round Time (minutes)",
-            "Retention (%)",
-            (0, 100),
-        )
-        save_line(
-            retention_by_stats_like_time_percent,
-            args.outdir / "retention_percent_by_stats_like_round_time_played_first_30.png",
-            "Player Retention by Stats-Like Round Time (First 30 Minutes)",
-            "Stats-Like Round Time (minutes)",
-            "Retention (%)",
-            (0, 100),
-            x_max=30,
         )
         summary.append("retention_by_stats_like_round_time_percent_player:")
         summary.append(f"  max_minutes: {max_stats_like_minutes}")
+        summary.append(f"  max_minutes_outliers_removed: {filtered_max_stats_like_minutes}")
 
     ab_variant_lookup = infer_experiment_variants_by_player(sessions, attempts_with_player)
     if not ab_variant_lookup.empty:
@@ -2040,19 +2137,35 @@ def main() -> None:
         for variant_name in ["A", "B"]:
             summary.append(f"  {variant_name}: {label_experiment_variant(variant_name)}")
 
-        if not player_retention_seconds.empty:
-            variant_time = pd.DataFrame(index=player_retention_seconds.index.astype(str))
-            variant_time.index.name = "player_id_norm"
-            variant_time["retention_seconds"] = player_retention_seconds
-            variant_time["ab_variant"] = variant_time.index.map(ab_variant_lookup)
-            variant_time = variant_time[variant_time["ab_variant"].isin(["A", "B"])].copy()
-            if not variant_time.empty:
-                variant_time["ab_variant_label"] = variant_time["ab_variant"].map(label_experiment_variant)
-                variant_time.reset_index().to_csv(ab_dir / "ab_variant_time_played_cohorts.csv", index=False)
+        def save_ab_variant_time_outputs(
+            cohort_frame: pd.DataFrame,
+            seconds_col: str,
+            cohort_basename: str,
+            retention_basename: str,
+            plot_basename: str,
+            title_root: str,
+            xlabel: str,
+            summary_key: str,
+        ) -> None:
+            if cohort_frame.empty:
+                return
+
+            def save_variant(
+                variant_frame: pd.DataFrame,
+                filename_suffix: str = "",
+                title_modifier: str = "",
+            ) -> None:
+                if variant_frame.empty:
+                    return
+                variant_frame = variant_frame.copy()
+                variant_frame.reset_index().to_csv(
+                    ab_dir / f"{cohort_basename}{filename_suffix}.csv",
+                    index=False,
+                )
                 retention_rows: list[dict[str, Any]] = []
-                max_variant_minutes = int(np.ceil(variant_time["retention_seconds"].max() / 60.0))
-                for variant_name, group_rows in variant_time.groupby("ab_variant"):
-                    seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
+                max_variant_minutes = int(np.ceil(variant_frame[seconds_col].max() / 60.0)) if not variant_frame.empty else 0
+                for variant_name, group_rows in variant_frame.groupby("ab_variant"):
+                    seconds = pd.to_numeric(group_rows[seconds_col], errors="coerce").dropna().astype(float)
                     if seconds.empty:
                         continue
                     for minute in range(0, max(1, max_variant_minutes) + 1):
@@ -2066,27 +2179,62 @@ def main() -> None:
                         )
                 if retention_rows:
                     variant_retention_df = pd.DataFrame(retention_rows)
-                    variant_retention_df.to_csv(ab_dir / "ab_variant_retention_by_time_played.csv", index=False)
+                    variant_retention_df.to_csv(
+                        ab_dir / f"{retention_basename}{filename_suffix}.csv",
+                        index=False,
+                    )
                     variant_retention_plot = variant_retention_df.pivot(index="minute", columns="ab_variant_label", values="percent")
                     variant_retention_plot = variant_retention_plot.reindex(columns=ab_variant_label_order).dropna(axis=1, how="all")
+                    plot_title = title_root
+                    plot_first_30_title = f"{title_root} (First 30 Minutes)"
+                    if title_modifier:
+                        plot_title = f"{title_root} ({title_modifier})"
+                        plot_first_30_title = f"{title_root} ({title_modifier}, First 30 Minutes)"
                     save_multi_line_percent(
                         variant_retention_plot,
-                        ab_dir / "ab_variant_retention_by_time_played.png",
-                        "Retention by Time Played for A/B Variants",
-                        "Time played (minutes threshold)",
+                        ab_dir / f"{plot_basename}{filename_suffix}.png",
+                        plot_title,
+                        xlabel,
                         "Retention (%)",
                         (0, 100),
                     )
                     save_multi_line_percent(
                         variant_retention_plot,
-                        ab_dir / "ab_variant_retention_by_time_played_first_30.png",
-                        "Retention by Time Played for A/B Variants (First 30 Minutes)",
-                        "Time played (minutes threshold)",
+                        ab_dir / f"{plot_basename}{filename_suffix}_first_30.png",
+                        plot_first_30_title,
+                        xlabel,
                         "Retention (%)",
                         (0, 100),
                         x_max=30,
                     )
-                    summary.append(f"ab_variant_time_played_graph: {(ab_dir / 'ab_variant_retention_by_time_played.png').name}")
+
+            save_variant(cohort_frame)
+            save_variant(
+                filter_frame_by_player_ids(cohort_frame, time_played_outlier_player_ids),
+                "_outliers_removed",
+                "Outliers Removed",
+            )
+            summary.append(f"{summary_key}: {(ab_dir / f'{plot_basename}.png').name}")
+            summary.append(f"{summary_key}_outliers_removed: {(ab_dir / f'{plot_basename}_outliers_removed.png').name}")
+
+        if not player_retention_seconds.empty:
+            variant_time = pd.DataFrame(index=player_retention_seconds.index.astype(str))
+            variant_time.index.name = "player_id_norm"
+            variant_time["retention_seconds"] = player_retention_seconds
+            variant_time["ab_variant"] = variant_time.index.map(ab_variant_lookup)
+            variant_time = variant_time[variant_time["ab_variant"].isin(["A", "B"])].copy()
+            if not variant_time.empty:
+                variant_time["ab_variant_label"] = variant_time["ab_variant"].map(label_experiment_variant)
+                save_ab_variant_time_outputs(
+                    variant_time,
+                    "retention_seconds",
+                    "ab_variant_time_played_cohorts",
+                    "ab_variant_retention_by_time_played",
+                    "ab_variant_retention_by_time_played",
+                    "Retention by Time Played for A/B Variants",
+                    "Time played (minutes threshold)",
+                    "ab_variant_time_played_graph",
+                )
 
         if not player_active_playtime_seconds.empty:
             variant_active = pd.DataFrame(index=player_active_playtime_seconds.index.astype(str))
@@ -2096,45 +2244,16 @@ def main() -> None:
             variant_active = variant_active[variant_active["ab_variant"].isin(["A", "B"])].copy()
             if not variant_active.empty:
                 variant_active["ab_variant_label"] = variant_active["ab_variant"].map(label_experiment_variant)
-                variant_active.reset_index().to_csv(ab_dir / "ab_variant_active_playtime_cohorts.csv", index=False)
-                active_rows: list[dict[str, Any]] = []
-                max_active_variant_minutes = int(np.ceil(variant_active["active_playtime_seconds"].max() / 60.0))
-                for variant_name, group_rows in variant_active.groupby("ab_variant"):
-                    seconds = pd.to_numeric(group_rows["active_playtime_seconds"], errors="coerce").dropna().astype(float)
-                    if seconds.empty:
-                        continue
-                    for minute in range(0, max(1, max_active_variant_minutes) + 1):
-                        active_rows.append(
-                            {
-                                "ab_variant": variant_name,
-                                "ab_variant_label": label_experiment_variant(variant_name),
-                                "minute": minute,
-                                "percent": float((seconds >= (minute * 60.0)).mean() * 100.0),
-                            }
-                        )
-                if active_rows:
-                    variant_active_df = pd.DataFrame(active_rows)
-                    variant_active_df.to_csv(ab_dir / "ab_variant_retention_by_active_playtime.csv", index=False)
-                    variant_active_plot = variant_active_df.pivot(index="minute", columns="ab_variant_label", values="percent")
-                    variant_active_plot = variant_active_plot.reindex(columns=ab_variant_label_order).dropna(axis=1, how="all")
-                    save_multi_line_percent(
-                        variant_active_plot,
-                        ab_dir / "ab_variant_retention_by_active_playtime.png",
-                        "Retention by Active Playtime for A/B Variants",
-                        "Active playtime (minutes threshold)",
-                        "Retention (%)",
-                        (0, 100),
-                    )
-                    save_multi_line_percent(
-                        variant_active_plot,
-                        ab_dir / "ab_variant_retention_by_active_playtime_first_30.png",
-                        "Retention by Active Playtime for A/B Variants (First 30 Minutes)",
-                        "Active playtime (minutes threshold)",
-                        "Retention (%)",
-                        (0, 100),
-                        x_max=30,
-                    )
-                    summary.append(f"ab_variant_active_playtime_graph: {(ab_dir / 'ab_variant_retention_by_active_playtime.png').name}")
+                save_ab_variant_time_outputs(
+                    variant_active,
+                    "active_playtime_seconds",
+                    "ab_variant_active_playtime_cohorts",
+                    "ab_variant_retention_by_active_playtime",
+                    "ab_variant_retention_by_active_playtime",
+                    "Retention by Active Playtime for A/B Variants",
+                    "Active playtime (minutes threshold)",
+                    "ab_variant_active_playtime_graph",
+                )
 
         if not player_highest_completed.empty:
             variant_level = pd.DataFrame(index=player_highest_completed.index.astype(str))
@@ -2968,7 +3087,14 @@ def main() -> None:
         summary.append("sandbox_time_seconds_observed: n/a")
     # Add after the sandbox analysis and before the final summary write
     analyze_level_dropoff_metrics(attempts_with_player, player_highest_completed, events, args.outdir)
-    analyze_feature_usage(sessions, attempts_with_player, events, args.outdir, summary)
+    analyze_feature_usage(
+        sessions,
+        attempts_with_player,
+        events,
+        args.outdir,
+        summary,
+        excluded_player_ids=time_played_outlier_player_ids,
+    )
 
     (args.outdir / "summary.txt").write_text("\n".join(summary) + "\n", encoding="utf-8")
     if not sessions.empty:
