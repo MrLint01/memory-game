@@ -5,7 +5,12 @@ This script intentionally mirrors analyze_logs.py retention denominator logic:
 - Player population = union of player ids seen in sessions/attempts/events.
 - Highest level completed uses sessions.last_level_completed when available,
   with fallback to attempts passed levels if sessions data is unavailable.
-- Retention by time uses attempts.time_seconds sum per player.
+- Main time-played retention uses attempts.time_seconds sum per player, which is
+  the closest complete exported proxy for reveal+recall gameplay time.
+- Active-playtime retention uses sessions.total_playtime_seconds sum per player.
+- Stats-like round-time retention uses events.round_complete.time_spent_seconds
+  sum per player, but this is partial because final successful rounds are not
+  emitted as round_complete events.
 """
 
 from __future__ import annotations
@@ -19,6 +24,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+ADAPTIVE_GROUP_LABELS = {
+    "A": "A - completed level 2",
+    "B": "B - early failure in levels 1-2",
+    "unassigned": "Unassigned - no early outcome yet",
+}
+
 
 def bool_series(s: pd.Series) -> pd.Series:
     if s is None or len(s) == 0:
@@ -29,6 +40,11 @@ def bool_series(s: pd.Series) -> pd.Series:
         return s.fillna(0).astype(float) != 0
     vals = s.astype(str).str.strip().str.lower()
     return vals.isin({"1", "true", "t", "yes", "y"})
+
+
+def label_adaptive_group(value: Any) -> str:
+    normalized = str(value or "").strip()
+    return ADAPTIVE_GROUP_LABELS.get(normalized, normalized or str(value))
 
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -92,6 +108,96 @@ def load_tables(args: argparse.Namespace) -> tuple[pd.DataFrame, pd.DataFrame, p
     return sessions, attempts, events
 
 
+def build_player_retention_seconds(
+    sessions: pd.DataFrame,
+    attempts: pd.DataFrame,
+    player_index: pd.Index | None = None,
+) -> pd.Series:
+    player_retention_seconds = pd.Series(dtype=float)
+
+    a_player_col = pick_player_column(attempts)
+    if a_player_col is not None and "time_seconds" in attempts.columns:
+        attempts["time_seconds"] = pd.to_numeric(attempts["time_seconds"], errors="coerce")
+        valid_attempts = attempts[a_player_col].notna() & attempts["time_seconds"].notna()
+        if valid_attempts.any():
+            player_retention_seconds = (
+                attempts.loc[valid_attempts]
+                .groupby(attempts.loc[valid_attempts, a_player_col].astype(str))["time_seconds"]
+                .sum()
+                .astype(float)
+            )
+
+    s_player_col = pick_player_column(sessions)
+    if player_retention_seconds.empty and s_player_col is not None and "total_playtime_seconds" in sessions.columns:
+        sessions["total_playtime_seconds"] = pd.to_numeric(sessions["total_playtime_seconds"], errors="coerce")
+        valid_sessions = sessions[s_player_col].notna() & sessions["total_playtime_seconds"].notna()
+        if valid_sessions.any():
+            player_retention_seconds = (
+                sessions.loc[valid_sessions]
+                .groupby(sessions.loc[valid_sessions, s_player_col].astype(str))["total_playtime_seconds"]
+                .sum()
+                .astype(float)
+            )
+
+    if player_index is not None and len(player_index) > 0:
+        player_retention_seconds = player_retention_seconds.reindex(player_index).fillna(0.0)
+
+    return player_retention_seconds
+
+
+def build_player_active_playtime_seconds(
+    sessions: pd.DataFrame,
+    player_index: pd.Index | None = None,
+) -> pd.Series:
+    player_active_seconds = pd.Series(dtype=float)
+
+    s_player_col = pick_player_column(sessions)
+    if s_player_col is not None and "total_playtime_seconds" in sessions.columns:
+        sessions["total_playtime_seconds"] = pd.to_numeric(sessions["total_playtime_seconds"], errors="coerce")
+        valid_sessions = sessions[s_player_col].notna() & sessions["total_playtime_seconds"].notna()
+        if valid_sessions.any():
+            player_active_seconds = (
+                sessions.loc[valid_sessions]
+                .groupby(sessions.loc[valid_sessions, s_player_col].astype(str))["total_playtime_seconds"]
+                .sum()
+                .astype(float)
+            )
+
+    if player_index is not None and len(player_index) > 0:
+        player_active_seconds = player_active_seconds.reindex(player_index).fillna(0.0)
+
+    return player_active_seconds
+
+
+def build_player_stats_like_round_seconds(
+    events: pd.DataFrame,
+    player_index: pd.Index | None = None,
+) -> pd.Series:
+    player_round_seconds = pd.Series(dtype=float)
+
+    e_player_col = pick_player_column(events)
+    if e_player_col is not None and {"event_type", "time_spent_seconds"} <= set(events.columns):
+        event_type = events["event_type"].astype(str).str.strip().str.lower()
+        round_seconds = pd.to_numeric(events["time_spent_seconds"], errors="coerce")
+        valid_rounds = (
+            events[e_player_col].notna()
+            & round_seconds.notna()
+            & event_type.eq("round_complete")
+        )
+        if valid_rounds.any():
+            player_round_seconds = (
+                round_seconds[valid_rounds]
+                .groupby(events.loc[valid_rounds, e_player_col].astype(str))
+                .sum()
+                .astype(float)
+            )
+
+    if player_index is not None and len(player_index) > 0:
+        player_round_seconds = player_round_seconds.reindex(player_index).fillna(0.0)
+
+    return player_round_seconds
+
+
 def get_player_metrics_from_tables(
     s: pd.DataFrame, a: pd.DataFrame, e: pd.DataFrame
 ) -> pd.DataFrame:
@@ -138,16 +244,19 @@ def get_player_metrics_from_tables(
             cnt = passed.groupby(passed[a_player_col].astype(str))["level_number"].nunique().astype(float)
             player_levels_completed_count = cnt.reindex(player_highest_completed.index).fillna(0.0)
 
-    player_retention_seconds = pd.Series(0.0, index=player_highest_completed.index, dtype=float)
-    if a_player_col is not None and "time_seconds" in a.columns:
-        a["time_seconds"] = pd.to_numeric(a["time_seconds"], errors="coerce")
-        t = (
-            a.dropna(subset=[a_player_col, "time_seconds"])
-            .groupby(a[a_player_col].astype(str))["time_seconds"]
-            .sum()
-            .astype(float)
-        )
-        player_retention_seconds = t.reindex(player_highest_completed.index).fillna(0.0)
+    player_retention_seconds = build_player_retention_seconds(
+        s,
+        a,
+        player_highest_completed.index,
+    )
+    player_active_playtime_seconds = build_player_active_playtime_seconds(
+        s,
+        player_highest_completed.index,
+    )
+    player_stats_like_round_seconds = build_player_stats_like_round_seconds(
+        e,
+        player_highest_completed.index,
+    )
 
     out = pd.DataFrame(
         {
@@ -155,6 +264,8 @@ def get_player_metrics_from_tables(
             "highest_level_completed": player_highest_completed.astype(float).astype(int).values,
             "levels_completed_count": player_levels_completed_count.astype(float).astype(int).values,
             "total_playtime_seconds": player_retention_seconds.astype(float).values,
+            "active_playtime_seconds": player_active_playtime_seconds.astype(float).values,
+            "stats_like_round_time_seconds": player_stats_like_round_seconds.astype(float).values,
         }
     )
     return out
@@ -226,7 +337,16 @@ def retention_curve_time(seconds: pd.Series) -> pd.Series:
     return pd.Series({m: (seconds >= (m * 60.0)).mean() * 100.0 for m in idx}, index=idx)
 
 
-def plot_two_lines(out_png: Path, title: str, xlabel: str, old_label: str, new_label: str, old_s: pd.Series, new_s: pd.Series) -> None:
+def plot_two_lines(
+    out_png: Path,
+    title: str,
+    xlabel: str,
+    old_label: str,
+    new_label: str,
+    old_s: pd.Series,
+    new_s: pd.Series,
+    x_max: float | None = None,
+) -> None:
     idx = sorted(set(old_s.index.tolist()) | set(new_s.index.tolist()))
     old_p = old_s.reindex(idx).ffill().fillna(100.0)
     new_p = new_s.reindex(idx).ffill().fillna(100.0)
@@ -234,6 +354,8 @@ def plot_two_lines(out_png: Path, title: str, xlabel: str, old_label: str, new_l
     plt.plot(old_p.index, old_p.values, marker="o", color="#5b8ff9", label=old_label)
     plt.plot(new_p.index, new_p.values, marker="o", color="#5ad8a6", label=new_label)
     plt.ylim(0, 100)
+    if x_max is not None:
+        plt.xlim(0, x_max)
     plt.xlabel(xlabel)
     plt.ylabel("Retention (%)")
     plt.title(title)
@@ -597,6 +719,7 @@ def plot_adaptive_six_lines(
     old_df: pd.DataFrame,
     new_df: pd.DataFrame,
     value_col: str,
+    x_max: float | None = None,
 ) -> None:
     if old_df.empty and new_df.empty:
         return
@@ -631,7 +754,7 @@ def plot_adaptive_six_lines(
                 linestyle=linestyle,
                 marker=marker,
                 color=color,
-                label=f"{version_label} {group_name}",
+                label=f"{version_label} {label_adaptive_group(group_name)}",
             )
             plotted = True
 
@@ -640,6 +763,8 @@ def plot_adaptive_six_lines(
         return
 
     plt.ylim(0, 100)
+    if x_max is not None:
+        plt.xlim(0, x_max)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
@@ -660,6 +785,7 @@ def plot_adaptive_by_group_panels(
     old_df: pd.DataFrame,
     new_df: pd.DataFrame,
     value_col: str,
+    x_max: float | None = None,
 ) -> None:
     if old_df.empty and new_df.empty:
         return
@@ -695,9 +821,11 @@ def plot_adaptive_by_group_panels(
             )
             group_plotted = True
             plotted_any = True
-        ax.set_title(f"{group_name} cohort")
+        ax.set_title(f"{label_adaptive_group(group_name)} cohort")
         ax.set_ylabel(ylabel)
         ax.set_ylim(0, 100)
+        if x_max is not None:
+            ax.set_xlim(0, x_max)
         ax.grid(True, alpha=0.25)
         if group_plotted:
             ax.legend()
@@ -794,11 +922,59 @@ def main() -> None:
     plot_two_lines(
         outdir / "retention_curve_time_played_minutes.png",
         "Retention Curve by Time Played",
-        "Gameplay time (minutes threshold)",
+        "Time played (minutes threshold)",
         args.old_version,
         args.new_version,
         retention_curve_time(old_stats["total_playtime_seconds"]),
         retention_curve_time(new_stats["total_playtime_seconds"]),
+    )
+    plot_two_lines(
+        outdir / "retention_curve_time_played_minutes_first_30.png",
+        "Retention Curve by Time Played (First 30 Minutes)",
+        "Time played (minutes threshold)",
+        args.old_version,
+        args.new_version,
+        retention_curve_time(old_stats["total_playtime_seconds"]),
+        retention_curve_time(new_stats["total_playtime_seconds"]),
+        x_max=30,
+    )
+    plot_two_lines(
+        outdir / "retention_curve_active_playtime_minutes.png",
+        "Retention Curve by Active Playtime",
+        "Active gameplay time (minutes threshold)",
+        args.old_version,
+        args.new_version,
+        retention_curve_time(old_stats["active_playtime_seconds"]),
+        retention_curve_time(new_stats["active_playtime_seconds"]),
+    )
+    plot_two_lines(
+        outdir / "retention_curve_active_playtime_minutes_first_30.png",
+        "Retention Curve by Active Playtime (First 30 Minutes)",
+        "Active gameplay time (minutes threshold)",
+        args.old_version,
+        args.new_version,
+        retention_curve_time(old_stats["active_playtime_seconds"]),
+        retention_curve_time(new_stats["active_playtime_seconds"]),
+        x_max=30,
+    )
+    plot_two_lines(
+        outdir / "retention_curve_stats_like_round_time_minutes.png",
+        "Retention Curve by Stats-Like Round Time",
+        "Stats-like round time (minutes threshold)",
+        args.old_version,
+        args.new_version,
+        retention_curve_time(old_stats["stats_like_round_time_seconds"]),
+        retention_curve_time(new_stats["stats_like_round_time_seconds"]),
+    )
+    plot_two_lines(
+        outdir / "retention_curve_stats_like_round_time_minutes_first_30.png",
+        "Retention Curve by Stats-Like Round Time (First 30 Minutes)",
+        "Stats-like round time (minutes threshold)",
+        args.old_version,
+        args.new_version,
+        retention_curve_time(old_stats["stats_like_round_time_seconds"]),
+        retention_curve_time(new_stats["stats_like_round_time_seconds"]),
+        x_max=30,
     )
     plot_grouped_feature_bars(
         outdir / "level_1_feature_bar_comparison.png",
@@ -873,6 +1049,18 @@ def main() -> None:
         new_adaptive_retention,
         "percent",
     )
+    plot_adaptive_six_lines(
+        outdir / "adaptive_group_retention_by_time_comparison_first_30.png",
+        "Adaptive Cohort Retention by Time (First 30 Minutes)",
+        "Gameplay time (minutes threshold)",
+        "Retention (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_retention,
+        new_adaptive_retention,
+        "percent",
+        x_max=30,
+    )
     plot_adaptive_by_group_panels(
         outdir / "adaptive_group_retention_by_time_comparison_by_group.png",
         "Adaptive Cohort Retention by Time (By Group Panels)",
@@ -883,6 +1071,18 @@ def main() -> None:
         old_adaptive_retention,
         new_adaptive_retention,
         "percent",
+    )
+    plot_adaptive_by_group_panels(
+        outdir / "adaptive_group_retention_by_time_comparison_by_group_first_30.png",
+        "Adaptive Cohort Retention by Time (By Group Panels, First 30 Minutes)",
+        "Gameplay time (minutes threshold)",
+        "Retention (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_retention,
+        new_adaptive_retention,
+        "percent",
+        x_max=30,
     )
 
     old_adaptive_all = load_adaptive_retention_csv(
@@ -906,6 +1106,18 @@ def main() -> None:
         new_adaptive_all,
         "percent_all_players",
     )
+    plot_adaptive_six_lines(
+        outdir / "adaptive_group_retention_by_time_all_players_comparison_first_30.png",
+        "Adaptive Cohort Retention by Time (% of All Cohort Players, First 30 Minutes)",
+        "Gameplay time (minutes threshold)",
+        "Percent of All Three-Group Players (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_all,
+        new_adaptive_all,
+        "percent_all_players",
+        x_max=30,
+    )
     plot_adaptive_by_group_panels(
         outdir / "adaptive_group_retention_by_time_all_players_comparison_by_group.png",
         "Adaptive Cohort Retention by Time (% of All Cohort Players, By Group Panels)",
@@ -916,6 +1128,18 @@ def main() -> None:
         old_adaptive_all,
         new_adaptive_all,
         "percent_all_players",
+    )
+    plot_adaptive_by_group_panels(
+        outdir / "adaptive_group_retention_by_time_all_players_comparison_by_group_first_30.png",
+        "Adaptive Cohort Retention by Time (% of All Cohort Players, By Group Panels, First 30 Minutes)",
+        "Gameplay time (minutes threshold)",
+        "Percent of All Three-Group Players (%)",
+        args.old_version,
+        args.new_version,
+        old_adaptive_all,
+        new_adaptive_all,
+        "percent_all_players",
+        x_max=30,
     )
 
     old_adaptive_counts = get_adaptive_cohort_counts(old_dir)
@@ -933,16 +1157,33 @@ def main() -> None:
         f"new_version: {args.new_version}",
         "",
         "Comparison output: superimposed retention curves plus level-1 onboarding/flow and early-completion grouped bars",
+        "retention_metric: attempts.time_seconds sum per player (stage gameplay time; closest complete exported proxy for reveal+recall time), fallback sessions.total_playtime_seconds",
+        "active_playtime_metric: sessions.total_playtime_seconds sum per player (includes menu/result viewing until inactivity pause)",
+        "stats_like_time_metric: events.round_complete.time_spent_seconds sum per player (same per-round timer source as local stats menu, but partial because final successful rounds are not emitted as round_complete)",
         f"old_players: {len(old_stats)}",
         f"new_players: {len(new_stats)}",
         f"old_retention_levels_completed_2plus_pct: {retention_pct(old_stats, 2):.2f}",
         f"new_retention_levels_completed_2plus_pct: {retention_pct(new_stats, 2):.2f}",
-        f"old_avg_playtime_minutes: {(old_stats['total_playtime_seconds'].mean() / 60.0) if len(old_stats) else 0:.2f}",
-        f"new_avg_playtime_minutes: {(new_stats['total_playtime_seconds'].mean() / 60.0) if len(new_stats) else 0:.2f}",
+        f"old_avg_time_played_minutes: {(old_stats['total_playtime_seconds'].mean() / 60.0) if len(old_stats) else 0:.2f}",
+        f"new_avg_time_played_minutes: {(new_stats['total_playtime_seconds'].mean() / 60.0) if len(new_stats) else 0:.2f}",
+        f"old_avg_active_playtime_minutes: {(old_stats['active_playtime_seconds'].mean() / 60.0) if len(old_stats) else 0:.2f}",
+        f"new_avg_active_playtime_minutes: {(new_stats['active_playtime_seconds'].mean() / 60.0) if len(new_stats) else 0:.2f}",
+        f"old_avg_stats_like_round_time_minutes: {(old_stats['stats_like_round_time_seconds'].mean() / 60.0) if len(old_stats) else 0:.2f}",
+        f"new_avg_stats_like_round_time_minutes: {(new_stats['stats_like_round_time_seconds'].mean() / 60.0) if len(new_stats) else 0:.2f}",
         f"old_median_highest_level: {old_stats['highest_level_completed'].median() if len(old_stats) else 0}",
         f"new_median_highest_level: {new_stats['highest_level_completed'].median() if len(new_stats) else 0}",
         f"old_median_levels_completed_count: {old_stats['levels_completed_count'].median() if len(old_stats) else 0}",
         f"new_median_levels_completed_count: {new_stats['levels_completed_count'].median() if len(new_stats) else 0}",
+        f"time_played_comparison_chart: {(outdir / 'retention_curve_time_played_minutes.png').name}",
+        f"time_played_first_30_minutes_comparison_chart: {(outdir / 'retention_curve_time_played_minutes_first_30.png').name}",
+        f"active_playtime_comparison_chart: {(outdir / 'retention_curve_active_playtime_minutes.png').name}",
+        f"active_playtime_first_30_comparison_chart: {(outdir / 'retention_curve_active_playtime_minutes_first_30.png').name}",
+        f"stats_like_round_time_comparison_chart: {(outdir / 'retention_curve_stats_like_round_time_minutes.png').name}",
+        f"stats_like_round_time_first_30_comparison_chart: {(outdir / 'retention_curve_stats_like_round_time_minutes_first_30.png').name}",
+        "adaptive_group_labels:",
+        f"  A: {label_adaptive_group('A')}",
+        f"  B: {label_adaptive_group('B')}",
+        f"  unassigned: {label_adaptive_group('unassigned')}",
         "",
         "Level 1 feature bar chart definitions:",
         "- started_level_1 = player has any evidence of entering level 1 (attempt row, level_start, level_end, round_complete, or first-level autoplay entry)",
@@ -972,9 +1213,13 @@ def main() -> None:
         f"new_adaptive_b_players: {new_adaptive_counts['B']}",
         f"new_adaptive_a_players: {new_adaptive_counts['A']}",
         f"adaptive_time_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_comparison.png').name}",
+        f"adaptive_time_first_30_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_first_30.png').name}",
         f"adaptive_time_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_by_group.png').name}",
+        f"adaptive_time_first_30_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_comparison_by_group_first_30.png').name}",
         f"adaptive_time_all_players_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison.png').name}",
+        f"adaptive_time_all_players_first_30_comparison_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_first_30.png').name}",
         f"adaptive_time_all_players_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_by_group.png').name}",
+        f"adaptive_time_all_players_first_30_comparison_by_group_graph: {(outdir / 'adaptive_group_retention_by_time_all_players_comparison_by_group_first_30.png').name}",
     ]
     (outdir / "summary.txt").write_text("\n".join(map(str, summary)) + "\n", encoding="utf-8")
     old_stats.to_csv(outdir / "old_version_player_stats.csv", index=False)

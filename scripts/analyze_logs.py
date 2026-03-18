@@ -16,6 +16,15 @@ import numpy as np
 import pandas as pd
 
 TRUE_VALUES = {"true", "1", "yes", "y", "t"}
+EXPERIMENT_VARIANT_LABELS = {
+    "A": "A - Turbo / original early-game build",
+    "B": "B - alternate early-game modifiers / Turbo off",
+}
+ADAPTIVE_GROUP_LABELS = {
+    "A": "A - completed level 2",
+    "B": "B - early failure in levels 1-2",
+    "unassigned": "Unassigned - no early outcome yet",
+}
 
 
 def load_table(path: Optional[Path]) -> pd.DataFrame:
@@ -36,6 +45,21 @@ def load_table(path: Optional[Path]) -> pd.DataFrame:
                 return pd.DataFrame(obj["documents"])
             return pd.json_normalize(obj)
     raise ValueError(f"Unsupported file type for {path}")
+
+
+def normalize_experiment_variant(value: Any) -> str:
+    normalized = str(value or "").strip().upper()
+    return normalized if normalized in {"A", "B"} else ""
+
+
+def label_experiment_variant(value: Any) -> str:
+    normalized = normalize_experiment_variant(value)
+    return EXPERIMENT_VARIANT_LABELS.get(normalized, str(value))
+
+
+def label_adaptive_group(value: Any) -> str:
+    normalized = str(value or "").strip()
+    return ADAPTIVE_GROUP_LABELS.get(normalized, normalized or str(value))
 
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -113,7 +137,15 @@ def save_bar(series: pd.Series, path: Path, title: str, xlabel: str, ylabel: str
     plt.close()
 
 
-def save_line(series: pd.Series, path: Path, title: str, xlabel: str, ylabel: str, ylim: Optional[tuple[float, float]] = None) -> None:
+def save_line(
+    series: pd.Series,
+    path: Path,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    ylim: Optional[tuple[float, float]] = None,
+    x_max: Optional[float] = None,
+) -> None:
     if series.empty:
         return
     plt.figure(figsize=(9, 5))
@@ -125,6 +157,8 @@ def save_line(series: pd.Series, path: Path, title: str, xlabel: str, ylabel: st
     plt.ylabel(ylabel)
     if ylim is not None:
         plt.ylim(*ylim)
+    if x_max is not None:
+        plt.xlim(0, x_max)
     plt.tight_layout()
     plt.savefig(path, dpi=120)
     plt.close()
@@ -217,6 +251,96 @@ def infer_currently_playing_players(sessions: pd.DataFrame, stale_minutes: int =
         in_level = (current_level > last_completed)
 
     return (state_active & ~ended & recent) | (in_level & recent)
+
+
+def build_player_retention_seconds(
+    sessions: pd.DataFrame,
+    attempts_with_player: pd.DataFrame,
+    player_index: Optional[pd.Index] = None,
+) -> pd.Series:
+    player_retention_seconds = pd.Series(dtype=float)
+
+    if {"player_id_norm", "time_seconds"} <= set(attempts_with_player.columns):
+        attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player["time_seconds"], errors="coerce")
+        valid_attempts = attempts_with_player["player_id_norm"].notna() & attempts_with_player["time_seconds"].notna()
+        if valid_attempts.any():
+            player_retention_seconds = (
+                attempts_with_player.loc[valid_attempts]
+                .groupby("player_id_norm")["time_seconds"]
+                .sum()
+                .astype(float)
+            )
+
+    if player_retention_seconds.empty:
+        sessions_player_col = pick_player_column(sessions) if not sessions.empty else None
+        if sessions_player_col is not None and "total_playtime_seconds" in sessions.columns:
+            session_totals = pd.to_numeric(sessions["total_playtime_seconds"], errors="coerce")
+            valid_sessions = sessions[sessions_player_col].notna() & session_totals.notna()
+            if valid_sessions.any():
+                player_retention_seconds = (
+                    session_totals[valid_sessions]
+                    .groupby(sessions.loc[valid_sessions, sessions_player_col].astype(str))
+                    .sum()
+                    .astype(float)
+                )
+
+    if player_index is not None and len(player_index) > 0:
+        player_retention_seconds = player_retention_seconds.reindex(player_index).fillna(0.0)
+
+    return player_retention_seconds
+
+
+def build_player_active_playtime_seconds(
+    sessions: pd.DataFrame,
+    player_index: Optional[pd.Index] = None,
+) -> pd.Series:
+    player_active_seconds = pd.Series(dtype=float)
+
+    sessions_player_col = pick_player_column(sessions) if not sessions.empty else None
+    if sessions_player_col is not None and "total_playtime_seconds" in sessions.columns:
+        session_totals = pd.to_numeric(sessions["total_playtime_seconds"], errors="coerce")
+        valid_sessions = sessions[sessions_player_col].notna() & session_totals.notna()
+        if valid_sessions.any():
+            player_active_seconds = (
+                session_totals[valid_sessions]
+                .groupby(sessions.loc[valid_sessions, sessions_player_col].astype(str))
+                .sum()
+                .astype(float)
+            )
+
+    if player_index is not None and len(player_index) > 0:
+        player_active_seconds = player_active_seconds.reindex(player_index).fillna(0.0)
+
+    return player_active_seconds
+
+
+def build_player_stats_like_round_seconds(
+    events: pd.DataFrame,
+    player_index: Optional[pd.Index] = None,
+) -> pd.Series:
+    player_round_seconds = pd.Series(dtype=float)
+
+    events_player_col = pick_player_column(events) if not events.empty else None
+    if events_player_col is not None and {"event_type", "time_spent_seconds"} <= set(events.columns):
+        event_type = events["event_type"].astype(str).str.strip().str.lower()
+        round_seconds = pd.to_numeric(events["time_spent_seconds"], errors="coerce")
+        valid_rounds = (
+            events[events_player_col].notna()
+            & round_seconds.notna()
+            & event_type.eq("round_complete")
+        )
+        if valid_rounds.any():
+            player_round_seconds = (
+                round_seconds[valid_rounds]
+                .groupby(events.loc[valid_rounds, events_player_col].astype(str))
+                .sum()
+                .astype(float)
+            )
+
+    if player_index is not None and len(player_index) > 0:
+        player_round_seconds = player_round_seconds.reindex(player_index).fillna(0.0)
+
+    return player_round_seconds
 
 
 def infer_quit_summary(events: pd.DataFrame, attempts: pd.DataFrame) -> pd.DataFrame:
@@ -324,7 +448,15 @@ def save_grouped_bar(frame: pd.DataFrame, path: Path, title: str, xlabel: str, y
     plt.close()
 
 
-def save_multi_line_percent(frame: pd.DataFrame, path: Path, title: str, xlabel: str, ylabel: str, ylim: Optional[tuple[float, float]] = None) -> None:
+def save_multi_line_percent(
+    frame: pd.DataFrame,
+    path: Path,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    ylim: Optional[tuple[float, float]] = None,
+    x_max: Optional[float] = None,
+) -> None:
     if frame.empty:
         return
     plt.figure(figsize=(10, 6))
@@ -335,6 +467,8 @@ def save_multi_line_percent(frame: pd.DataFrame, path: Path, title: str, xlabel:
     plt.ylabel(ylabel)
     if ylim is not None:
         plt.ylim(*ylim)
+    if x_max is not None:
+        plt.xlim(0, x_max)
     plt.legend()
     plt.grid(True, alpha=0.25)
     plt.tight_layout()
@@ -391,6 +525,45 @@ def infer_adaptive_cohorts_from_attempts(attempts_with_player: pd.DataFrame) -> 
     return pd.DataFrame(rows)
 
 
+def infer_experiment_variants_by_player(
+    sessions: pd.DataFrame,
+    attempts_with_player: pd.DataFrame,
+) -> pd.Series:
+    parts: list[pd.DataFrame] = []
+
+    if {"player_id_norm", "ab_variant"} <= set(attempts_with_player.columns):
+        a_part = attempts_with_player[["player_id_norm", "ab_variant"]].copy()
+        a_part["player_id_norm"] = a_part["player_id_norm"].astype(str)
+        a_part["ab_variant"] = a_part["ab_variant"].map(normalize_experiment_variant)
+        a_part = a_part[a_part["player_id_norm"].notna() & a_part["ab_variant"].ne("")]
+        if not a_part.empty:
+            parts.append(a_part)
+
+    session_player_col = pick_player_column(sessions)
+    if session_player_col is not None and {"ab_variant"} <= set(sessions.columns):
+        s_part = sessions[[session_player_col, "ab_variant"]].copy()
+        s_part = s_part.rename(columns={session_player_col: "player_id_norm"})
+        s_part["player_id_norm"] = s_part["player_id_norm"].astype(str)
+        s_part["ab_variant"] = s_part["ab_variant"].map(normalize_experiment_variant)
+        s_part = s_part[s_part["player_id_norm"].notna() & s_part["ab_variant"].ne("")]
+        if not s_part.empty:
+            parts.append(s_part)
+
+    if not parts:
+        return pd.Series(dtype="object")
+
+    combined = pd.concat(parts, ignore_index=True)
+    if combined.empty:
+        return pd.Series(dtype="object")
+
+    variant_lookup = (
+        combined.drop_duplicates(subset=["player_id_norm"])
+        .set_index("player_id_norm")["ab_variant"]
+        .astype(str)
+    )
+    return variant_lookup
+
+
 def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataFrame, events: pd.DataFrame, outdir: Path, summary: list[str]) -> None:
     if events.empty and sessions.empty:
         return
@@ -400,11 +573,19 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
     adaptive_dir = outdir / "adaptive_features"
     adaptive_dir.mkdir(parents=True, exist_ok=True)
     adaptive_cohorts = infer_adaptive_cohorts_from_attempts(attempts_with_player)
+    adaptive_group_label_order = [label_adaptive_group(name) for name in ["unassigned", "B", "A"]]
     adaptive_group_lookup = (
         adaptive_cohorts.set_index("player_id_norm")["adaptive_group"]
         if not adaptive_cohorts.empty
         else pd.Series(dtype="object")
     )
+    if not adaptive_cohorts.empty:
+        adaptive_assignments = adaptive_cohorts.copy()
+        adaptive_assignments["adaptive_group_label"] = adaptive_assignments["adaptive_group"].map(label_adaptive_group)
+        adaptive_assignments.to_csv(adaptive_dir / "adaptive_group_assignments.csv", index=False)
+        summary.append("adaptive_group_labels:")
+        for group_name in ["A", "B", "unassigned"]:
+            summary.append(f"  {group_name}: {label_adaptive_group(group_name)}")
 
     events_with_player = add_player_id_to_events(events, sessions) if not events.empty else pd.DataFrame()
     total_players = 0
@@ -790,6 +971,7 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                     .unstack(fill_value=0)
                     .sort_index()
                 )
+                adaptive_quit.index = [label_adaptive_group(idx) for idx in adaptive_quit.index]
                 save_stacked_bar(
                     adaptive_quit,
                     adaptive_dir / "adaptive_group_quit_buckets.png",
@@ -823,8 +1005,10 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
 
             if not adaptive_sessions.empty:
                 avg_playtime = adaptive_sessions.groupby("adaptive_group_reconstructed")["total_playtime_seconds"].mean().sort_index()
+                avg_playtime.index = [label_adaptive_group(idx) for idx in avg_playtime.index]
                 save_bar(avg_playtime, adaptive_dir / "adaptive_group_avg_playtime.png", "Average Playtime by Adaptive Group", "Adaptive Group", "Seconds")
                 avg_level = adaptive_sessions.groupby("adaptive_group_reconstructed")["last_level_completed"].mean().sort_index()
+                avg_level.index = [label_adaptive_group(idx) for idx in avg_level.index]
                 save_bar(avg_level, adaptive_dir / "adaptive_group_avg_last_level.png", "Average Last Level Completed by Adaptive Group", "Adaptive Group", "Level")
                 avg_playtime.rename("avg_playtime_seconds").to_csv(adaptive_dir / "adaptive_group_avg_playtime.csv")
                 avg_level.rename("avg_last_level_completed").to_csv(adaptive_dir / "adaptive_group_avg_last_level.csv")
@@ -833,6 +1017,7 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                 if player_col:
                     adaptive_sessions["reached_level_3"] = pd.to_numeric(adaptive_sessions["last_level_completed"], errors="coerce").fillna(0) >= 3
                     level3_pct = adaptive_sessions.groupby("adaptive_group_reconstructed")["reached_level_3"].mean().mul(100.0).sort_index()
+                    level3_pct.index = [label_adaptive_group(idx) for idx in level3_pct.index]
                     save_bar(level3_pct, adaptive_dir / "adaptive_group_reached_level3_percent.png", "Percent Reaching Level 3 by Adaptive Group", "Adaptive Group", "Percent", (0, 100))
                     level3_pct.rename("percent").to_csv(adaptive_dir / "adaptive_group_reached_level3_percent.csv")
 
@@ -884,8 +1069,10 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                                     })
                             if retention_rows:
                                 retention_df = pd.DataFrame(retention_rows)
+                                retention_df["adaptive_group_label"] = retention_df["adaptive_group"].map(label_adaptive_group)
                                 retention_df.to_csv(adaptive_dir / "adaptive_group_retention_windows.csv", index=False)
-                                retention_plot = retention_df.pivot(index="window", columns="adaptive_group", values="percent").sort_index()
+                                retention_plot = retention_df.pivot(index="window", columns="adaptive_group_label", values="percent").sort_index()
+                                retention_plot = retention_plot.reindex(columns=[label_adaptive_group(name) for name in ["B", "A"]]).dropna(axis=1, how="all")
                                 save_grouped_bar(
                                     retention_plot,
                                     adaptive_dir / "adaptive_group_retention_windows.png",
@@ -909,6 +1096,7 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                 cohort.index.name = "player_id_norm"
                 cohort["retention_seconds"] = player_retention
                 cohort["adaptive_retention_group"] = cohort.index.map(adaptive_group_lookup)
+                cohort["adaptive_retention_group_label"] = cohort["adaptive_retention_group"].map(label_adaptive_group)
 
                 cohort = cohort[cohort["adaptive_retention_group"].isin(["A", "B", "unassigned"])].copy()
                 if not cohort.empty:
@@ -927,9 +1115,10 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                             })
                     if retention_rows:
                         retention_curve_df = pd.DataFrame(retention_rows)
+                        retention_curve_df["adaptive_group_label"] = retention_curve_df["adaptive_group"].map(label_adaptive_group)
                         retention_curve_df.to_csv(adaptive_dir / "adaptive_group_retention_by_time.csv", index=False)
-                        retention_curve_plot = retention_curve_df.pivot(index="minute", columns="adaptive_group", values="percent")
-                        retention_curve_plot = retention_curve_plot.reindex(columns=["unassigned", "B", "A"]).dropna(axis=1, how="all")
+                        retention_curve_plot = retention_curve_df.pivot(index="minute", columns="adaptive_group_label", values="percent")
+                        retention_curve_plot = retention_curve_plot.reindex(columns=adaptive_group_label_order).dropna(axis=1, how="all")
                         save_multi_line_percent(
                             retention_curve_plot,
                             adaptive_dir / "adaptive_group_retention_by_time.png",
@@ -937,6 +1126,15 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                             "Gameplay time (minutes threshold)",
                             "Retention (%)",
                             (0, 100),
+                        )
+                        save_multi_line_percent(
+                            retention_curve_plot,
+                            adaptive_dir / "adaptive_group_retention_by_time_first_30.png",
+                            "Retention by Time for Adaptive Cohorts (First 30 Minutes)",
+                            "Gameplay time (minutes threshold)",
+                            "Retention (%)",
+                            (0, 100),
+                            x_max=30,
                         )
 
                         total_players_denominator = int(cohort.shape[0])
@@ -955,9 +1153,10 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                                     })
                             if retention_all_rows:
                                 retention_all_df = pd.DataFrame(retention_all_rows)
+                                retention_all_df["adaptive_group_label"] = retention_all_df["adaptive_group"].map(label_adaptive_group)
                                 retention_all_df.to_csv(adaptive_dir / "adaptive_group_retention_by_time_all_players.csv", index=False)
-                                retention_all_plot = retention_all_df.pivot(index="minute", columns="adaptive_group", values="percent_all_players")
-                                retention_all_plot = retention_all_plot.reindex(columns=["unassigned", "B", "A"]).dropna(axis=1, how="all")
+                                retention_all_plot = retention_all_df.pivot(index="minute", columns="adaptive_group_label", values="percent_all_players")
+                                retention_all_plot = retention_all_plot.reindex(columns=adaptive_group_label_order).dropna(axis=1, how="all")
                                 save_multi_line_percent(
                                     retention_all_plot,
                                     adaptive_dir / "adaptive_group_retention_by_time_all_players.png",
@@ -965,6 +1164,15 @@ def analyze_feature_usage(sessions: pd.DataFrame, attempts_with_player: pd.DataF
                                     "Gameplay time (minutes threshold)",
                                     "Percent of All Three-Group Players (%)",
                                     (0, 100),
+                                )
+                                save_multi_line_percent(
+                                    retention_all_plot,
+                                    adaptive_dir / "adaptive_group_retention_by_time_all_players_first_30.png",
+                                    "Retention by Time for Adaptive Cohorts (% of All Cohort Players, First 30 Minutes)",
+                                    "Gameplay time (minutes threshold)",
+                                    "Percent of All Three-Group Players (%)",
+                                    (0, 100),
+                                    x_max=30,
                                 )
 
 
@@ -1524,19 +1732,29 @@ def main() -> None:
         summary.append(f"sessions: {len(sessions)}")
         if "player_id" in sessions.columns:
             summary.append(f"unique_players: {sessions['player_id'].nunique()}")
-        if "site_host" in sessions.columns:
-            host_counts = (
-                sessions["site_host"]
+        sessions_player_col = pick_player_column(sessions)
+        if sessions_player_col is not None and "site_host" in sessions.columns:
+            host_players = sessions[[sessions_player_col, "site_host"]].copy()
+            host_players[sessions_player_col] = host_players[sessions_player_col].astype(str)
+            host_players["site_host"] = (
+                host_players["site_host"]
                 .astype(str)
                 .replace({"": pd.NA, "nan": pd.NA, "none": pd.NA, "null": pd.NA})
-                .dropna()
-                .value_counts()
             )
-            if not host_counts.empty:
-                summary.append("site_hosts_by_session_count:")
-                for host, count in host_counts.items():
-                    summary.append(f"  {host}: {int(count)}")
-    summary.append("retention_metric: attempts.time_seconds sum per player (strict gameplay-only)")
+            host_players = host_players.dropna(subset=[sessions_player_col, "site_host"]).drop_duplicates()
+            if not host_players.empty:
+                host_counts = (
+                    host_players.groupby("site_host")[sessions_player_col]
+                    .nunique()
+                    .sort_values(ascending=False)
+                )
+                if not host_counts.empty:
+                    summary.append("site_hosts_by_unique_players:")
+                    for host, count in host_counts.items():
+                        summary.append(f"  {host}: {int(count)}")
+    summary.append("retention_metric: attempts.time_seconds sum per player (stage gameplay time; closest complete exported proxy for reveal+recall time), fallback sessions.total_playtime_seconds")
+    summary.append("active_playtime_metric: sessions.total_playtime_seconds sum per player (includes menu/result viewing until inactivity pause)")
+    summary.append("stats_like_time_metric: events.round_complete.time_spent_seconds sum per player (same per-round timer source as local stats menu, but partial because final successful rounds are not emitted as round_complete)")
     attempts_with_player = add_player_id_to_attempts(attempts, sessions)
 
     # Player-level baseline: highest completed level per player, with 0 for players with no completed levels.
@@ -1710,17 +1928,19 @@ def main() -> None:
         summary.append(f"  max_levels_completed_count: {max_completed_count}")
 
     # New retention by time: player-based denominator.
-    player_retention_seconds = pd.Series(dtype=float)
-    if {"player_id_norm", "time_seconds"} <= set(attempts_with_player.columns):
-        attempts_with_player["time_seconds"] = pd.to_numeric(attempts_with_player["time_seconds"], errors="coerce")
-        player_retention_seconds = (
-            attempts_with_player.dropna(subset=["player_id_norm", "time_seconds"])
-            .groupby("player_id_norm")["time_seconds"]
-            .sum()
-            .astype(float)
-        )
-    if not player_highest_completed.empty:
-        player_retention_seconds = player_retention_seconds.reindex(player_highest_completed.index).fillna(0.0)
+    player_retention_seconds = build_player_retention_seconds(
+        sessions,
+        attempts_with_player,
+        player_highest_completed.index if not player_highest_completed.empty else None,
+    )
+    player_active_playtime_seconds = build_player_active_playtime_seconds(
+        sessions,
+        player_highest_completed.index if not player_highest_completed.empty else None,
+    )
+    player_stats_like_round_seconds = build_player_stats_like_round_seconds(
+        events,
+        player_highest_completed.index if not player_highest_completed.empty else None,
+    )
     if not player_retention_seconds.empty:
         max_minutes = int(np.ceil(player_retention_seconds.max() / 60.0))
         minute_index = pd.Index(range(0, max(1, max_minutes) + 1), dtype=int)
@@ -1734,21 +1954,262 @@ def main() -> None:
         save_line(
             retention_by_time_percent,
             args.outdir / "retention_percent_by_time_played.png",
-            "Player Retention by Gameplay Time",
-            "Gameplay Time (minutes)",
+            "Player Retention by Time Played",
+            "Time Played (minutes)",
             "Retention (%)",
             (0, 100),
+        )
+        save_line(
+            retention_by_time_percent,
+            args.outdir / "retention_percent_by_time_played_first_30.png",
+            "Player Retention by Time Played (First 30 Minutes)",
+            "Time Played (minutes)",
+            "Retention (%)",
+            (0, 100),
+            x_max=30,
         )
         summary.append("retention_by_time_played_percent_player:")
         summary.append(f"  max_minutes: {max_minutes}")
 
+    if not player_active_playtime_seconds.empty:
+        max_active_minutes = int(np.ceil(player_active_playtime_seconds.max() / 60.0))
+        active_minute_index = pd.Index(range(0, max(1, max_active_minutes) + 1), dtype=int)
+        retention_by_active_time_percent = pd.Series(
+            {
+                minute: (player_active_playtime_seconds >= (minute * 60.0)).mean() * 100.0
+                for minute in active_minute_index
+            },
+            index=active_minute_index,
+        )
+        save_line(
+            retention_by_active_time_percent,
+            args.outdir / "retention_percent_by_active_playtime.png",
+            "Player Retention by Active Playtime",
+            "Active Playtime (minutes)",
+            "Retention (%)",
+            (0, 100),
+        )
+        save_line(
+            retention_by_active_time_percent,
+            args.outdir / "retention_percent_by_active_playtime_first_30.png",
+            "Player Retention by Active Playtime (First 30 Minutes)",
+            "Active Playtime (minutes)",
+            "Retention (%)",
+            (0, 100),
+            x_max=30,
+        )
+        summary.append("retention_by_active_playtime_percent_player:")
+        summary.append(f"  max_minutes: {max_active_minutes}")
+
+    if not player_stats_like_round_seconds.empty:
+        max_stats_like_minutes = int(np.ceil(player_stats_like_round_seconds.max() / 60.0))
+        stats_like_minute_index = pd.Index(range(0, max(1, max_stats_like_minutes) + 1), dtype=int)
+        retention_by_stats_like_time_percent = pd.Series(
+            {
+                minute: (player_stats_like_round_seconds >= (minute * 60.0)).mean() * 100.0
+                for minute in stats_like_minute_index
+            },
+            index=stats_like_minute_index,
+        )
+        save_line(
+            retention_by_stats_like_time_percent,
+            args.outdir / "retention_percent_by_stats_like_round_time_played.png",
+            "Player Retention by Stats-Like Round Time",
+            "Stats-Like Round Time (minutes)",
+            "Retention (%)",
+            (0, 100),
+        )
+        save_line(
+            retention_by_stats_like_time_percent,
+            args.outdir / "retention_percent_by_stats_like_round_time_played_first_30.png",
+            "Player Retention by Stats-Like Round Time (First 30 Minutes)",
+            "Stats-Like Round Time (minutes)",
+            "Retention (%)",
+            (0, 100),
+            x_max=30,
+        )
+        summary.append("retention_by_stats_like_round_time_percent_player:")
+        summary.append(f"  max_minutes: {max_stats_like_minutes}")
+
+    ab_variant_lookup = infer_experiment_variants_by_player(sessions, attempts_with_player)
+    if not ab_variant_lookup.empty:
+        ab_dir = args.outdir / "ab_variant_features"
+        ab_dir.mkdir(parents=True, exist_ok=True)
+        ab_variant_label_order = [label_experiment_variant(name) for name in ["A", "B"]]
+        summary.append("ab_variant_labels:")
+        for variant_name in ["A", "B"]:
+            summary.append(f"  {variant_name}: {label_experiment_variant(variant_name)}")
+
+        if not player_retention_seconds.empty:
+            variant_time = pd.DataFrame(index=player_retention_seconds.index.astype(str))
+            variant_time.index.name = "player_id_norm"
+            variant_time["retention_seconds"] = player_retention_seconds
+            variant_time["ab_variant"] = variant_time.index.map(ab_variant_lookup)
+            variant_time = variant_time[variant_time["ab_variant"].isin(["A", "B"])].copy()
+            if not variant_time.empty:
+                variant_time["ab_variant_label"] = variant_time["ab_variant"].map(label_experiment_variant)
+                variant_time.reset_index().to_csv(ab_dir / "ab_variant_time_played_cohorts.csv", index=False)
+                retention_rows: list[dict[str, Any]] = []
+                max_variant_minutes = int(np.ceil(variant_time["retention_seconds"].max() / 60.0))
+                for variant_name, group_rows in variant_time.groupby("ab_variant"):
+                    seconds = pd.to_numeric(group_rows["retention_seconds"], errors="coerce").dropna().astype(float)
+                    if seconds.empty:
+                        continue
+                    for minute in range(0, max(1, max_variant_minutes) + 1):
+                        retention_rows.append(
+                            {
+                                "ab_variant": variant_name,
+                                "ab_variant_label": label_experiment_variant(variant_name),
+                                "minute": minute,
+                                "percent": float((seconds >= (minute * 60.0)).mean() * 100.0),
+                            }
+                        )
+                if retention_rows:
+                    variant_retention_df = pd.DataFrame(retention_rows)
+                    variant_retention_df.to_csv(ab_dir / "ab_variant_retention_by_time_played.csv", index=False)
+                    variant_retention_plot = variant_retention_df.pivot(index="minute", columns="ab_variant_label", values="percent")
+                    variant_retention_plot = variant_retention_plot.reindex(columns=ab_variant_label_order).dropna(axis=1, how="all")
+                    save_multi_line_percent(
+                        variant_retention_plot,
+                        ab_dir / "ab_variant_retention_by_time_played.png",
+                        "Retention by Time Played for A/B Variants",
+                        "Time played (minutes threshold)",
+                        "Retention (%)",
+                        (0, 100),
+                    )
+                    save_multi_line_percent(
+                        variant_retention_plot,
+                        ab_dir / "ab_variant_retention_by_time_played_first_30.png",
+                        "Retention by Time Played for A/B Variants (First 30 Minutes)",
+                        "Time played (minutes threshold)",
+                        "Retention (%)",
+                        (0, 100),
+                        x_max=30,
+                    )
+                    summary.append(f"ab_variant_time_played_graph: {(ab_dir / 'ab_variant_retention_by_time_played.png').name}")
+
+        if not player_active_playtime_seconds.empty:
+            variant_active = pd.DataFrame(index=player_active_playtime_seconds.index.astype(str))
+            variant_active.index.name = "player_id_norm"
+            variant_active["active_playtime_seconds"] = player_active_playtime_seconds
+            variant_active["ab_variant"] = variant_active.index.map(ab_variant_lookup)
+            variant_active = variant_active[variant_active["ab_variant"].isin(["A", "B"])].copy()
+            if not variant_active.empty:
+                variant_active["ab_variant_label"] = variant_active["ab_variant"].map(label_experiment_variant)
+                variant_active.reset_index().to_csv(ab_dir / "ab_variant_active_playtime_cohorts.csv", index=False)
+                active_rows: list[dict[str, Any]] = []
+                max_active_variant_minutes = int(np.ceil(variant_active["active_playtime_seconds"].max() / 60.0))
+                for variant_name, group_rows in variant_active.groupby("ab_variant"):
+                    seconds = pd.to_numeric(group_rows["active_playtime_seconds"], errors="coerce").dropna().astype(float)
+                    if seconds.empty:
+                        continue
+                    for minute in range(0, max(1, max_active_variant_minutes) + 1):
+                        active_rows.append(
+                            {
+                                "ab_variant": variant_name,
+                                "ab_variant_label": label_experiment_variant(variant_name),
+                                "minute": minute,
+                                "percent": float((seconds >= (minute * 60.0)).mean() * 100.0),
+                            }
+                        )
+                if active_rows:
+                    variant_active_df = pd.DataFrame(active_rows)
+                    variant_active_df.to_csv(ab_dir / "ab_variant_retention_by_active_playtime.csv", index=False)
+                    variant_active_plot = variant_active_df.pivot(index="minute", columns="ab_variant_label", values="percent")
+                    variant_active_plot = variant_active_plot.reindex(columns=ab_variant_label_order).dropna(axis=1, how="all")
+                    save_multi_line_percent(
+                        variant_active_plot,
+                        ab_dir / "ab_variant_retention_by_active_playtime.png",
+                        "Retention by Active Playtime for A/B Variants",
+                        "Active playtime (minutes threshold)",
+                        "Retention (%)",
+                        (0, 100),
+                    )
+                    save_multi_line_percent(
+                        variant_active_plot,
+                        ab_dir / "ab_variant_retention_by_active_playtime_first_30.png",
+                        "Retention by Active Playtime for A/B Variants (First 30 Minutes)",
+                        "Active playtime (minutes threshold)",
+                        "Retention (%)",
+                        (0, 100),
+                        x_max=30,
+                    )
+                    summary.append(f"ab_variant_active_playtime_graph: {(ab_dir / 'ab_variant_retention_by_active_playtime.png').name}")
+
+        if not player_highest_completed.empty:
+            variant_level = pd.DataFrame(index=player_highest_completed.index.astype(str))
+            variant_level.index.name = "player_id_norm"
+            variant_level["highest_level_completed"] = player_highest_completed.astype(float)
+            variant_level["ab_variant"] = variant_level.index.map(ab_variant_lookup)
+            variant_level = variant_level[variant_level["ab_variant"].isin(["A", "B"])].copy()
+            if not variant_level.empty:
+                variant_level["ab_variant_label"] = variant_level["ab_variant"].map(label_experiment_variant)
+                variant_level.reset_index().to_csv(ab_dir / "ab_variant_highest_level_cohorts.csv", index=False)
+                level_rows: list[dict[str, Any]] = []
+                max_variant_level = int(variant_level["highest_level_completed"].max()) if not variant_level.empty else 0
+                for variant_name, group_rows in variant_level.groupby("ab_variant"):
+                    levels = pd.to_numeric(group_rows["highest_level_completed"], errors="coerce").dropna().astype(float)
+                    if levels.empty:
+                        continue
+                    for level in range(0, max(1, max_variant_level) + 1):
+                        level_rows.append(
+                            {
+                                "ab_variant": variant_name,
+                                "ab_variant_label": label_experiment_variant(variant_name),
+                                "level": level,
+                                "percent": float((levels >= level).mean() * 100.0),
+                            }
+                        )
+                if level_rows:
+                    variant_level_df = pd.DataFrame(level_rows)
+                    variant_level_df.to_csv(ab_dir / "ab_variant_retention_by_level.csv", index=False)
+                    variant_level_plot = variant_level_df.pivot(index="level", columns="ab_variant_label", values="percent")
+                    variant_level_plot = variant_level_plot.reindex(columns=ab_variant_label_order).dropna(axis=1, how="all")
+                    save_multi_line_percent(
+                        variant_level_plot,
+                        ab_dir / "ab_variant_retention_by_level.png",
+                        "Retention by Highest Level Completed for A/B Variants",
+                        "Level",
+                        "Retention (%)",
+                        (0, 100),
+                    )
+                    summary.append(f"ab_variant_level_retention_graph: {(ab_dir / 'ab_variant_retention_by_level.png').name}")
+
     if not player_retention_seconds.empty:
-        save_hist_minutes(player_retention_seconds, args.outdir / "session_duration_hist.png", "Total Retention Time Per Unique Player (Inactivity-Excluded)")
+        save_hist_minutes(player_retention_seconds, args.outdir / "session_duration_hist.png", "Total Time Played Per Unique Player")
         summary.append(f"unique_players_for_duration_hist: {int(player_retention_seconds.shape[0])}")
-        summary.append(f"avg_player_gameplay_minutes_zero_filled: {player_retention_seconds.mean() / 60.0:.2f}")
+        summary.append(f"avg_player_time_played_minutes_zero_filled: {player_retention_seconds.mean() / 60.0:.2f}")
         nonzero_player_retention_seconds = player_retention_seconds[player_retention_seconds > 0]
-        summary.append(f"avg_player_gameplay_minutes_nonzero_only: {(nonzero_player_retention_seconds.mean() / 60.0) if not nonzero_player_retention_seconds.empty else 0.0:.2f}")
-        summary.append(f"players_with_nonzero_gameplay_attempt_time: {int(nonzero_player_retention_seconds.shape[0])}")
+        summary.append(f"avg_player_time_played_minutes_nonzero_only: {(nonzero_player_retention_seconds.mean() / 60.0) if not nonzero_player_retention_seconds.empty else 0.0:.2f}")
+        summary.append(f"players_with_nonzero_time_played: {int(nonzero_player_retention_seconds.shape[0])}")
+
+    if not player_active_playtime_seconds.empty:
+        save_hist_minutes(
+            player_active_playtime_seconds,
+            args.outdir / "active_playtime_hist.png",
+            "Total Active Playtime Per Unique Player",
+        )
+        summary.append(f"unique_players_for_active_playtime_hist: {int(player_active_playtime_seconds.shape[0])}")
+        summary.append(f"avg_player_active_playtime_minutes_zero_filled: {player_active_playtime_seconds.mean() / 60.0:.2f}")
+        nonzero_player_active_playtime_seconds = player_active_playtime_seconds[player_active_playtime_seconds > 0]
+        summary.append(
+            f"avg_player_active_playtime_minutes_nonzero_only: {(nonzero_player_active_playtime_seconds.mean() / 60.0) if not nonzero_player_active_playtime_seconds.empty else 0.0:.2f}"
+        )
+        summary.append(f"players_with_nonzero_active_playtime: {int(nonzero_player_active_playtime_seconds.shape[0])}")
+
+    if not player_stats_like_round_seconds.empty:
+        save_hist_minutes(
+            player_stats_like_round_seconds,
+            args.outdir / "stats_like_round_time_hist.png",
+            "Total Stats-Like Round Time Per Unique Player",
+        )
+        summary.append(f"unique_players_for_stats_like_time_hist: {int(player_stats_like_round_seconds.shape[0])}")
+        summary.append(f"avg_player_stats_like_round_time_minutes_zero_filled: {player_stats_like_round_seconds.mean() / 60.0:.2f}")
+        nonzero_player_stats_like_round_seconds = player_stats_like_round_seconds[player_stats_like_round_seconds > 0]
+        summary.append(
+            f"avg_player_stats_like_round_time_minutes_nonzero_only: {(nonzero_player_stats_like_round_seconds.mean() / 60.0) if not nonzero_player_stats_like_round_seconds.empty else 0.0:.2f}"
+        )
+        summary.append(f"players_with_nonzero_stats_like_round_time: {int(nonzero_player_stats_like_round_seconds.shape[0])}")
 
     if not sessions.empty and "total_playtime_seconds" in sessions.columns:
         session_total_playtime_seconds = pd.to_numeric(sessions["total_playtime_seconds"], errors="coerce").dropna()
